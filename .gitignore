@@ -1,0 +1,20 @@
+# 個人資料 (開發時存在原始碼資料夾)
+config.json
+lyrics_overrides.json
+ai_lyrics.json
+fonts_cache.json
+app.log
+backgrounds/
+.webview/
+
+# 打包產物 (安裝程式放在 GitHub Releases)
+build/
+dist/
+release/
+*.spec
+installer/wizard_*.bmp
+
+# 其他
+__pycache__/
+*.pyc
+.claude/

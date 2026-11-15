@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Now Playing Lyrics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --c1:#3a2a6a; --c2:#a04a7a; --c3:#1f4a7a;
+  --fg:#fff; --dim:rgba(255,255,255,.42);
+  --glass:rgba(255,255,255,.08); --glass-b:rgba(255,255,255,.14);
+  --font:"Inter","Noto Sans TC",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden;background:#0b0b12;color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased}
+
+/* ───── 背景 ───── */
+#bg{position:fixed;inset:0;z-index:0;overflow:hidden;background:#0b0b12}
+#bg .art{position:absolute;inset:-20%;background-size:cover;background-position:center;filter:blur(var(--bg-blur,90px)) saturate(1.6) brightness(.75);transform:scale(1.2);opacity:0;transition:opacity 1.2s ease, background-image 1s}
+#bg .art.on{opacity:.85}
+.blob{position:absolute;width:70vmax;height:70vmax;border-radius:50%;filter:blur(110px);opacity:.55;mix-blend-mode:screen;transition:background 1.6s ease}
+.b1{background:var(--c1);top:-25%;left:-15%;animation:drift1 26s ease-in-out infinite}
+.b2{background:var(--c2);bottom:-30%;right:-20%;animation:drift2 32s ease-in-out infinite}
+.b3{background:var(--c3);top:20%;left:35%;width:50vmax;height:50vmax;animation:drift3 22s ease-in-out infinite}
+@keyframes drift1{50%{transform:translate(18vw,14vh) scale(1.15)}}
+@keyframes drift2{50%{transform:translate(-20vw,-12vh) scale(.9)}}
+@keyframes drift3{50%{transform:translate(-14vw,16vh) scale(1.2)}}
+#bg::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,transparent 0%,rgba(0,0,0,.3) 75%),rgba(0,0,0,var(--bg-dim,.35));}
+#bg-custom{position:absolute;inset:0;opacity:0;transition:opacity .8s ease;background-size:cover;background-position:center}
+#bg[data-mode="color"] #bg-custom{opacity:1;background:var(--bg1)}
+#bg[data-mode="gradient"] #bg-custom{opacity:1;background:linear-gradient(135deg,var(--bg1),var(--bg2))}
+#bg[data-mode="image"] #bg-custom{opacity:1;inset:calc(var(--bg-blur,0px) * -1.5);filter:blur(var(--bg-blur,0px))}
+#bg:not([data-mode="album"]) .art{opacity:0!important}
+#bg.no-blobs .blob{display:none}
+#bg:not([data-mode="album"]) .blob{opacity:.35}
+#status-actions{display:none;gap:10px;flex-wrap:wrap;pointer-events:auto;margin-top:4px}
+#status-actions.show{display:flex}
+#status.hide #status-actions{pointer-events:none}
+#status-actions .chip{font-size:14px;height:38px;padding:0 16px}
+#status-actions .chip.primary{background:#fff;color:#111;border-color:#fff}
+#lyr-src button{background:none;border:0;color:#b9a6ff;font:inherit;cursor:pointer;text-decoration:underline;padding:0 0 0 6px}
+.modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+.modal.open{display:flex;animation:pop .18s ease-out}
+.dialog{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 80px);display:flex;flex-direction:column;border-radius:20px;background:#16161f;border:1px solid var(--glass-b);box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden}
+.dialog header{display:flex;align-items:center;gap:6px;padding:14px 16px 0}
+.dialog header .tab{height:34px;padding:0 14px;border-radius:10px;border:0;background:none;color:var(--dim);font:600 14px var(--font);cursor:pointer}
+.dialog header .tab.on{background:rgba(255,255,255,.1);color:#fff}
+.dialog header .x{margin-left:auto;background:none;border:0;color:var(--dim);font-size:22px;cursor:pointer}
+.dialog .body{padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0}
+.dialog .q{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+.dialog input[type=text],.dialog textarea{width:100%;padding:0 12px;height:40px;border-radius:10px;border:1px solid var(--glass-b);background:rgba(0,0,0,.25);color:var(--fg);font:500 14px var(--font);outline:none}
+.dialog input[type=text]:focus,.dialog textarea:focus{border-color:#7c5cff}
+.dialog textarea{height:260px;padding:10px 12px;resize:vertical;font:500 13px/1.6 Consolas,"Microsoft JhengHei",monospace}
+.dialog .btn{height:40px;padding:0 18px;border-radius:10px;border:0;background:#7c5cff;color:#fff;font:600 14px var(--font);cursor:pointer;white-space:nowrap}
+.dialog .btn.ghost{background:rgba(255,255,255,.1)}
+.dialog .btn:disabled{opacity:.5;cursor:default}
+.dialog .msg{font:500 13px var(--font);color:var(--dim);min-height:18px}
+.dialog .msg.err{color:#ff8a8a}
+#lyr-results{display:flex;flex-direction:column;gap:4px}
+#lyr-results button{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid transparent;background:rgba(255,255,255,.04);color:var(--fg);cursor:pointer}
+#lyr-results button:hover{background:rgba(255,255,255,.1);border-color:var(--glass-b)}
+#lyr-results button:disabled{opacity:.5}
+#lyr-results .src{font:700 11px var(--font);padding:3px 8px;border-radius:6px;white-space:nowrap}
+#lyr-results .src.lrclib{background:#2f6f5e}#lyr-results .src.netease{background:#a3262a}#lyr-results .src.kugou{background:#1f5fbf}#lyr-results .src.qq{background:#1f9d55}
+#lyr-results .t{display:block;font:700 15px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lyr-results .a{display:block;font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lyr-results .d{font:500 12px var(--font);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+#lyr-results .d .ok{color:#7ee2a8}
+.dialog footer{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.07)}
+.dialog footer .hint{margin:0 auto 0 0;font:400 12px/1.5 var(--font);color:var(--dim)}
+#bg-colors{display:flex;gap:10px;align-items:center}
+#ai-status{font:500 12px/1.5 var(--font);color:var(--dim);padding:2px 0 8px}
+#ai-status b{color:#b9a6ff;font-weight:600}
+.ai-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#b9a6ff;margin-right:6px;vertical-align:1px;animation:pulse 1.4s ease-in-out infinite}
+#bg-colors input[type=color]{width:44px;height:32px;border:1px solid var(--glass-b);border-radius:8px;background:none;padding:2px;cursor:pointer}
+#bg-image-row{display:flex;gap:10px;align-items:center}
+#bg-thumb{width:64px;height:40px;border-radius:8px;background:rgba(255,255,255,.08) center/cover;flex:none;border:1px solid var(--glass-b)}
+.seg.four{grid-template-columns:repeat(4,1fr)}
+
+#grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.06;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ───── 版面 ───── */
+#app{position:relative;z-index:2;height:100%;display:grid;grid-template-columns:minmax(300px,38%) 1fr;gap:clamp(24px,4vw,72px);padding:clamp(24px,5vh,64px) clamp(24px,5vw,80px)}
+#left{display:flex;flex-direction:column;justify-content:center;gap:28px;min-width:0}
+#cover-wrap{position:relative;width:min(100%,46vh,440px);aspect-ratio:1;align-self:flex-start}
+#cover{width:100%;height:100%;border-radius:22px;object-fit:cover;background:var(--glass);box-shadow:0 40px 80px -20px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08) inset;transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .5s}
+#cover-wrap.paused #cover{transform:scale(.92);opacity:.75}
+#cover-glow{position:absolute;inset:8%;border-radius:30px;background-size:cover;filter:blur(40px) saturate(1.8);opacity:.6;z-index:-1;transform:translateY(18px)}
+.meta{min-width:0}
+#source{display:inline-flex;align-items:center;gap:8px;font:600 12px var(--font);letter-spacing:.08em;text-transform:uppercase;padding:6px 12px 6px 10px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-b);backdrop-filter:blur(20px);cursor:pointer;color:var(--fg)}
+#source .dot{width:8px;height:8px;border-radius:50%;background:#1ed760;box-shadow:0 0 10px #1ed760}
+#source.yt .dot{background:#ff3b3b;box-shadow:0 0 10px #ff3b3b}
+#source.web .dot{background:#7ab8ff;box-shadow:0 0 10px #7ab8ff}
+#source.paused .dot{animation:none;opacity:.4;box-shadow:none}
+#source .dot{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(.6);opacity:.6}}
+#title{font:800 clamp(26px,3.2vw,44px)/1.1 var(--font);letter-spacing:-.02em;margin-top:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#artist{font:500 clamp(15px,1.4vw,19px) var(--font);color:rgba(255,255,255,.7);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#progress{margin-top:4px}
+#bar{position:relative;height:6px;border-radius:6px;background:rgba(255,255,255,.15);cursor:pointer;overflow:hidden}
+#bar:hover{height:8px;margin:-1px 0}
+#fill{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,rgba(255,255,255,.75),#fff);border-radius:6px;box-shadow:0 0 12px rgba(255,255,255,.6)}
+.times{display:flex;justify-content:space-between;margin-top:8px;font:500 12px var(--font);color:var(--dim);font-variant-numeric:tabular-nums}
+
+#controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-b);color:var(--fg);font:500 13px var(--font);cursor:pointer;backdrop-filter:blur(20px);transition:background .2s}
+.chip:hover{background:rgba(255,255,255,.16)}
+.chip.icon{width:34px;padding:0;justify-content:center}
+#offset-val{font-variant-numeric:tabular-nums;min-width:52px;text-align:center;font-size:13px;color:rgba(255,255,255,.8)}
+#lyr-src{font-size:12px;color:var(--dim);margin-left:auto}
+
+/* ───── 歌詞 ───── */
+#right{position:relative;min-width:0;height:100%;overflow:hidden;
+  -webkit-mask-image:linear-gradient(transparent 0%,#000 18%,#000 72%,transparent 100%);
+          mask-image:linear-gradient(transparent 0%,#000 18%,#000 72%,transparent 100%)}
+#lyrics{position:absolute;left:0;right:0;top:0;will-change:transform;transition:transform .75s cubic-bezier(.22,.9,.24,1)}
+.line{font:800 clamp(24px,2.9vw,42px)/1.28 var(--font);letter-spacing:-.01em;padding:clamp(10px,1.4vh,16px) 12px;margin:0 -12px;border-radius:14px;color:var(--dim);
+  transform-origin:left center;transform:scale(.94);cursor:pointer;
+  transition:transform .6s cubic-bezier(.22,.9,.24,1),color .4s,filter .6s,opacity .6s;}
+.line:hover{background:rgba(255,255,255,.06)}
+.line .tr{display:block;font:600 .55em/1.35 var(--font);margin-top:.3em;opacity:.8}
+.line.active{transform:scale(1);color:transparent;filter:none!important;opacity:1!important}
+.line.active .txt{background:linear-gradient(90deg,#fff calc(var(--p,0)*100% - 6%),rgba(255,255,255,.55) calc(var(--p,0)*100% + 6%));-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
+.line.active .tr{color:rgba(255,255,255,.85)}
+.line.past{color:rgba(255,255,255,.5)}
+.line.empty{min-height:.6em}
+.interlude{display:flex;gap:.35em;padding:20px 0;height:clamp(40px,6vh,64px);align-items:center}
+.interlude i{width:.45em;height:.45em;border-radius:50%;background:#fff;opacity:.3;font-size:clamp(24px,2.9vw,42px);transition:opacity .3s, transform .3s}
+.interlude.on i{animation:breathe 1.8s ease-in-out infinite}
+.interlude.on i:nth-child(2){animation-delay:.25s}.interlude.on i:nth-child(3){animation-delay:.5s}
+@keyframes breathe{50%{opacity:1;transform:scale(1.3)}}
+.plain .line{transform:none;color:rgba(255,255,255,.85);cursor:default;font-size:clamp(20px,2.2vw,30px)}
+#right.scroll{overflow-y:auto;-webkit-mask-image:none;mask-image:none}
+#right.scroll #lyrics{position:static;transform:none!important;padding:10vh 0}
+
+#status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px;font:700 clamp(22px,2.4vw,34px) var(--font);color:rgba(255,255,255,.55);pointer-events:none;transition:opacity .4s}
+#status small{font:500 15px var(--font);color:var(--dim)}
+#status.hide{opacity:0}
+.spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 來源選單 */
+#menu{position:fixed;z-index:10;min-width:280px;max-width:420px;padding:6px;border-radius:16px;background:rgba(20,20,30,.75);border:1px solid var(--glass-b);backdrop-filter:blur(30px) saturate(1.4);box-shadow:0 20px 60px rgba(0,0,0,.5);display:none}
+#menu.open{display:block;animation:pop .18s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.98)}}
+#menu button{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:10px 12px;border:0;border-radius:10px;background:none;color:var(--fg);font:500 14px var(--font);cursor:pointer}
+#menu button:hover,#menu button.sel{background:rgba(255,255,255,.1)}
+#menu button span{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#settings{position:fixed;z-index:9;right:clamp(16px,3vw,40px);bottom:clamp(16px,3vh,40px);width:min(360px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:20px;border-radius:20px;background:rgba(18,18,28,.72);border:1px solid var(--glass-b);backdrop-filter:blur(30px) saturate(1.4);box-shadow:0 30px 80px rgba(0,0,0,.55);display:none}
+#settings.open{display:block;animation:pop .2s ease-out}
+body.app #settings{max-height:calc(100vh - 38px - 2*clamp(16px,3vh,40px))}
+#settings h2{font:700 17px var(--font);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
+#settings h2 button{background:none;border:0;color:var(--dim);font-size:20px;cursor:pointer}
+#settings .hint{font:400 12px/1.5 var(--font);color:var(--dim);margin-bottom:14px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.07);font:500 14px var(--font)}
+.row.col{flex-direction:column;align-items:stretch}
+.row output{font-variant-numeric:tabular-nums;color:var(--dim);font-size:13px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{height:34px;border-radius:10px;border:1px solid var(--glass-b);background:var(--glass);color:var(--fg);font:500 13px var(--font);cursor:pointer}
+.seg button.on{background:#fff;color:#111;border-color:#fff}
+.switch{position:relative;width:42px;height:24px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;border-radius:24px;background:rgba(255,255,255,.18);transition:.2s;cursor:pointer}
+.switch span::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+.switch input:checked+span{background:#7c5cff}
+.switch input:checked+span::after{transform:translateX(18px)}
+input[type=range]{width:100%;accent-color:#fff}
+#unlock.on{background:#7c5cff;border-color:#7c5cff;color:#fff}
+#settings h3{font:700 12px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:18px 0 6px}
+#font-btn{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--glass-b);background:var(--glass);color:var(--fg);cursor:pointer;text-align:left}
+#font-btn .fname{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#font-btn .chev{color:var(--dim);flex:none;transition:transform .2s}
+#font-picker.open+#font-btn .chev,#font-btn.open .chev{transform:rotate(180deg)}
+#font-picker{display:none;margin-top:8px;border-radius:12px;border:1px solid var(--glass-b);background:rgba(0,0,0,.25);overflow:hidden}
+#font-picker.open{display:block}
+#font-search{width:100%;height:38px;padding:0 12px;border:0;border-bottom:1px solid var(--glass-b);background:transparent;color:var(--fg);font:500 14px var(--font);outline:none}
+#font-search::placeholder{color:var(--dim)}
+.font-filter{display:flex;align-items:center;gap:8px;padding:8px 12px;font:500 12px var(--font);color:var(--dim);border-bottom:1px solid rgba(255,255,255,.07)}
+#font-list{max-height:280px;overflow-y:auto}
+#font-list button{display:block;width:100%;text-align:left;padding:9px 12px;border:0;background:none;color:var(--fg);cursor:pointer}
+#font-list button:hover{background:rgba(255,255,255,.08)}
+#font-list button.sel{background:rgba(124,92,255,.35)}
+#font-list .pv{display:block;font-size:19px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#font-list .nm{display:block;font:500 11px "Inter","Noto Sans TC",sans-serif;color:var(--dim);margin-top:2px}
+#font-list .tag{display:inline-block;margin-left:6px;padding:0 5px;border-radius:4px;background:rgba(255,255,255,.12);font-size:10px}
+#font-list .empty{padding:14px 12px;font:500 13px var(--font);color:var(--dim)}
+.row.disabled{opacity:.45}
+#ver{font:500 11px var(--font);color:var(--dim);margin-top:14px;text-align:right}
+kbd{font:600 11px var(--font);padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15)}
+/* ───── 獨立視窗標題列 ───── */
+#titlebar{position:fixed;top:0;left:0;right:0;height:38px;z-index:20;display:none;align-items:center;user-select:none}
+body.app #titlebar{display:flex}
+body.app #app{padding-top:calc(38px + clamp(8px,3vh,40px))}
+#tb-drag{flex:1;height:100%;display:flex;align-items:center;padding-left:14px;font:600 12px var(--font);letter-spacing:.04em;color:rgba(255,255,255,.55);cursor:default}
+#tb-drag .note{margin-right:8px;opacity:.8}
+.tb-btns{display:flex;height:100%}
+.tb-btns button{width:44px;height:100%;border:0;background:none;color:rgba(255,255,255,.7);font:400 14px var(--font);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
+.tb-btns button:hover{background:rgba(255,255,255,.1);color:#fff}
+.tb-btns button.on{color:#b9a6ff}
+#tb-close:hover{background:#e81123!important;color:#fff}
+.tb-btns svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.4}
+body.mini #controls #lyr-src{display:none}
+#conn{position:fixed;right:16px;bottom:14px;z-index:5;font:500 12px var(--font);color:var(--dim);display:none}
+#conn.show{display:block}
+
+/* 專注模式 (按 H) */
+body.focus #app{grid-template-columns:1fr;grid-template-rows:1fr}
+body.focus #left{display:none}
+#focus-exit{position:fixed;left:16px;bottom:16px;z-index:8;display:none;opacity:.55;transition:opacity .2s}
+#focus-exit:hover{opacity:1}
+body.focus #focus-exit{display:inline-flex}
+body.focus .line{font-size:clamp(30px,4.2vw,64px)}
+
+@media (max-width:860px){
+  #app{grid-template-columns:1fr;grid-template-rows:auto 1fr;gap:16px;padding:16px}
+  #left{flex-direction:row;flex-wrap:wrap;align-items:center;gap:14px}
+  #cover-wrap{width:84px}
+  #cover{border-radius:12px}
+  .meta{flex:1}
+  #title{font-size:20px;margin-top:8px;-webkit-line-clamp:1}
+  #artist{font-size:14px}
+  #progress,#controls{width:100%}
+  .line{font-size:24px}
+}
+@media (prefers-reduced-motion:reduce){.blob{animation:none}#lyrics,.line{transition:none}}
+</style>
+</head>
+<body>
+<div id="bg" data-mode="album"><div class="art" id="bg-art"></div><div id="bg-custom"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div id="grain"></div>
+
+<header id="titlebar">
+  <div id="tb-drag" class="pywebview-drag-region"><span class="note">♪</span>Now Playing Lyrics</div>
+  <div class="tb-btns">
+    <button id="tb-mini" title="迷你模式（小視窗＋置頂）"><svg viewBox="0 0 14 14"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5"/><rect x="7" y="7" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg></button>
+    <button id="tb-pin" title="視窗置頂"><svg viewBox="0 0 14 14"><path d="M5 1.5h4l-.5 4 2 2h-7l2-2zM7 7.5v5"/></svg></button>
+    <button id="tb-min" title="最小化"><svg viewBox="0 0 14 14"><path d="M2 7h10"/></svg></button>
+    <button id="tb-max" title="最大化"><svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg></button>
+    <button id="tb-close" title="關閉（縮到系統匣，浮動歌詞會繼續）"><svg viewBox="0 0 14 14"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9"/></svg></button>
+  </div>
+</header>
+<main id="app">
+  <section id="left">
+    <div id="cover-wrap" class="paused"><div id="cover-glow"></div><img id="cover" alt=""></div>
+    <div class="meta">
+      <button id="source" class="paused" title="切換來源"><span class="dot"></span><span id="source-name">等待中</span></button>
+      <h1 id="title">—</h1>
+      <div id="artist"></div>
+    </div>
+    <div id="progress">
+      <div id="bar" title="點擊跳轉"><div id="fill"></div></div>
+      <div class="times"><span id="t-cur">0:00</span><span id="t-dur">0:00</span></div>
+    </div>
+    <div id="controls">
+      <button class="chip icon" id="btn-play" title="播放 / 暫停 (空白鍵)">⏯</button>
+      <button class="chip icon" id="off-minus" title="歌詞提早 0.25 秒 (←)">−</button>
+      <span id="offset-val">±0.00s</span>
+      <button class="chip icon" id="off-plus" title="歌詞延後 0.25 秒 (→)">+</button>
+      <button class="chip" id="btn-refetch" title="重新搜尋歌詞">↻ 歌詞</button>
+      <button class="chip" id="btn-lyrsearch" title="手動搜尋、選擇或貼上歌詞">🔍 找歌詞</button>
+      <button class="chip icon" id="btn-focus" title="只顯示歌詞 (H)">⤢</button>
+      <button class="chip" id="btn-settings" title="設定 (字體、浮動歌詞、開機啟動)">⚙ 設定</button>
+      <span id="lyr-src"></span>
+    </div>
+  </section>
+
+  <section id="right">
+    <div id="lyrics"></div>
+    <div id="status"><span id="status-text">正在連線…</span><small id="status-sub"></small>
+      <div id="status-actions"><button class="chip primary" data-open="search">🔍 手動搜尋歌詞</button><button class="chip" data-open="paste">📋 貼上歌詞 / 匯入 LRC</button></div></div>
+  </section>
+</main>
+
+<div id="menu"></div>
+<aside id="settings" aria-label="設定">
+  <h2>設定 <button id="settings-close" aria-label="關閉">×</button></h2>
+  <h3>字體</h3>
+  <button id="font-btn"><span class="fname" id="font-name">預設</span><span class="chev">▾</span></button>
+  <div id="font-picker">
+    <input id="font-search" type="search" placeholder="搜尋字體…" autocomplete="off">
+    <label class="font-filter"><span class="switch" style="transform:scale(.8);transform-origin:left"><input type="checkbox" id="font-zh" checked><span></span></span>只顯示支援中文的字體</label>
+    <div id="font-list"><div class="empty">正在讀取字體…</div></div>
+  </div>
+  <p class="hint" style="margin:8px 0 0">主視窗和浮動歌詞都會套用。字體沒有中文字時，中文會自動用微軟正黑體顯示。</p>
+  <h3>背景</h3>
+  <div class="seg four" id="bg-modes">
+    <button data-bg="album">專輯封面</button><button data-bg="color">純色</button><button data-bg="gradient">漸層</button><button data-bg="image">圖片</button>
+  </div>
+  <div class="row" id="bg-colors-row">顏色 <span id="bg-colors"><input type="color" data-bgk="color1" title="顏色 1"><input type="color" data-bgk="color2" title="顏色 2"></span></div>
+  <div class="row" id="bg-image-row-wrap">圖片
+    <span id="bg-image-row"><span id="bg-thumb"></span><button class="chip" id="bg-pick">選擇圖片…</button></span>
+    <input type="file" id="bg-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+  </div>
+  <div class="row col"><div class="row" style="border:0;padding:0">模糊 <output id="o-bg-blur"></output></div><input type="range" min="0" max="150" step="2" data-bgk="blur"></div>
+  <div class="row col"><div class="row" style="border:0;padding:0">變暗 <output id="o-bg-dim"></output></div><input type="range" min="0" max="90" step="5" data-bgk="dim"></div>
+  <label class="row">流動光暈 <span class="switch"><input type="checkbox" data-bgk="blobs"><span></span></span></label>
+  <h3>浮動歌詞</h3>
+  <p class="hint">歌詞浮在所有視窗最上層，滑鼠點擊會穿透，玩遊戲或工作都不受影響。系統匣圖示也能調整。</p>
+  <label class="row">顯示浮動歌詞 <span class="switch"><input type="checkbox" data-k="enabled"><span></span></span></label>
+  <div class="row col">位置
+    <div class="seg" id="presets">
+      <button data-p="bottom-left">左下</button><button data-p="bottom-center">下方中間</button><button data-p="bottom-right">右下</button>
+      <button data-p="top-center">上方中間</button><button data-p="custom">自訂</button><button id="unlock">🔓 拖曳</button>
+    </div>
+  </div>
+  <div class="row col"><div class="row" style="border:0;padding:0">文字大小 <output id="o-font_size"></output></div><input type="range" min="18" max="80" step="1" data-k="font_size"></div>
+  <div class="row col"><div class="row" style="border:0;padding:0">寬度 <output id="o-width"></output></div><input type="range" min="400" max="1800" step="20" data-k="width"></div>
+  <div class="row col"><div class="row" style="border:0;padding:0">背景深度 <output id="o-bg_opacity"></output></div><input type="range" min="0" max="90" step="5" data-k="bg_opacity"></div>
+  <label class="row">顯示翻譯 <span class="switch"><input type="checkbox" data-k="show_translation"><span></span></span></label>
+  <label class="row">顯示下一句 <span class="switch"><input type="checkbox" data-k="show_next"><span></span></span></label>
+  <label class="row">用專輯配色 <span class="switch"><input type="checkbox" data-k="color" data-on="album" data-off="white"><span></span></span></label>
+  <h3>AI 歌詞</h3>
+  <p class="hint">四個歌詞來源都沒有同步歌詞時，AI 會聽正在播放的聲音：沒有歌詞就邊聽邊寫，有歌詞沒時間就自動對時。聽完整首後會存起來，下次播放就完全同步。</p>
+  <label class="row">啟用 AI 歌詞 <span class="switch"><input type="checkbox" data-aik="enabled"><span></span></span></label>
+  <label class="row" title="AI 只錄播放器的聲音，不會錄到遊戲；這個選項是為了不占用遊戲的顯示卡效能">玩全螢幕遊戲時暫停（省效能） <span class="switch"><input type="checkbox" data-aik="pause_fullscreen"><span></span></span></label>
+  <div id="ai-status"></div>
+  <h3>其他</h3>
+  <label class="row" id="autostart-row">開機時自動啟動 <span class="switch"><input type="checkbox" id="autostart"><span></span></span></label>
+  <p class="hint" style="margin:12px 0 0">全域快捷鍵：<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd> 解鎖拖曳 · <kbd>H</kbd> 隱藏 · <kbd>←</kbd><kbd>→</kbd> 調整歌詞快慢</p>
+  <div id="ver"></div>
+</aside>
+<div id="conn">⚠ 與本機伺服器斷線，重新連線中…</div>
+<div class="modal" id="lyr-dialog" role="dialog" aria-label="找歌詞">
+  <div class="dialog">
+    <header><button class="tab on" data-tab="search">🔍 搜尋</button><button class="tab" data-tab="paste">📋 貼上 / 匯入</button><button class="x" id="lyr-close" aria-label="關閉">×</button></header>
+    <div class="body" data-pane="search">
+      <form class="q" id="lyr-form"><input type="text" id="q-title" placeholder="歌名"><input type="text" id="q-artist" placeholder="歌手 (可留空)"><button class="btn" type="submit">搜尋</button></form>
+      <div class="msg" id="lyr-msg">同時搜尋 LRCLIB、網易雲、酷狗、QQ音樂。點一個結果就會套用，並記住這首歌的選擇。</div>
+      <div id="lyr-results"></div>
+    </div>
+    <div class="body" data-pane="paste" hidden>
+      <div class="msg">貼上歌詞。有時間標籤 <code>[01:23.45]</code> 的 LRC 會同步捲動；沒有的話會顯示成一般歌詞。</div>
+      <textarea id="lyr-text" placeholder="[00:12.30]第一句歌詞&#10;[00:15.80]第二句歌詞&#10;…"></textarea>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn ghost" id="lyr-file-btn">選擇 .lrc 檔…</button><input type="file" id="lyr-file" accept=".lrc,.txt,text/plain" hidden><span class="msg" id="lyr-paste-msg"></span><button class="btn" id="lyr-apply" style="margin-left:auto">套用到這首歌</button></div>
+    </div>
+    <footer><p class="hint" id="lyr-foot">選擇只會套用到目前這首歌，下次播放會自動使用。</p><button class="btn ghost" id="lyr-reset" hidden>恢復自動搜尋</button></footer>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const els = { lyrics:$('#lyrics'), right:$('#right'), status:$('#status'), statusText:$('#status-text'), statusSub:$('#status-sub') };
+
+let ws, track = null, lyr = null, lineEls = [], activeIdx = -2, sessions = [], pinned = null;
+// 本地時鐘：anchorPos 在 anchorAt (performance.now) 時的播放位置
+let anchorPos = 0, anchorAt = performance.now(), playing = false, duration = 0;
+let aiStatus = null, statusKey = '';
+let offset = 0, cfg = null, unlocked = false, offsetEditedAt = 0, autostart = false, canAutostart = false, appliedFont = null;
+try { if (localStorage.getItem('focus') === '1') document.body.classList.add('focus'); } catch {}
+
+const now = () => anchorPos + (playing ? (performance.now() - anchorAt) / 1000 : 0);
+const fmt = s => { s = Math.max(0, s|0); return `${(s/60)|0}:${String(s%60).padStart(2,'0')}`; };
+
+function connect(){
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { $('#conn').classList.remove('show'); send({type:'hello', w: innerWidth, h: innerHeight, dpr: devicePixelRatio, app: document.body.classList.contains('app')}); };
+  ws.onclose = () => { $('#conn').classList.add('show'); setTimeout(connect, 1000); };
+  ws.onmessage = e => { const m = JSON.parse(e.data); m.type === 'state' ? onState(m) : onLyrics(m); };
+}
+const send = o => ws?.readyState === 1 && ws.send(JSON.stringify(o));
+
+function onState(m){
+  sessions = m.sessions || []; pinned = m.pinned;
+  if (m.config){
+    cfg = m.config; unlocked = m.unlocked; autostart = !!m.autostart; canAutostart = !!m.can_autostart;
+    if (m.version) $('#ver').textContent = `Now Playing Lyrics v${m.version}`;
+    aiStatus = m.ai; renderAiStatus();
+    applyFont(cfg.font);
+    if (cfg.background) applyBackground(cfg.background);
+    if (performance.now() - offsetEditedAt > 1500 && cfg.offset !== offset) setOffset(cfg.offset, false);
+    syncSettings();
+  }
+  const t = m.track;
+  if (!t){
+    if (track){ track = null; lyr = null; renderLyrics(); }
+    setStatus('沒有正在播放的音樂', '在 Spotify 或 YouTube Music 播一首歌吧');
+    $('#title').textContent = '—'; $('#artist').textContent = ''; $('#source-name').textContent = '等待中';
+    playing = false; return;
+  }
+  const changed = !track || track.track_id !== t.track_id;
+  track = t;
+  // 時鐘同步：偏差超過 0.35s、播放狀態改變、或換歌 才重新對準 → 避免抖動
+  const drift = Math.abs(now() - t.position);
+  if (changed || t.playing !== playing || drift > .35){
+    anchorPos = t.position; anchorAt = performance.now();
+  }
+  playing = t.playing; duration = t.duration;
+  if (changed) onTrackChange(t);
+  if (t.has_art && !$('#cover').dataset.loaded) loadArt(t);
+  $('#cover-wrap').classList.toggle('paused', !playing);
+  const src = $('#source');
+  src.classList.toggle('paused', !playing);
+  src.classList.toggle('yt', t.source === 'YouTube Music');
+  src.classList.toggle('web', t.source !== 'YouTube Music' && t.source !== 'Spotify');
+  $('#source-name').textContent = t.source + (pinned ? ' · 已鎖定' : '');
+  $('#t-dur').textContent = fmt(duration);
+}
+
+function onTrackChange(t){
+  $('#title').textContent = t.title || '未知歌曲';
+  $('#artist').textContent = [t.artist, t.album && t.album !== t.title ? t.album : ''].filter(Boolean).join(' — ');
+  document.title = `${t.title} · ${t.artist}`;
+  $('#cover').dataset.loaded = '';
+  if (t.has_art) loadArt(t); else setArt(null);
+  if (!lyr || lyr.track_id !== t.track_id) lyr = {track_id: t.track_id, loading: true};
+  renderLyrics();
+}
+
+function loadArt(t){
+  if (!t.has_art) return;
+  $('#cover').dataset.loaded = '1';
+  setArt(`/art?id=${encodeURIComponent(t.track_id)}`);
+}
+
+function setArt(url){
+  const img = $('#cover'), bg = $('#bg-art');
+  if (!url){ img.removeAttribute('src'); bg.classList.remove('on'); return; }
+  const pre = new Image();
+  pre.onload = () => {
+    img.src = url;
+    $('#cover-glow').style.backgroundImage = bg.style.backgroundImage = `url("${url}")`;
+    bg.classList.add('on');
+    extractColors(pre);
+  };
+  pre.src = url;
+}
+
+function extractColors(img){
+  try{
+    const c = document.createElement('canvas'), W = 24; c.width = c.height = W;
+    const x = c.getContext('2d', {willReadFrequently:true}); x.drawImage(img, 0, 0, W, W);
+    const d = x.getImageData(0, 0, W, W).data, px = [];
+    for (let i = 0; i < d.length; i += 4){
+      const [r,g,b] = [d[i],d[i+1],d[i+2]], mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+      px.push({r,g,b, s: mx ? (mx-mn)/mx : 0, v: mx/255});
+    }
+    // 依飽和度×亮度排序挑三個差異夠大的顏色
+    px.sort((a,b) => (b.s*(.4+b.v)) - (a.s*(.4+a.v)));
+    const pick = [];
+    for (const p of px){
+      if (pick.every(q => Math.hypot(p.r-q.r, p.g-q.g, p.b-q.b) > 70)) pick.push(p);
+      if (pick.length === 3) break;
+    }
+    while (pick.length < 3) pick.push(px[pick.length * 50] || {r:60,g:60,b:90});
+    albumColors = pick.map(p => `rgb(${p.r},${p.g},${p.b})`);
+    applyBlobColors();
+  }catch(e){}
+}
+
+function onLyrics(m){
+  lyr = m;
+  if (track && m.track_id === track.track_id) renderLyrics();
+}
+
+function setStatus(text, sub='', spin=false, actions=false){
+  els.status.classList.remove('hide');
+  $('#status-actions').classList.toggle('show', actions);
+  els.statusText.innerHTML = (spin ? '<div class="spinner"></div>' : '') + text;
+  els.statusSub.textContent = sub;
+}
+
+function renderLyrics(){
+  els.lyrics.innerHTML = ''; lineEls = []; activeIdx = -2;
+  els.right.classList.remove('scroll'); els.lyrics.classList.remove('plain');
+  $('#lyr-src').textContent = '';
+  if (!track) return;
+  if (!lyr || lyr.loading){ setStatus('', '正在尋找歌詞…', true); return; }
+  if (!lyr.lines?.length){ statusKey = ''; showNoLyrics(); return; }
+  els.status.classList.add('hide');
+  $('#lyr-src').textContent = `歌詞來源：${lyr.source}${lyr.synced ? '' : '（未同步）'}${lyr.override ? '・手動指定' : ''}`
+    + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() ? '・AI 對時中' : '');
+  if (lyr.ai === 'live') $('#lyr-src').insertAdjacentHTML('afterbegin', '<span class="ai-dot"></span>');
+  if (lyr.override){ const b = document.createElement('button'); b.textContent = '恢復自動'; b.onclick = resetLyrics; $('#lyr-src').appendChild(b); }
+
+  if (!lyr.synced){
+    els.right.classList.add('scroll'); els.lyrics.classList.add('plain');
+    for (const l of lyr.lines){ const d = document.createElement('div'); d.className = 'line' + (l.text ? '' : ' empty'); d.textContent = l.text; els.lyrics.appendChild(d); }
+    return;
+  }
+  // 前奏的呼吸點
+  const intro = document.createElement('div'); intro.className = 'interlude'; intro.innerHTML = '<i></i><i></i><i></i>';
+  els.lyrics.appendChild(intro);
+  lyr.lines.forEach((l, i) => {
+    const d = document.createElement('div');
+    d.className = 'line' + (l.text ? '' : ' empty');
+    const txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = l.text || '';
+    d.appendChild(txt);
+    if (l.tr){ const tr = document.createElement('span'); tr.className = 'tr'; tr.textContent = l.tr; d.appendChild(tr); }
+    d.onclick = () => { send({type:'seek', t: Math.max(0, l.t - offset)}); anchorPos = l.t - offset; anchorAt = performance.now(); };
+    els.lyrics.appendChild(d); lineEls.push(d);
+  });
+  lineEls.intro = intro;
+}
+
+function findIdx(t){
+  const L = lyr.lines; let lo = 0, hi = L.length - 1, ans = -1;
+  while (lo <= hi){ const mid = (lo+hi) >> 1; if (L[mid].t <= t){ ans = mid; lo = mid+1; } else hi = mid-1; }
+  // 空白行 = 間奏
+  return ans;
+}
+
+function scrollTo(el){
+  const target = el.offsetTop - els.right.clientHeight * 0.38 + el.offsetHeight / 2;
+  els.lyrics.style.transform = `translateY(${-Math.max(0, target) | 0}px)`;
+}
+
+function frame(){
+  requestAnimationFrame(frame);
+  if (!track) return;
+  let pos = now(); if (duration) pos = Math.min(pos, duration);
+  $('#fill').style.width = duration ? `${pos / duration * 100}%` : '0';
+  $('#t-cur').textContent = fmt(pos);
+  if (!lyr?.synced || !lineEls.length) return;
+
+  const t = pos + offset, L = lyr.lines, idx = findIdx(t);
+  const cur = L[idx], next = L[idx + 1];
+  const isGap = idx >= 0 && !cur.text;
+  if (idx !== activeIdx){
+    activeIdx = idx;
+    lineEls.intro.classList.toggle('on', idx < 0);
+    lineEls.forEach((el, i) => {
+      const dist = Math.abs(i - idx);
+      el.classList.toggle('active', i === idx && !isGap);
+      el.classList.toggle('past', i < idx);
+      el.style.filter = dist === 0 ? '' : `blur(${Math.min(dist * .6, 3)}px)`;
+      el.style.opacity = Math.max(.25, 1 - dist * .12);
+    });
+    scrollTo(idx < 0 ? lineEls.intro : lineEls[idx]);
+  }
+  // 卡拉OK 掃光：依本句時長推進
+  if (cur && cur.text){
+    const end = next ? next.t : cur.t + 5;
+    const len = Math.min(end - cur.t, cur.text.length * .35 + 2.5);
+    const p = Math.min(1.12, (t - cur.t) / Math.max(len, .3));
+    lineEls[idx].style.setProperty('--p', p.toFixed(3));
+  }
+}
+
+// ───── 控制 ─────
+function setOffset(v, push = true){
+  offset = Math.round(v * 100) / 100;
+  if (push){ offsetEditedAt = performance.now(); send({type:'offset', value: offset}); }
+  $('#offset-val').textContent = (offset >= 0 ? '+' : '') + offset.toFixed(2) + 's';
+  activeIdx = -2;
+}
+setOffset(0, false);
+
+// ───── 浮動歌詞設定 ─────
+const panel = $('#settings');
+$('#btn-settings').onclick = e => { e.stopPropagation(); panel.classList.toggle('open'); syncSettings(true); };
+$('#settings-close').onclick = () => panel.classList.remove('open');
+panel.onclick = e => e.stopPropagation();
+const patch = p => { Object.assign(cfg.overlay, p); send({type:'overlay', patch: p}); syncSettings(true); };
+let editing = 0;
+function syncSettings(force){
+  if (!cfg || !panel.classList.contains('open')) return;
+  if (!force && performance.now() - editing < 800) return;  // 拖拉滑桿時不要被伺服器值蓋回去
+  const o = cfg.overlay;
+  panel.querySelectorAll('[data-k]').forEach(el => {
+    const k = el.dataset.k;
+    if (el.type === 'checkbox') el.checked = el.dataset.on ? o[k] === el.dataset.on : !!o[k];
+    else el.value = o[k];
+    const out = $('#o-' + k); if (out) out.textContent = k === 'bg_opacity' ? o[k] + '%' : o[k] + 'px';
+  });
+  panel.querySelectorAll('#presets [data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === o.preset));
+  $('#unlock').classList.toggle('on', unlocked);
+  $('#autostart').checked = autostart; $('#autostart').disabled = !canAutostart;
+  $('#autostart-row').classList.toggle('disabled', !canAutostart);
+  $('#autostart-row').title = canAutostart ? '' : '安裝成應用程式 (.exe) 後才能設定';
+  $('#unlock').textContent = unlocked ? '🔒 鎖定' : '🔓 拖曳';
+}
+panel.querySelectorAll('[data-k]').forEach(el => {
+  el.addEventListener(el.type === 'range' ? 'input' : 'change', () => {
+    editing = performance.now();
+    const k = el.dataset.k;
+    patch({[k]: el.type === 'checkbox' ? (el.dataset.on ? (el.checked ? el.dataset.on : el.dataset.off) : el.checked) : +el.value});
+  });
+});
+panel.querySelectorAll('#presets [data-p]').forEach(b => b.onclick = () => patch({preset: b.dataset.p}));
+$('#autostart').onchange = e => { autostart = e.target.checked; send({type:'autostart', value: autostart}); };
+
+// ───── 字體 ─────
+const DEFAULT_FONT = '"Inter","Noto Sans TC",system-ui,sans-serif';
+const cssFont = f => f ? `"${f.replace(/"/g, '')}","Inter","Noto Sans TC",system-ui,sans-serif` : DEFAULT_FONT;
+let fontList = null, fontMeta = {};
+function applyFont(f){
+  if (f === appliedFont) return;
+  appliedFont = f;
+  document.documentElement.style.setProperty('--font', cssFont(f));
+  const meta = fontMeta[f];
+  $('#font-name').textContent = f ? (meta?.local || f) : '預設（Inter ＋ 微軟正黑體）';
+  $('#font-name').style.fontFamily = cssFont(f);
+  activeIdx = -2;  // 換字體後行高會變，重新捲動
+  setTimeout(() => activeIdx = -2, 300);
+}
+async function loadFonts(){
+  if (fontList) return;
+  try { fontList = await (await fetch('/fonts')).json(); } catch { fontList = []; }
+  fontList.forEach(f => fontMeta[f.family] = f);
+  appliedFont = null; applyFont(cfg?.font || '');
+  renderFonts();
+}
+function renderFonts(){
+  const box = $('#font-list'), q = $('#font-search').value.trim().toLowerCase(), zh = $('#font-zh').checked;
+  if (!fontList){ return; }
+  const items = [{family:'', local:'預設（Inter ＋ 微軟正黑體）', zh:true}].concat(
+    fontList.filter(f => (!zh || f.zh) && (!q || f.family.toLowerCase().includes(q) || (f.local||'').toLowerCase().includes(q))));
+  box.innerHTML = '';
+  if (items.length === 1 && (q || zh)) box.innerHTML = '';
+  for (const f of items.slice(0, 400)){
+    const b = document.createElement('button');
+    if ((cfg?.font || '') === f.family) b.className = 'sel';
+    const pv = document.createElement('span'); pv.className = 'pv'; pv.style.fontFamily = cssFont(f.family);
+    pv.textContent = (f.local && f.local !== f.family ? f.local : f.family) + (f.zh ? '　歌詞 Lyrics' : '　Lyrics 123');
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = f.family || 'Default';
+    if (f.family && f.zh) nm.innerHTML += '<span class="tag">中</span>';
+    if (f.ja) nm.innerHTML += '<span class="tag">日</span>';
+    if (f.ko) nm.innerHTML += '<span class="tag">韓</span>';
+    b.append(pv, nm);
+    b.onclick = () => { cfg.font = f.family; send({type:'font', value: f.family}); applyFont(f.family); renderFonts(); };
+    box.appendChild(b);
+  }
+  if (items.length <= 1 && q) box.insertAdjacentHTML('beforeend', '<div class="empty">找不到符合的字體</div>');
+}
+$('#font-btn').onclick = () => { const open = !$('#font-picker').classList.contains('open');
+  $('#font-picker').classList.toggle('open', open); $('#font-btn').classList.toggle('open', open);
+  if (open){ loadFonts(); renderFonts(); setTimeout(() => $('#font-search').focus(), 50); } };
+$('#font-search').oninput = renderFonts;
+$('#font-zh').onchange = renderFonts;
+$('#font-search').onkeydown = e => e.stopPropagation();  // 搜尋時不要觸發快捷鍵
+setTimeout(loadFonts, 1500);  // 背景先載入，讓字體名稱顯示中文
+
+$('#unlock').onclick = () => { unlocked = !unlocked; send({type:'unlock', value: unlocked}); syncSettings(true); };
+$('#off-minus').onclick = () => setOffset(offset - .25);
+$('#off-plus').onclick = () => setOffset(offset + .25);
+$('#btn-play').onclick = () => send({type:'toggle'});
+$('#btn-refetch').onclick = () => { send({type:'refetch'}); lyr = {loading:true}; renderLyrics(); };
+document.body.insertAdjacentHTML('beforeend', '<button class="chip" id="focus-exit" title="顯示歌曲資訊和按鈕 (H)">⤡ 顯示歌曲資訊</button>');
+$('#focus-exit').onclick = () => $('#btn-focus').click();
+$('#btn-focus').onclick = () => { document.body.classList.toggle('focus'); try{localStorage.setItem('focus', document.body.classList.contains('focus')?'1':'0')}catch{}; activeIdx = -2; };
+$('#bar').onclick = e => {
+  if (!duration) return;
+  const r = e.currentTarget.getBoundingClientRect(), t = (e.clientX - r.left) / r.width * duration;
+  send({type:'seek', t}); anchorPos = t; anchorAt = performance.now(); activeIdx = -2;
+};
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') setOffset(offset - .25);
+  else if (e.key === 'ArrowRight') setOffset(offset + .25);
+  else if (e.key === ' '){ e.preventDefault(); send({type:'toggle'}); }
+  else if (e.key.toLowerCase() === 'h') $('#btn-focus').click();
+  else if (e.key.toLowerCase() === 'f') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+});
+addEventListener('resize', () => activeIdx = -2);
+
+// 來源選單
+const menu = $('#menu');
+$('#source').onclick = e => {
+  e.stopPropagation();
+  const r = e.currentTarget.getBoundingClientRect();
+  menu.style.left = r.left + 'px'; menu.style.top = (r.bottom + 8) + 'px';
+  menu.innerHTML = '';
+  const add = (label, sub, app) => {
+    const b = document.createElement('button'); if ((pinned || null) === app) b.className = 'sel';
+    b.innerHTML = `<div></div><span></span>`; b.firstChild.textContent = label; b.lastChild.textContent = sub;
+    b.onclick = () => { send({type:'pin', app}); menu.classList.remove('open'); };
+    menu.appendChild(b);
+  };
+  add('自動偵測', '優先選正在播放的 Spotify / YouTube Music', null);
+  sessions.forEach(s => add(`${s.playing ? '▶ ' : '⏸ '}${s.source}`, `${s.title}${s.artist ? ' · ' + s.artist : ''}`, s.app));
+  menu.classList.add('open');
+};
+addEventListener('click', () => { menu.classList.remove('open'); panel.classList.remove('open'); });
+
+// ───── 獨立視窗模式 ─────
+if (new URLSearchParams(location.search).has('app')){
+  document.body.classList.add('app');
+  const api = () => window.pywebview?.api;
+  $('#tb-min').onclick = () => api()?.minimize();
+  $('#tb-max').onclick = () => api()?.toggle_maximize();
+  $('#tb-drag').ondblclick = () => api()?.toggle_maximize();
+  $('#tb-close').onclick = () => api()?.hide();
+  $('#tb-pin').onclick = async () => { const on = await api()?.toggle_on_top(); $('#tb-pin').classList.toggle('on', !!on); };
+  $('#tb-mini').onclick = async () => {
+    const mini = !document.body.classList.contains('mini');
+    document.body.classList.toggle('mini', mini);
+    $('#tb-mini').classList.toggle('on', mini);
+    const on = await api()?.mini(mini);
+    $('#tb-pin').classList.toggle('on', !!on);
+    activeIdx = -2;
+  };
+}
+
+// ───── AI 歌詞 ─────
+const aiActive = () => aiStatus && cfg?.ai?.enabled && ['listening', 'loading', 'downloading', 'paused'].includes(aiStatus.state);
+function aiText(){
+  if (!aiStatus) return '';
+  const pct = aiStatus.progress != null ? ` ${Math.round(aiStatus.progress * 100)}%` : '';
+  return (aiStatus.detail || '') + pct;
+}
+function showNoLyrics(){
+  const key = aiActive() ? 'ai:' + aiText() : 'none';
+  if (key === statusKey) return;
+  statusKey = key;
+  if (aiActive()) setStatus('AI 正在聽這首歌', `沒有現成歌詞，AI 會邊聽邊寫出來。${aiText()}`, aiStatus.state !== 'paused', true);
+  else setStatus('找不到歌詞', '四個歌詞來源都沒找到。可以自己搜尋看看，或貼上歌詞。', false, true);
+}
+function renderAiStatus(){
+  if (track && lyr && !lyr.loading && !lyr.lines?.length) showNoLyrics();
+  const box = $('#ai-status');
+  if (!box || !panel.classList.contains('open')) return;
+  if (!aiStatus){ box.textContent = '這台電腦無法使用 AI 歌詞（缺少必要元件）'; return; }
+  const dev = aiStatus.device ? `（${aiStatus.device === 'GPU' ? '顯示卡加速' : '處理器'}）` : '';
+  const names = {idle: '待命中', loading: '載入中', downloading: '下載中', listening: '運作中', paused: '已暫停', error: '發生錯誤'};
+  box.innerHTML = `狀態：<b></b>${dev}<br><span></span>`;
+  box.querySelector('b').textContent = names[aiStatus.state] || aiStatus.state;
+  box.querySelector('span').textContent = aiText();
+  document.querySelectorAll('[data-aik]').forEach(el => { if (cfg?.ai) el.checked = !!cfg.ai[el.dataset.aik]; });
+}
+document.querySelectorAll('[data-aik]').forEach(el => el.addEventListener('change', () => {
+  cfg.ai[el.dataset.aik] = el.checked;
+  send({type: 'ai', patch: {[el.dataset.aik]: el.checked}});
+}));
+
+// ───── 背景 ─────
+let albumColors = null, bgCfg = null, bgKey = '';
+function applyBlobColors(){
+  const m = bgCfg?.mode || 'album';
+  const cols = (m === 'color' || m === 'gradient') ? [bgCfg.color1, bgCfg.color2, bgCfg.color1] : albumColors;
+  if (cols) cols.forEach((c,i) => document.documentElement.style.setProperty(`--c${i+1}`, c));
+}
+function applyBackground(b){
+  const key = JSON.stringify(b);
+  if (key === bgKey) return;
+  bgKey = key; bgCfg = b;
+  const bg = $('#bg'), root = document.documentElement.style;
+  const mode = (b.mode === 'image' && !b.image) ? 'album' : b.mode;
+  bg.dataset.mode = mode;
+  bg.classList.toggle('no-blobs', !b.blobs);
+  root.setProperty('--bg1', b.color1); root.setProperty('--bg2', b.color2);
+  root.setProperty('--bg-blur', b.blur + 'px'); root.setProperty('--bg-dim', b.dim / 100);
+  $('#bg-custom').style.backgroundImage = mode === 'image' ? `url("/bg/${encodeURIComponent(b.image)}")` : '';
+  $('#bg-thumb').style.backgroundImage = b.image ? `url("/bg/${encodeURIComponent(b.image)}")` : '';
+  applyBlobColors();
+  syncBgSettings();
+}
+function syncBgSettings(){
+  if (!bgCfg) return;
+  document.querySelectorAll('#bg-modes [data-bg]').forEach(x => x.classList.toggle('on', x.dataset.bg === bgCfg.mode));
+  $('#bg-colors-row').hidden = !(bgCfg.mode === 'color' || bgCfg.mode === 'gradient');
+  document.querySelector('[data-bgk=color2]').hidden = bgCfg.mode !== 'gradient';
+  $('#bg-image-row-wrap').hidden = bgCfg.mode !== 'image';
+  document.querySelectorAll('[data-bgk]').forEach(el => {
+    if (performance.now() - bgEditing < 800 && el.type === 'range') return;
+    const k = el.dataset.bgk;
+    if (el.type === 'checkbox') el.checked = !!bgCfg[k]; else el.value = bgCfg[k];
+  });
+  $('#o-bg-blur').textContent = bgCfg.blur + 'px';
+  $('#o-bg-dim').textContent = bgCfg.dim + '%';
+}
+let bgEditing = 0;
+const bgPatch = p => { bgEditing = performance.now(); const nb = {...bgCfg, ...p}; applyBackground(nb); send({type:'background', patch: p}); };
+document.querySelectorAll('#bg-modes [data-bg]').forEach(b => b.onclick = () => {
+  if (b.dataset.bg === 'image' && !bgCfg.image){ $('#bg-file').click(); return; }
+  bgPatch({mode: b.dataset.bg});
+});
+document.querySelectorAll('[data-bgk]').forEach(el => el.addEventListener(el.type === 'range' || el.type === 'color' ? 'input' : 'change', () => {
+  const k = el.dataset.bgk;
+  bgPatch({[k]: el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value});
+}));
+$('#bg-pick').onclick = () => $('#bg-file').click();
+$('#bg-file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (f.size > 40 * 1024 * 1024){ alert('圖片太大了 (上限 40 MB)'); return; }
+  $('#bg-pick').textContent = '上傳中…';
+  try {
+    const r = await (await fetch('/background', {method: 'POST', headers: {'Content-Type': f.type}, body: f})).json();
+    if (!r.ok) alert(r.error || '上傳失敗');
+    else bgPatch({mode: 'image', image: r.image});
+  } catch { alert('上傳失敗'); }
+  $('#bg-pick').textContent = '選擇圖片…';
+};
+
+// ───── 找歌詞對話框 ─────
+const dlg = $('#lyr-dialog');
+const fmtDur = s => s ? fmt(s) : '?';
+let searchSeq = 0;
+function openLyrDialog(tab = 'search'){
+  if (!track) return;
+  dlg.classList.add('open');
+  switchTab(tab);
+  const clean = s => (s || '').replace(/[\(\[【（「].*?[\)\]】）」]/g, ' ').replace(/\s+-\s+Topic$/i, '').replace(/\s+/g, ' ').trim();
+  $('#q-title').value = clean(track.title) || track.title || '';
+  $('#q-artist').value = clean(track.artist);
+  $('#lyr-reset').hidden = !lyr?.override;
+  $('#lyr-results').innerHTML = '';
+  $('#lyr-msg').className = 'msg';
+  $('#lyr-msg').textContent = '同時搜尋 LRCLIB、網易雲、酷狗、QQ音樂。點一個結果就會套用，並記住這首歌的選擇。';
+  if (tab === 'search'){ setTimeout(() => $('#q-title').focus(), 50); doSearch(); }
+}
+function switchTab(tab){
+  dlg.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === tab));
+  dlg.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== tab);
+}
+async function doSearch(){
+  const title = $('#q-title').value.trim(), artist = $('#q-artist').value.trim();
+  if (!title) return;
+  const msg = $('#lyr-msg'), box = $('#lyr-results');
+  msg.className = 'msg'; msg.textContent = '搜尋中…'; box.innerHTML = '';
+  let list = [];
+  const seq = ++searchSeq;
+  try { list = await (await fetch(`/lyrics/search?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`)).json(); }
+  catch { if (seq === searchSeq){ msg.className = 'msg err'; msg.textContent = '搜尋失敗，請檢查網路'; } return; }
+  if (seq !== searchSeq) return;  // 已經有更新的搜尋，丟掉這次的結果
+  box.innerHTML = '';
+  msg.textContent = list.length ? `找到 ${list.length} 個結果。長度標綠色的跟正在播的歌最接近。` : '沒有結果。試試只填歌名，或換成原文 / 英文歌名。';
+  const label = {lrclib: 'LRCLIB', netease: '網易雲', kugou: '酷狗', qq: 'QQ音樂'};
+  for (const c of list){
+    const b = document.createElement('button');
+    const close = duration && c.duration && Math.abs(c.duration - duration) <= 3;
+    b.innerHTML = `<span class="src ${c.source}"></span><span><span class="t"></span><span class="a"></span></span><span class="d"></span>`;
+    b.querySelector('.src').textContent = label[c.source];
+    b.querySelector('.t').textContent = c.title;
+    b.querySelector('.a').textContent = [c.artist, c.album].filter(Boolean).join(' · ') + (c.synced === false ? '　（未同步）' : '');
+    b.querySelector('.d').innerHTML = `<span class="${close ? 'ok' : ''}">${fmtDur(c.duration)}</span>`;
+    b.onclick = async () => {
+      box.querySelectorAll('button').forEach(x => x.disabled = true);
+      msg.className = 'msg'; msg.textContent = '套用中…';
+      try {
+        const r = await (await fetch('/lyrics/use', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)})).json();
+        if (r.ok) dlg.classList.remove('open');
+        else { msg.className = 'msg err'; msg.textContent = r.error || '套用失敗'; }
+      } catch { msg.className = 'msg err'; msg.textContent = '套用失敗'; }
+      box.querySelectorAll('button').forEach(x => x.disabled = false);
+    };
+    box.appendChild(b);
+  }
+}
+async function resetLyrics(){
+  await fetch('/lyrics/reset', {method: 'POST'});
+  dlg.classList.remove('open');
+}
+$('#lyr-form').onsubmit = e => { e.preventDefault(); doSearch(); };
+$('#lyr-close').onclick = () => dlg.classList.remove('open');
+dlg.onclick = e => { if (e.target === dlg) dlg.classList.remove('open'); };
+dlg.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') dlg.classList.remove('open'); });
+dlg.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+$('#lyr-reset').onclick = resetLyrics;
+$('#btn-lyrsearch').onclick = () => openLyrDialog('search');
+document.querySelectorAll('#status-actions [data-open]').forEach(b => b.onclick = () => openLyrDialog(b.dataset.open));
+$('#lyr-file-btn').onclick = () => $('#lyr-file').click();
+$('#lyr-file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const buf = await f.arrayBuffer();
+  let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('�')) text = new TextDecoder('big5').decode(buf);  // 舊的 LRC 常是 Big5 / GBK
+  if (text.includes('�')) text = new TextDecoder('gbk').decode(buf);
+  $('#lyr-text').value = text;
+  $('#lyr-paste-msg').textContent = f.name;
+};
+$('#lyr-apply').onclick = async () => {
+  const text = $('#lyr-text').value;
+  if (!text.trim()){ $('#lyr-paste-msg').textContent = '請先貼上歌詞'; return; }
+  const r = await (await fetch('/lyrics/import', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})})).json();
+  if (r.ok){ dlg.classList.remove('open'); $('#lyr-text').value = ''; $('#lyr-paste-msg').textContent = ''; }
+  else $('#lyr-paste-msg').textContent = r.error || '套用失敗';
+};
+
+connect();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+aiohttp
+winrt-runtime
+winrt-Windows.Media.Control
+winrt-Windows.Storage.Streams
+winrt-Windows.Foundation
+pillow
+opencc-python-reimplemented
+pystray
+pyinstaller
+fonttools
+faster-whisper
+soundcard
+numpy
+comtypes
