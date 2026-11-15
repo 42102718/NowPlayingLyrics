@@ -11,7 +11,7 @@
 
 ## 功能
 
-- **自動抓歌詞**：讀取 Windows 媒體控制 (Spotify 桌面版、瀏覽器、YouTube Music)，同時搜尋 LRCLIB、網易雲、酷狗、QQ音樂，自動轉成繁體中文
+- **自動抓歌詞**：讀取 Windows 媒體控制 (Spotify 桌面版、瀏覽器、YouTube Music)，同時搜尋 LRCLIB、網易雲、酷狗、QQ音樂、Apple Music，自動轉成繁體中文。YouTube 影片標題裡的歌詞摘句、【動態歌詞】標籤會自動去掉，並檢查歌名、歌手，不會抓到別首歌
 - **AI 歌詞**：所有歌詞庫都沒有的歌，AI (Whisper) 會聽歌自動寫出同步歌詞；有歌詞沒時間的會自動對時。只錄播放器的聲音，不會錄到遊戲或 Discord，全部在本機處理
 - **浮動歌詞**：透明、永遠置頂、滑鼠可穿透，可以邊玩遊戲邊看 (遊戲請用「無邊框視窗」模式)
 - **自訂**：字體、背景 (專輯封面 / 純色 / 漸層 / 圖片)、浮動歌詞位置與大小、卡拉 OK 掃光
@@ -52,4 +52,4 @@ installer\build-installer.bat
 
 ## 歌詞來源
 
-[LRCLIB](https://lrclib.net)、網易雲音樂、酷狗音樂、QQ音樂。歌詞版權屬於原作者；網易雲 / 酷狗 / QQ音樂使用的是非官方介面，隨時可能失效。
+[LRCLIB](https://lrclib.net)、網易雲音樂、酷狗音樂、QQ音樂、Apple Music (透過 [LyricsPlus](https://lyricsplus.prjktla.my.id) 共用伺服器)。歌詞版權屬於原作者；網易雲 / 酷狗 / QQ音樂 / LyricsPlus 使用的是非官方或第三方介面，隨時可能失效。

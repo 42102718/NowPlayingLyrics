@@ -1,4 +1,4 @@
-﻿Now Playing Lyrics v1.3.1
+﻿Now Playing Lyrics v1.4.0
 即時顯示 Spotify / YouTube Music 正在播放的歌詞，還有可以浮在遊戲上的浮動歌詞。
 
 ────────────────────────
@@ -26,7 +26,7 @@
 ────────────────────────
 ・播一首歌，視窗就會自動顯示歌詞，正在唱的那句會亮起來。
 ・點任何一句歌詞可以跳到那裡播放。
-・找不到歌詞或歌詞不對：按「🔍 找歌詞」自己搜尋 (LRCLIB / 網易雲 / 酷狗 / QQ音樂)，
+・找不到歌詞或歌詞不對：按「🔍 找歌詞」自己搜尋 (LRCLIB / 網易雲 / 酷狗 / QQ音樂 / Apple Music)，
   或貼上 / 匯入 .lrc 檔。選過一次，下次播這首歌會自動使用。
 ・所有歌詞庫都沒有的歌：AI 會自動聽歌寫出歌詞 (只聽播放器的聲音，不會錄到遊戲或 Discord)。
   第一次用到時會自動下載 AI 模型 (約 1.6 GB；有 NVIDIA 顯示卡再加約 0.6 GB)。
@@ -49,7 +49,7 @@
 隱私
 ────────────────────────
 為了找歌詞，程式會把「歌名、歌手、專輯、歌曲長度」傳給
-LRCLIB (lrclib.net)、網易雲音樂 (music.163.com)、酷狗音樂 (kugou.com)、QQ音樂 (y.qq.com)。
+LRCLIB (lrclib.net)、網易雲音樂 (music.163.com)、酷狗音樂 (kugou.com)、QQ音樂 (y.qq.com)、Apple Music 歌詞 (透過 LyricsPlus 共用伺服器)。
 不會傳送其他資料。設定只存在你自己的電腦：
     %APPDATA%\NowPlayingLyrics
 AI 聽歌只在你的電腦上處理，聲音不會上傳到任何地方。

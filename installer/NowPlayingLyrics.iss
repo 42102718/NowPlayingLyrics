@@ -3,7 +3,7 @@
 ; 輸出：release\NowPlayingLyrics-Setup-<版本>.exe
 
 #define MyAppName "Now Playing Lyrics"
-#define MyAppVersion "1.3.1"
+#define MyAppVersion "1.4.0"
 #define MyAppExe "Now Playing Lyrics.exe"
 #define SrcDir "..\dist\Now Playing Lyrics"
 

@@ -64,7 +64,7 @@ html,body{height:100%;overflow:hidden;background:#0b0b12;color:var(--fg);font-fa
 #lyr-results button:hover{background:rgba(255,255,255,.1);border-color:var(--glass-b)}
 #lyr-results button:disabled{opacity:.5}
 #lyr-results .src{font:700 11px var(--font);padding:3px 8px;border-radius:6px;white-space:nowrap}
-#lyr-results .src.lrclib{background:#2f6f5e}#lyr-results .src.netease{background:#a3262a}#lyr-results .src.kugou{background:#1f5fbf}#lyr-results .src.qq{background:#1f9d55}
+#lyr-results .src.lrclib{background:#2f6f5e}#lyr-results .src.netease{background:#a3262a}#lyr-results .src.kugou{background:#1f5fbf}#lyr-results .src.qq{background:#1f9d55}#lyr-results .src.lyricsplus{background:#c2185b}
 #lyr-results .t{display:block;font:700 15px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #lyr-results .a{display:block;font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #lyr-results .d{font:500 12px var(--font);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -330,7 +330,7 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
     <header><button class="tab on" data-tab="search">🔍 搜尋</button><button class="tab" data-tab="paste">📋 貼上 / 匯入</button><button class="x" id="lyr-close" aria-label="關閉">×</button></header>
     <div class="body" data-pane="search">
       <form class="q" id="lyr-form"><input type="text" id="q-title" placeholder="歌名"><input type="text" id="q-artist" placeholder="歌手 (可留空)"><button class="btn" type="submit">搜尋</button></form>
-      <div class="msg" id="lyr-msg">同時搜尋 LRCLIB、網易雲、酷狗、QQ音樂。點一個結果就會套用，並記住這首歌的選擇。</div>
+      <div class="msg" id="lyr-msg">同時搜尋 LRCLIB、網易雲、酷狗、QQ音樂、Apple Music。點一個結果就會套用，並記住這首歌的選擇。</div>
       <div id="lyr-results"></div>
     </div>
     <div class="body" data-pane="paste" hidden>
@@ -800,7 +800,7 @@ function openLyrDialog(tab = 'search'){
   $('#lyr-reset').hidden = !lyr?.override;
   $('#lyr-results').innerHTML = '';
   $('#lyr-msg').className = 'msg';
-  $('#lyr-msg').textContent = '同時搜尋 LRCLIB、網易雲、酷狗、QQ音樂。點一個結果就會套用，並記住這首歌的選擇。';
+  $('#lyr-msg').textContent = '同時搜尋 LRCLIB、網易雲、酷狗、QQ音樂、Apple Music。點一個結果就會套用，並記住這首歌的選擇。';
   if (tab === 'search'){ setTimeout(() => $('#q-title').focus(), 50); doSearch(); }
 }
 function switchTab(tab){
@@ -819,7 +819,7 @@ async function doSearch(){
   if (seq !== searchSeq) return;  // 已經有更新的搜尋，丟掉這次的結果
   box.innerHTML = '';
   msg.textContent = list.length ? `找到 ${list.length} 個結果。長度標綠色的跟正在播的歌最接近。` : '沒有結果。試試只填歌名，或換成原文 / 英文歌名。';
-  const label = {lrclib: 'LRCLIB', netease: '網易雲', kugou: '酷狗', qq: 'QQ音樂'};
+  const label = {lrclib: 'LRCLIB', netease: '網易雲', kugou: '酷狗', qq: 'QQ音樂', lyricsplus: 'Apple Music'};
   for (const c of list){
     const b = document.createElement('button');
     const close = duration && c.duration && Math.abs(c.duration - duration) <= 3;

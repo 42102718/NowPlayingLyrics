@@ -41,7 +41,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.3.1"
+VERSION = "1.4.0"
 APP_NAME = "Now Playing Lyrics"
 UA = f"NowPlayingLyrics/{VERSION} (desktop lyrics app)"
 
@@ -162,31 +162,101 @@ def clean_artist(artist: str) -> str:
     return artist.strip()
 
 
+# YouTube 影片標題的雜訊：【動態歌詞】[가사/해석]、#hashtag、表情符號、引號裡的歌詞摘句
+TAG_BLOCK = re.compile(r"[【\[][^】\]]*(?:[】\]]|$)")
+QUOTE_BLOCK = re.compile(r"[「『“\"《]([^」』”\"》]*)(?:[」』”\"》]|$)")
+HASHTAG = re.compile(r"(?:^|\s)#\S+")
+EMOJI = re.compile(r"[\U0001F000-\U0001FFFF☀-➿⬀-⯿️‍♪♫♬]")
+FEAT = re.compile(r"\s*(?:[\*/]+\s*(?:with|feat\.?|ft\.?)\b.*|[\(（]\s*(?:feat\.?|ft\.?|with)\b[^\)）]*[\)）]"
+                  r"|\s(?:feat\.?|ft\.?)\s.*)$", re.I)
+PAREN = re.compile(r"\s*[\(（][^\)）]*[\)）]")
+
+
+def _quote_repl(m):
+    # 短的引號內容通常就是歌名 (周杰倫「晴天」)，長的或有空白、標點的是歌詞摘句
+    inner = m.group(1).strip()
+    if inner and len(inner) <= 12 and not re.search(r"[\s,，。！？!?、]", inner):
+        return f" {inner} "
+    return " "
+
+
 def clean_title(title: str) -> str:
-    t = NOISE.sub("", title or "")
-    t = re.sub(r"\s*[\|｜].*$", "", t)  # 「歌名 | 頻道」
-    t = re.sub(r"\s+", " ", t).strip(" -–—")
+    t = TAG_BLOCK.sub(" ", title or "")
+    t = QUOTE_BLOCK.sub(_quote_repl, t)
+    t = HASHTAG.sub(" ", t)
+    t = EMOJI.sub(" ", t)
+    t = NOISE.sub(" ", t)
+    t = re.sub(r"\s+", " ", t).strip(" -–—|｜/*")
     return t
+
+
+def _primary_artist(a: str) -> str:
+    a = FEAT.sub("", a or "")
+    return re.split(r"\s*(?:/|、|&|,|，|\bx\b|×)\s*", a, maxsplit=1)[0].strip() or a.strip()
 
 
 def title_variants(title: str, artist: str):
     """產生幾組 (歌名, 歌手) 嘗試搜尋。"""
     t, a = clean_title(title), clean_artist(artist)
+    # 「分明在 IG 聽過? : Unstable - Tom Frane」→ 冒號前面是影片標語
+    m = re.search(r"\s[:：]\s|:\s", t)
+    if m and " - " in t[m.end():]:
+        t = t[m.end():].strip()
     out = [(t, a)]
-    # YouTube 常見「歌手 - 歌名」
-    if " - " in t:
-        left, right = [x.strip() for x in t.split(" - ", 1)]
-        out += [(right, left), (left, right)]
+    pairs = []
+    for sep in ("｜", "|"):  # 「歌手｜歌名」或「歌名｜頻道」
+        if sep in t:
+            left, right = [x.strip() for x in t.split(sep, 1)]
+            pairs.append((left, right))
+            out.append((left, a))
+    body = pairs[0][0] if pairs else t
+    if " - " in body:  # YouTube 常見「歌手 - 歌名」
+        pairs.append(tuple(x.strip() for x in body.split(" - ", 1)))
+    elif re.search(r"\S-\S", body) and not pairs:  # 「416RevoltK1D-只愛你在星期五」
+        pairs.append(tuple(x.strip() for x in body.split("-", 1)))
+    for left, right in pairs:
+        right, left = FEAT.sub("", right), FEAT.sub("", left)
+        bare = PAREN.sub("", right).strip()  # 括號裡常是「可轉伴奏」之類的說明，先用沒括號的搜
+        out += [(bare, left), (right, left), (bare, _primary_artist(left)), (left, right)]
+    if pairs:  # 拆得出「歌手 - 歌名」時，整串標題 + 頻道名稱放最後 (容易配到別人上傳的翻唱)
+        out.append(out.pop(0))
     # 去括號內容：「day after day (日復一日)」→ 兩種都試
-    m = re.match(r"^(.*?)\s*[\(（](.+?)[\)）]\s*$", t)
-    if m:
-        out += [(m.group(1).strip(), a), (m.group(2).strip(), a)]
+    for tt, aa in list(out):
+        mm = re.match(r"^(.*?)\s*[\(（](.+?)[\)）]\s*$", tt)
+        if mm:
+            out += [(mm.group(1).strip(), aa), (mm.group(2).strip(), aa)]
     seen, res = set(), []
     for x in out:
+        x = (x[0].strip(" -–—/*"), x[1].strip(" -–—/*"))
         if x[0] and x not in seen:
             seen.add(x)
             res.append(x)
-    return res
+    return res[:8]
+
+
+def title_matches(query: str, cand: str) -> int:
+    """候選歌名跟要找的歌名像不像：2 = 一樣，1 = 互相包含且長度差不多，0 = 不是同一首。"""
+    q, c = _norm(query), _norm(cand)
+    if not q or not c:
+        return 0
+    if q == c or _norm(PAREN.sub("", cand)) == q or _norm(PAREN.sub("", query)) == c:
+        return 2
+    c2 = _norm(PAREN.sub("", cand)) or c
+    short, long_ = sorted((q, c2), key=len)
+    if short in long_ and len(short) >= 0.5 * len(long_):
+        return 1
+    return 0
+
+
+def artist_matches(query: str, cand: str) -> bool:
+    q, c = _norm(query), _norm(cand)
+    if not q or not c:
+        return False
+    if q == c or (min(len(q), len(c)) >= 2 and (q in c or c in q)):
+        return True
+    def parts(s):
+        return {_norm(x) for x in re.split(r"\s*(?:/|、|&|,|，|\bx\b|×|\band\b|和)\s*", s or "", flags=re.I)} - {""}
+    return bool(parts(query) & parts(cand))
 
 
 # ───────────────────────── LRC 解析 ─────────────────────────
@@ -221,7 +291,9 @@ CREDIT = re.compile(r"^(作词|作詞|作曲|编曲|編曲|制作人|製作人|�
                     r"出品|发行|發行|统筹|統籌|企划|企劃|策划|策劃|营销|營銷|宣传|宣傳|监修|監修|弦乐|弦樂|配唱|"
                     r"词|詞|曲|OP|SP|Lyricist|Lyrics|Composer|Arranger|Producer|Mixing|Mastering|Recording)"
                     r"[^:：]{0,24}[:：]", re.I)  # 允許「監製Executive Producer：」這種中英混合
-SOURCES = {"lrclib": "LRCLIB", "netease": "網易雲音樂", "kugou": "酷狗音樂", "qq": "QQ音樂", "custom": "自訂"}
+SOURCES = {"lrclib": "LRCLIB", "netease": "網易雲音樂", "kugou": "酷狗音樂", "qq": "QQ音樂",
+           "lyricsplus": "Apple Music (LyricsPlus)", "custom": "自訂"}
+LYRICSPLUS_HOSTS = ["https://lyricsplus.prjktla.my.id", "https://lyricsplus.binimum.org"]
 QQ_HEADERS = {"Referer": "https://y.qq.com/"}
 NETEASE_HEADERS = {"Referer": "https://music.163.com/"}
 
@@ -267,6 +339,8 @@ def clean_lines(lines, title="", artist="", *more):
 class Lyrics:
     def __init__(self, override_path):
         self.cache: dict[str, dict] = {}
+        self.lp_cache: dict = {}
+        self.lp_down: dict = {}
         self.http: aiohttp.ClientSession | None = None
         self.override_path = override_path
         try:
@@ -314,7 +388,8 @@ class Lyrics:
         result = await self._lrclib_exact(clean_title(title), clean_artist(artist), album, duration)
         if not (result and result["synced"]):
             for t, a in title_variants(title, artist):
-                cands = self.rank(await self.search(t, a), t, a, duration)
+                cands = self.rank(await self.search(t, a, duration=duration), t, a, duration,
+                                  need_artist=bool(a) and a != clean_artist(artist))
                 for c in cands[:4]:
                     r = await self.fetch(c)
                     if r and (r["synced"] or not result):
@@ -334,8 +409,7 @@ class Lyrics:
                 return traditionalize({**saved, "lines": [dict(l) for l in saved["lines"]]})
         return result
 
-    def rank(self, cands, title, artist, duration):
-        t, a = _norm(title), _norm(artist)
+    def rank(self, cands, title, artist, duration, strict=True, need_artist=False):
         def score(c):
             s = 0.0
             if duration and c.get("duration"):
@@ -343,19 +417,24 @@ class Lyrics:
                 if diff > 10:
                     return None  # 長度差太多，八成不是同一首
                 s += diff / 4
-            ct, ca = _norm(c.get("title")), _norm(c.get("artist"))
-            s += 0 if (t and (t == ct)) else 1.5 if (t and (t in ct or ct in t)) else 4
-            s += 0 if (a and a in ca) else 2 if a else 0
+            tm = title_matches(title, c.get("title"))
+            if tm == 0 and strict:
+                return None  # 歌名對不上：寧可找不到 (交給 AI)，也不要顯示別首歌的歌詞
+            am = artist_matches(artist, c.get("artist"))
+            if strict and artist and not am and (tm == 1 or need_artist):
+                return None  # 歌手是從影片標題拆出來的 (很可靠)，歌手不對就是別人的同名歌  # 歌名只是部分相同、歌手也不對
+            s += 0 if tm == 2 else 1.5 if tm == 1 else 4
+            s += 0 if am else 2 if artist else 0
             s += 0 if c.get("synced") is not False else 3
             return s
         scored = [(score(c), c) for c in cands]
         return [c for sc, c in sorted([x for x in scored if x[0] is not None], key=lambda x: x[0])]
 
-    # ───── 搜尋 (三個來源同時) ─────
-    async def search(self, title, artist, limit=8):
+    # ───── 搜尋 (五個來源同時) ─────
+    async def search(self, title, artist, limit=8, duration=None):
         res = await asyncio.gather(self._s_lrclib(title, artist, limit), self._s_netease(title, artist, limit),
                                    self._s_kugou(title, artist, limit), self._s_qq(title, artist, limit),
-                                   return_exceptions=True)
+                                   self._s_lyricsplus(title, artist, duration), return_exceptions=True)
         out = []
         for r in res:
             if isinstance(r, list):
@@ -409,11 +488,63 @@ class Lyrics:
                  "album": (s_.get("album") or {}).get("name") or "", "duration": s_.get("interval") or 0,
                  "synced": None} for s_ in songs if s_.get("mid")]
 
+    async def _lyricsplus_get(self, title, artist, duration=None):
+        """LyricsPlus (Apple Music / QQ / Deezer 的聚合伺服器)。直接回傳歌詞，常常很忙，所以逾時設短一點。"""
+        k = (title, artist)
+        if k in self.lp_cache:
+            return self.lp_cache[k]
+        http = await self.session()
+        params = {"title": title, "artist": artist}
+        if duration:
+            params["duration"] = str(round(duration))
+        d = None
+        now = time.monotonic()
+        for host in LYRICSPLUS_HOSTS:
+            if self.lp_down.get(host, 0) > now:
+                continue  # 剛剛逾時過，先跳過 5 分鐘，免得拖慢其他來源
+            try:
+                async with http.get(f"{host}/v2/lyrics/get", params=params,
+                                    timeout=aiohttp.ClientTimeout(total=6)) as r:
+                    if r.status == 404:
+                        break  # 伺服器有回應，只是沒有這首
+                    if r.status == 200:
+                        d = json.loads(await r.text())
+                        break
+            except Exception as e:
+                self.lp_down[host] = now + 300
+                print("[lyricsplus]", host, type(e).__name__)
+        self.lp_cache[k] = d
+        return d
+
+    async def _s_lyricsplus(self, title, artist, duration=None):
+        if not artist:
+            return []  # 這個服務一定要歌手
+        d = await self._lyricsplus_get(title, artist, duration)
+        if not d or not d.get("lyrics"):
+            return []
+        meta = ((d.get("processingTime") or {}).get("selectedSongMetadata")) or {}
+        return [{"source": "lyricsplus", "id": f"{title}\u0000{artist}", "q_title": title, "q_artist": artist,
+                 "title": meta.get("title") or title, "artist": meta.get("artist") or artist,
+                 "album": meta.get("album") or "", "duration": meta.get("duration") or 0,
+                 "synced": d.get("type") in ("Line", "Word")}]
+
     # ───── 下載某一個候選 ─────
     async def fetch(self, c):
         try:
             src = c.get("source")
             http = await self.session()
+            if src == "lyricsplus":
+                d = await self._lyricsplus_get(str(c.get("q_title") or c.get("title") or ""),
+                                               str(c.get("q_artist") or c.get("artist") or ""))
+                lines = [{"t": (l.get("time") or 0) / 1000, "text": (l.get("text") or "").strip()}
+                         for l in (d or {}).get("lyrics") or [] if isinstance(l.get("time"), (int, float))]
+                lines.sort(key=lambda l: l["t"])
+                if not has_real_lyrics(lines):
+                    return None
+                synced = d.get("type") in ("Line", "Word")
+                if not synced:
+                    lines = [{"t": None, "text": l["text"]} for l in lines]
+                return {"source": SOURCES["lyricsplus"], "synced": synced, "lines": lines}
             if src == "lrclib":
                 async with http.get(f"https://lrclib.net/api/get/{int(c['id'])}") as r:
                     if r.status != 200:
@@ -926,7 +1057,7 @@ def make_app():
         if not title:
             return web.json_response([])
         cands = await lyrics.search(title, artist, limit=10)
-        ranked = lyrics.rank(cands, title, artist, None)
+        ranked = lyrics.rank(cands, title, artist, None, strict=False)
         dur = t.get("duration") or 0
         ranked.sort(key=lambda c: (abs((c.get("duration") or 0) - dur) > 10 if dur and c.get("duration") else False))
         return web.json_response(ranked[:30])
@@ -947,7 +1078,7 @@ def make_app():
 
     async def lyr_use(request):
         c = await request.json()
-        if c.get("source") not in ("lrclib", "netease", "kugou", "qq"):
+        if c.get("source") not in ("lrclib", "netease", "kugou", "qq", "lyricsplus"):
             return web.json_response({"ok": False, "error": "未知來源"}, status=400)
         res = await lyrics.fetch(c)
         if not res or not res["lines"]:
