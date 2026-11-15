@@ -703,11 +703,14 @@ function aiText(){
   return (aiStatus.detail || '') + pct;
 }
 function showNoLyrics(){
-  const key = aiActive() ? 'ai:' + aiText() : 'none';
+  const kind = lyr?.kind || '';
+  const key = aiActive() ? 'ai:' + aiText() : 'none:' + kind;
   if (key === statusKey) return;
   statusKey = key;
   if (aiActive()) setStatus('AI 正在聽這首歌', `沒有現成歌詞，AI 會邊聽邊寫出來。${aiText()}`, aiStatus.state !== 'paused', true);
-  else setStatus('找不到歌詞', '四個歌詞來源都沒找到。可以自己搜尋看看，或貼上歌詞。', false, true);
+  else if (kind === 'short') setStatus('短影片', 'Shorts、TikTok 這類短影片不會找歌詞，也不會讓 AI 聽寫。', false, false);
+  else if (kind === 'video') setStatus('找不到歌詞', '這看起來是一般影片，不是音樂，所以 AI 不會自動聽寫。如果是歌，可以自己搜尋或貼上歌詞。', false, true);
+  else setStatus('找不到歌詞', '五個歌詞來源都沒找到。可以自己搜尋看看，或貼上歌詞。', false, true);
 }
 function renderAiStatus(){
   if (track && lyr && !lyr.loading && !lyr.lines?.length) showNoLyrics();

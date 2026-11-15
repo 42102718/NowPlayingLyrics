@@ -41,7 +41,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 APP_NAME = "Now Playing Lyrics"
 UA = f"NowPlayingLyrics/{VERSION} (desktop lyrics app)"
 
@@ -136,11 +136,46 @@ def classify_source(app_id: str, title: str, artist: str) -> str:
     a = app_id.lower()
     if "spotify" in a:
         return "Spotify"
-    if "youtube music" in a or "ytmusic" in a or "cinhimbnkkaeohfgghhklpknlkffjgod" in a:
+    if "youtube music" in a or "ytmusic" in a or "cinhimbnkk" in a:  # cinhimbnkk…：YouTube Music 的 Chrome App
         return "YouTube Music"
     if any(b in a for b in ("chrome", "msedge", "firefox", "brave", "opera", "vivaldi")):
         return "瀏覽器"
     return app_id.split("!")[0].split("\\")[-1].replace(".exe", "") or "未知"
+
+
+# 瀏覽器裡播的不一定是音樂：Shorts / TikTok / 一般影片不該去找歌詞或讓 AI 聽寫
+SHORT_TAG = re.compile(r"#(?:shorts?|tiktok|reels?|抖音)(?![a-z])", re.I)
+MUSIC_HINT = re.compile(
+    r"\s[-–—]\s|\b(?:m/?v|official|audio|lyrics?|cover|remix|live|acoustic|instrumental|karaoke|ost|"
+    r"sped\s*up|slowed|nightcore)\b|歌詞|歌词|翻唱|音樂|音乐|歌曲|主題曲|主题曲|插曲|片尾曲|片頭曲|伴奏|純音樂|"
+    r"가사|커버|歌ってみた|カバー", re.I)
+MUSIC_CHANNEL = re.compile(r"\s-\sTopic$|VEVO$|\bmusic\b|\brecords?\b|音樂|音乐|唱片", re.I)
+
+
+SHORT_APPS = ("douyin", "tiktok", "kuaishou", "instagram", "xiaohongshu")
+MUSIC_APPS = ("applemusic", "apple music", "itunes", "zunemusic", "tidal", "deezer", "amazon music", "amazonmusic",
+              "cloudmusic", "netease", "qqmusic", "kugou", "kuwo", "foobar", "musicbee", "aimp", "winamp",
+              "kkbox", "soundcloud", "pandora", "audirvana", "dopamine", "plexamp", "cider")
+
+
+def media_kind(track) -> str:
+    """music = 當成歌處理；video = 一般影片 (只在歌名、歌手都對得上時顯示歌詞，不讓 AI 聽)；short = 短影片 (完全不處理)。"""
+    src, app = track.get("source"), (track.get("app") or "").lower()
+    if src in ("Spotify", "YouTube Music"):
+        return "music"
+    if any(x in app for x in SHORT_APPS):
+        return "short"
+    if any(x in app for x in MUSIC_APPS):
+        return "music"
+    if src != "瀏覽器":
+        return "video"  # 不認識的 App (影音平台、Discord…)：當一般影片
+    title, artist = track.get("title") or "", track.get("artist") or ""
+    dur = float(track.get("duration") or 0)
+    if SHORT_TAG.search(title) or SHORT_TAG.search(artist) or 0 < dur < 60:
+        return "short"
+    if MUSIC_HINT.search(title) or MUSIC_CHANNEL.search(artist):
+        return "music"
+    return "video"
 
 
 def source_priority(src: str) -> int:
@@ -379,7 +414,7 @@ class Lyrics:
             print("[overrides]", e)
 
     # ───── 自動尋找 ─────
-    async def find(self, title, artist, album, duration):
+    async def find(self, title, artist, album, duration, need_artist=False):
         k = self.key(title, artist)
         if k in self.overrides:
             return {**self.overrides[k], "override": True}
@@ -389,7 +424,7 @@ class Lyrics:
         if not (result and result["synced"]):
             for t, a in title_variants(title, artist):
                 cands = self.rank(await self.search(t, a, duration=duration), t, a, duration,
-                                  need_artist=bool(a) and a != clean_artist(artist))
+                                  need_artist=need_artist or (bool(a) and a != clean_artist(artist)))
                 for c in cands[:4]:
                     r = await self.fetch(c)
                     if r and (r["synced"] or not result):
@@ -705,7 +740,28 @@ async def broadcast(msg):
 
 
 async def fetch_lyrics(track):
-    res = await lyrics.find(track["title"], track["artist"], track["album"], track["duration"])
+    if track.get("source") == "瀏覽器" and not track.get("duration"):
+        for _ in range(15):  # 瀏覽器常常先給標題、晚一點才給長度；判斷是不是短影片需要長度
+            await asyncio.sleep(0.2)
+            cur = state["track"]
+            if not cur or cur["track_id"] != track["track_id"]:
+                return
+            if cur.get("duration"):
+                track = cur
+                break
+    kind = media_kind(track)
+    if kind == "short":
+        print("[skip] short video:", track["title"], flush=True)
+        if state["track"] and state["track"]["track_id"] == track["track_id"]:
+            state["lyrics"] = {"track_id": track["track_id"], "source": None, "synced": False, "lines": [],
+                               "kind": "short"}
+            await broadcast({"type": "lyrics", **state["lyrics"]})
+        return
+    # 一般影片：歌手 (頻道) 也要對得上才算，避免標題剛好跟某首歌同名
+    res = await lyrics.find(track["title"], track["artist"], track["album"], track["duration"],
+                            need_artist=(kind == "video"))
+    if kind == "video" and not res.get("synced") and not res.get("override"):
+        res = {**res, "kind": "video"}
     if state["track"] and state["track"]["track_id"] == track["track_id"]:
         state["lyrics"] = {"track_id": track["track_id"], **res}
         await broadcast({"type": "lyrics", **state["lyrics"]})
@@ -714,7 +770,7 @@ async def fetch_lyrics(track):
                 AI.set_job(track, Lyrics.key(track["title"], track["artist"]),
                            [{"t": None, "text": l["text"]} for l in res["lines"]] if res.get("ai") == "aligned" else None,
                            improve=True)
-            elif res.get("synced") or res.get("override") or res.get("ai"):
+            elif res.get("synced") or res.get("override") or res.get("ai") or kind != "music":
                 AI.set_job(None)
             else:  # 沒有同步歌詞 → AI 接手 (有純文字歌詞就只對時)
                 AI.set_job(track, Lyrics.key(track["title"], track["artist"]),
