@@ -1,0 +1,7 @@
+Folia (folia-major) — https://github.com/chthollyphile/folia-major
+License: AGPL-3.0 (see LICENSE-Folia.txt). Third-party licenses: licenses/
+Built from commit cb5430acf289cb120b9cb798fce479f03e42d756 (2026-11-16)
+Build: npm ci --ignore-scripts && npx vite build --base /folia/
+Changes for Hummi: the build is served under /folia/ and the service-worker registration
+script tag was removed from index.html. No source files were modified.
+Hummi feeds it through Folia's PlayerCap OBS source (obsSource=playercap, player "hummi").

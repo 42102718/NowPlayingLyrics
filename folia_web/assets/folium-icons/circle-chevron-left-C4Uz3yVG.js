@@ -1,0 +1,1 @@
+import{Lc as e}from"../lucide-icons-BO9B8C78.js";var t={name:`circle-chevron-left`,size:24,node:[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}],[`path`,{d:`m14 16-4-4 4-4`,key:`ojs7w8`}]],aliases:[`chevron-left-circle`]};t.node;var n=e(t);export{t as __iconData,n as default};

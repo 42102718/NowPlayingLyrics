@@ -1,5 +1,5 @@
 """
-Now Playing Lyrics — 讀取 Windows 媒體工作階段 (Spotify / YouTube Music / 瀏覽器)，
+Hummi 哼哼 (舊名 Now Playing Lyrics) — 讀取 Windows 媒體工作階段 (Spotify / YouTube Music / 瀏覽器)，
 自動抓同步歌詞 (LRCLIB → 網易雲 備援)，透過 WebSocket 即時推送給網頁 UI。
 
 執行：python server.py   然後打開 http://localhost:8765
@@ -41,9 +41,9 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.4.1"
-APP_NAME = "Now Playing Lyrics"
-UA = f"NowPlayingLyrics/{VERSION} (desktop lyrics app)"
+VERSION = "1.5.0"
+APP_NAME = "Hummi 哼哼"
+UA = f"Hummi/{VERSION} (desktop lyrics app)"
 
 PLAYING = 4  # GlobalSystemMediaTransportControlsSessionPlaybackStatus.PLAYING
 
@@ -51,6 +51,14 @@ PLAYING = 4  # GlobalSystemMediaTransportControlsSessionPlaybackStatus.PLAYING
 CONFIG_PATH = DATA / "config.json"
 DEFAULT_CONFIG = {
     "offset": 0.0,
+    "notch": True,   # 螢幕頂端的小膠囊 (跟主視窗分開，一直都在)
+    "notch_opts": {
+        "battery": True,    # 藍牙裝置 / 筆電電量
+        "peek": True,       # 換歌時彈出封面和歌名
+        "spectrum": True,   # 真實頻譜 + 邊緣光暈 (只錄播放器的聲音)
+        "gestures": True,   # 滾輪調播放器音量、觸控板左右滑切歌
+    },
+    "folia": {"enabled": False},  # 把歌和歌詞送到 Folia 舞台 (唱歌台用)
     "font": "",  # 字體家族 (英文名)；空白 = 預設 (Inter + 微軟正黑體)
     "ai": {
         "enabled": True,          # 找不到同步歌詞時用 AI 聽寫 / 對時
@@ -76,6 +84,7 @@ DEFAULT_CONFIG = {
         "show_translation": True,
         "show_next": True,
         "color": "album",          # white / album
+        "auto_hide": True,         # 主視窗或舞台開著時自動隱藏 (避免同時好幾份歌詞)
     },
 }
 
@@ -85,12 +94,22 @@ def load_config():
     try:
         saved = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         cfg["offset"] = float(saved.get("offset", 0))
+        cfg["notch"] = bool(saved.get("notch", True))
+        cfg["notch_opts"].update({k: bool(v) for k, v in saved.get("notch_opts", {}).items() if k in cfg["notch_opts"]})
         cfg["font"] = str(saved.get("font", "") or "")
         cfg["background"].update({k: v for k, v in saved.get("background", {}).items() if k in cfg["background"]})
         cfg["ai"].update({k: v for k, v in saved.get("ai", {}).items() if k in cfg["ai"]})
         cfg["overlay"].update({k: v for k, v in saved.get("overlay", {}).items() if k in cfg["overlay"]})
+        dv = saved.get("devices") or {}
+        cfg["devices"] = {"low": int(dv.get("low", 15)), "tray": bool(dv.get("tray", True)),
+                          "hidden": [str(x) for x in dv.get("hidden", [])][:50]}
+        # 舊版 (1.4 以前) 沒有 seen_version：算是「更新上來的」，要給他看新功能
+        cfg["seen_version"] = str(saved.get("seen_version", "1.4"))
+        cfg["auto_update"] = bool(saved.get("auto_update", True))
+        cfg["folia"]["enabled"] = bool((saved.get("folia") or {}).get("enabled", False))
+        cfg["update_notified"] = str(saved.get("update_notified", ""))
     except Exception:
-        pass
+        cfg["seen_version"] = VERSION  # 第一次安裝：不用跳「新功能」
     return cfg
 
 
@@ -128,6 +147,15 @@ def traditionalize(result):
         l["text"] = to_trad(l["text"])
         if l.get("tr"):
             l["tr"] = to_trad(l["tr"])
+        if l.get("w"):  # 逐字：整句一起轉 (詞的轉換比較準)，再照原本每個字的長度切回去
+            joined = "".join(s[2] for s in l["w"])
+            conv = to_trad(joined)
+            if len(conv) == len(joined):
+                i = 0
+                for s in l["w"]:
+                    n = len(s[2])
+                    s[2] = conv[i:i + n]
+                    i += n
     return result
 
 
@@ -571,8 +599,15 @@ class Lyrics:
             if src == "lyricsplus":
                 d = await self._lyricsplus_get(str(c.get("q_title") or c.get("title") or ""),
                                                str(c.get("q_artist") or c.get("artist") or ""))
-                lines = [{"t": (l.get("time") or 0) / 1000, "text": (l.get("text") or "").strip()}
-                         for l in (d or {}).get("lyrics") or [] if isinstance(l.get("time"), (int, float))]
+                lines = []
+                for l in (d or {}).get("lyrics") or []:
+                    if not isinstance(l.get("time"), (int, float)):
+                        continue
+                    line = {"t": l["time"] / 1000, "text": (l.get("text") or "").strip()}
+                    syl = [s for s in l.get("syllabus") or [] if isinstance(s.get("time"), (int, float))]
+                    if d.get("type") == "Word" and syl:  # 逐字時間 (給 Folia 舞台做逐字動畫)
+                        line["w"] = [[s["time"] / 1000, (s.get("duration") or 0) / 1000, s.get("text") or ""] for s in syl]
+                    lines.append(line)
                 lines.sort(key=lambda l: l["t"])
                 if not has_real_lyrics(lines):
                     return None
@@ -688,7 +723,7 @@ class Media:
                 "app": app, "source": src, "playing": playing,
                 "title": p.title, "artist": p.artist, "album": p.album_title,
                 "position": pos, "duration": dur, "track_id": track_id,
-                "_thumb": p.thumbnail, "_session": s,
+                "_thumb": p.thumbnail, "_session": s, "_raw": tl.position.total_seconds(),
             })
         return sessions
 
@@ -727,6 +762,7 @@ lyrics = Lyrics(str(DATA / "lyrics_overrides.json"))
 AI = None    # ai_lyrics.AIEngine，在 poll_loop 開始時建立
 LOOP = None
 clients: set[web.WebSocketResponse] = set()
+stage_clients: set[web.WebSocketResponse] = set()  # 舞台頁面 (要即時音量)
 state = {"track": None, "lyrics": None, "sessions": []}
 
 
@@ -799,6 +835,76 @@ async def _ai_push(track_id, key, result, live):
     await broadcast({"type": "lyrics", **state["lyrics"]})
 
 
+class PlaybackClock:
+    """比 Windows 媒體資訊更穩的播放時鐘。
+
+    Spotify 有時候回報錯的東西：
+      ・明明還在播，卻說「暫停」→ 歌詞停住
+      ・說「播放中」，位置卻一直是同一個數字 (一直「更新」同一個值) → 歌詞停住
+    所以同時看播放器有沒有真的發出聲音 (音量表)：有聲音就當作在播，時間自己往前推；
+    播放器一回報新的位置 (正常每幾秒一次、或是拖了進度條) 就馬上對齊。"""
+
+    def __init__(self):
+        self.key = None
+        self.anchor = self.at = self.raw = 0.0
+        self.rep_playing = self.playing = False
+        self.loud = self.quiet = 0
+        self.meter_at = 0.0
+
+    def audio(self, app, now):
+        """播放器有沒有在出聲 (連續兩次有聲音才算，避免誤判)。"""
+        a = (app or "").lower()
+        if any(b in a for b in ("chrome", "msedge", "edge", "firefox", "308046b0af4a39cb", "brave", "opera", "vivaldi")):
+            return False  # 瀏覽器的聲音是整個瀏覽器一起算 (別的分頁在播影片也算)，不能用來判斷音樂有沒有在播
+        if now - self.meter_at >= 0.4:
+            self.meter_at = now
+            try:
+                import audio_ctl
+                pk = audio_ctl.peak(app)
+            except Exception:
+                pk = None
+            if pk is None:
+                self.loud = self.quiet = 0
+            elif pk > 0.003:
+                self.loud, self.quiet = self.loud + 1, 0
+            else:
+                self.loud, self.quiet = 0, self.quiet + 1
+        return self.loud >= 2
+
+    def update(self, cur):
+        now = time.monotonic()
+        tid, raw, rep_pos, rep_playing = cur["track_id"], cur["_raw"], cur["position"], cur["playing"]
+        sounding = self.audio(cur["app"], now)
+        if tid != self.key:  # 換歌：直接相信回報
+            self.key, self.anchor, self.at, self.raw = tid, rep_pos, now, raw
+            self.rep_playing = self.playing = rep_playing
+            return rep_pos, rep_playing
+        est = self.anchor + ((now - self.at) if self.playing else 0.0)
+        playing = rep_playing or sounding
+        moved = abs(raw - self.raw) > 0.05
+        # 只有「暫停 / 播放」狀態變了、位置數字沒變：如果本來就聽得到聲音 (我們已經當它在播)，那個位置是舊的，不要跳回去
+        flipped = rep_playing != self.rep_playing and not (sounding and self.playing)
+        new_info = moved or flipped
+        self.raw, self.rep_playing = raw, rep_playing
+        if new_info:
+            if rep_playing or not sounding:
+                self.anchor, self.at = rep_pos, now        # 正常更新、拖進度條、真的暫停
+            elif abs(raw - est) > 2.5:
+                self.anchor, self.at = raw, now            # 說暫停但還有聲音，而且位置跳了：拖過進度條
+            else:
+                self.anchor, self.at = est, now            # 說暫停但還有聲音：照自己的時間繼續走
+        elif playing != self.playing:
+            self.anchor, self.at = est, now
+        self.playing = playing
+        pos = self.anchor + ((now - self.at) if playing else 0.0)
+        if cur["duration"] > 0:
+            pos = max(0.0, min(pos, cur["duration"]))
+        return pos, playing
+
+
+clock = PlaybackClock()
+
+
 async def poll_loop():
     global AI, LOOP
     await media.init()
@@ -818,6 +924,7 @@ async def poll_loop():
             ]
             media.current = cur["_session"] if cur else None
             if cur:
+                cur["position"], cur["playing"] = clock.update(cur)
                 await media.load_art(cur["track_id"], cur["_thumb"])
                 track = {k: v for k, v in cur.items() if not k.startswith("_")}
                 track["has_art"] = cur["track_id"] in media.art
@@ -838,6 +945,8 @@ async def poll_loop():
             await broadcast({"type": "state", "track": state["track"], "sessions": state["sessions"],
                              "pinned": media.pinned, "config": config, "unlocked": runtime["unlocked"],
                              "autostart": get_autostart(), "can_autostart": FROZEN, "version": VERSION,
+                             "mica": MICA_OK,
+                             "folia": runtime["folia"].status if runtime.get("folia") else None,
                              "ai": AI.status if AI is not None else None})
         except Exception as e:
             print("[poll]", e)
@@ -850,11 +959,16 @@ async def ws_handler(request):
     clients.add(ws)
     if state["lyrics"]:
         await ws.send_str(json.dumps({"type": "lyrics", **state["lyrics"]}, ensure_ascii=False))
+    await ws.send_str(json.dumps(devices_msg(), ensure_ascii=False))
+    if UPDATE.get("available") or UPDATE.get("whatsnew"):
+        await ws.send_str(json.dumps(update_msg(), ensure_ascii=False))
     async for msg in ws:
         try:
             d = json.loads(msg.data)
             if d.get("type") == "hello":
                 print("[page]", d, flush=True)
+                if d.get("stage"):  # 舞台頁面 (Hummi 舞台視窗 / OBS)：要即時音量
+                    stage_clients.add(ws)
             elif d.get("type") == "pin":
                 media.pinned = d.get("app") or None
             elif d.get("type") == "offset":
@@ -868,6 +982,10 @@ async def ws_handler(request):
                 patch = {k: v for k, v in (d.get("patch") or {}).items() if k in config["background"] and k != "image"}
                 config["background"].update(patch)
                 config_changed()
+                if "mode" in patch:
+                    await asyncio.get_running_loop().run_in_executor(None, apply_window_style)
+                    if settings_window is not None:
+                        await asyncio.get_running_loop().run_in_executor(None, apply_window_style, settings_window)
             elif d.get("type") == "font":
                 config["font"] = str(d.get("value") or "")
                 config_changed()
@@ -878,8 +996,58 @@ async def ws_handler(request):
                 runtime["cfg_version"] += 1
             elif d.get("type") == "seek" and media.current is not None:
                 await media.current.try_change_playback_position_async(int(float(d["t"]) * 10_000_000))
+            elif d.get("type") in ("next", "prev") and media.current is not None:  # 主視窗的上一首 / 下一首
+                if d["type"] == "next":
+                    await media.current.try_skip_next_async()
+                else:
+                    await media.current.try_skip_previous_async()
             elif d.get("type") == "toggle" and media.current is not None:
                 await media.current.try_toggle_play_pause_async()
+            elif d.get("type") == "notch":
+                to_notch() if d.get("value") else set_notch(False)
+            elif d.get("type") == "devices":  # 裝置頁的操作
+                svc = runtime.get("devices")
+                act = d.get("action")
+                if svc is not None:
+                    if act == "refresh":
+                        svc.refresh()
+                    elif act == "hide":
+                        svc.set_hidden(str(d.get("id")), bool(d.get("value")))
+                    elif act == "low":
+                        svc.set_low(int(d.get("value") or 15))
+                    elif act == "tray":
+                        config.setdefault("devices", {})["tray"] = bool(d.get("value"))
+                        save_config()
+                        if runtime.get("tray_devices"):
+                            runtime["tray_devices"].sync()
+                        await broadcast(devices_msg())
+                    elif act == "enabled":
+                        set_option("battery", bool(d.get("value")))
+                        svc.refresh()
+                        await broadcast(devices_msg())
+            elif d.get("type") == "update":  # 更新：檢查 / 安裝 / 看過新功能了
+                act = d.get("action")
+                if act == "check":
+                    asyncio.create_task(check_update(force=True))
+                elif act == "install":
+                    asyncio.create_task(install_update())
+                elif act == "seen":
+                    config["seen_version"] = VERSION
+                    save_config()
+                    UPDATE["whatsnew"] = None
+                elif act == "auto":
+                    config["auto_update"] = bool(d.get("value"))
+                    save_config()
+            elif d.get("type") == "folia":
+                set_option("folia", bool(d.get("value")))
+            elif d.get("type") == "open_stage":
+                await asyncio.get_running_loop().run_in_executor(None, open_stage)
+            elif d.get("type") == "settings_window":
+                await asyncio.get_running_loop().run_in_executor(None, open_settings)
+            elif d.get("type") == "open_url":
+                u = str(d.get("url") or "")
+                if u.startswith("https://github.com/"):  # 只開 GitHub (下載頁、HaloBattery)
+                    webbrowser.open(u)
             elif d.get("type") == "refetch" and state["track"]:
                 t = state["track"]
                 lyrics.cache.pop(Lyrics.key(t["title"], t["artist"]), None)
@@ -896,6 +1064,7 @@ async def ws_handler(request):
         except Exception:
             pass
     clients.discard(ws)
+    stage_clients.discard(ws)
     return ws
 
 
@@ -912,8 +1081,150 @@ async def index(request):
     return web.FileResponse(ROOT / "index.html", headers={"Cache-Control": "no-store"})
 
 
+# ───────────────────────── 更新 (GitHub Releases) ─────────────────────────
+RELEASES_API = "https://api.github.com/repos/42102718/NowPlayingLyrics/releases/latest"
+RELEASES_PAGE = "https://github.com/42102718/NowPlayingLyrics/releases/latest"
+UPDATE = {"available": None, "state": "idle", "progress": None, "error": "", "whatsnew": None, "checked": 0.0}
+
+
+def _ver(s):
+    out = []
+    for p in re.findall(r"\d+", str(s or ""))[:3]:
+        out.append(int(p))
+    return tuple(out + [0] * (3 - len(out)))
+
+
+def update_msg():
+    return {"type": "update", "current": VERSION, "available": UPDATE["available"], "state": UPDATE["state"],
+            "progress": UPDATE["progress"], "error": UPDATE["error"], "whatsnew": UPDATE["whatsnew"],
+            "page": RELEASES_PAGE, "can_install": FROZEN, "auto": config.get("auto_update", True)}
+
+
+def init_whatsnew():
+    """剛更新完：準備好「這版有什麼新功能」，主視窗和膠囊都會顯示一次。"""
+    import whatsnew
+    if _ver(config.get("seen_version")) < _ver(VERSION):
+        n = whatsnew.notes_for(VERSION)
+        if n:
+            UPDATE["whatsnew"] = {"version": VERSION, **n}
+            runtime["notch_event"] = ("updated", VERSION)
+        else:
+            config["seen_version"] = VERSION
+            save_config()
+
+
+async def check_update(force=False):
+    if not force and (not config.get("auto_update", True) or time.time() - UPDATE["checked"] < 3600):
+        return
+    UPDATE["checked"] = time.time()
+    try:
+        async with aiohttp.ClientSession(headers={"User-Agent": UA, "Accept": "application/vnd.github+json"}) as s:
+            async with s.get(RELEASES_API, timeout=aiohttp.ClientTimeout(total=15)) as r:
+                if r.status != 200:
+                    raise RuntimeError(f"GitHub 回應 {r.status}")
+                data = await r.json()
+        tag = data.get("tag_name") or ""
+        asset = next((a for a in data.get("assets") or []
+                      if a.get("name", "").lower().endswith(".exe") and "setup" in a.get("name", "").lower()), None)
+        if _ver(tag) > _ver(os.environ.get("HUMMI_PRETEND_VERSION") or VERSION):  # 環境變數：測試用
+            UPDATE["available"] = {"version": tag.lstrip("vV"), "notes": (data.get("body") or "")[:6000],
+                                   "url": asset.get("browser_download_url") if asset else None,
+                                   "size": asset.get("size") if asset else None, "page": data.get("html_url") or RELEASES_PAGE}
+            if config.get("update_notified") != UPDATE["available"]["version"]:
+                config["update_notified"] = UPDATE["available"]["version"]
+                save_config()
+                runtime["notch_event"] = ("update", UPDATE["available"]["version"])
+        else:
+            UPDATE["available"] = None
+        UPDATE["error"] = ""
+        print("[update] latest", tag, "current", VERSION, flush=True)
+    except Exception as e:
+        UPDATE["error"] = "沒辦法檢查更新：" + str(e)[:120] if force else ""
+        print("[update] check failed", repr(e), flush=True)
+    await broadcast(update_msg())
+
+
+async def update_loop():
+    await asyncio.sleep(20)
+    while True:
+        await check_update()
+        await asyncio.sleep(6 * 3600)
+
+
+async def install_update():
+    """下載新版安裝程式 → 在背景安裝 → 裝完自動重新開啟。"""
+    av = UPDATE.get("available")
+    if not av or not av.get("url") or UPDATE["state"] in ("downloading", "installing"):
+        return
+    if not FROZEN:
+        UPDATE["error"] = "開發版不能自動更新"
+        await broadcast(update_msg())
+        return
+    import tempfile
+    path = Path(tempfile.gettempdir()) / f"Hummi-Setup-{av['version']}.exe"
+    UPDATE.update(state="downloading", progress=0.0, error="")
+    await broadcast(update_msg())
+    try:
+        async with aiohttp.ClientSession(headers={"User-Agent": UA}) as s:
+            async with s.get(av["url"], timeout=aiohttp.ClientTimeout(total=900)) as r:
+                if r.status != 200:
+                    raise RuntimeError(f"下載失敗 ({r.status})")
+                total = int(r.headers.get("Content-Length") or av.get("size") or 0)
+                got, last = 0, 0.0
+                with open(path, "wb") as f:
+                    async for chunk in r.content.iter_chunked(1 << 16):
+                        f.write(chunk)
+                        got += len(chunk)
+                        if total and time.time() - last > 0.3:
+                            UPDATE["progress"] = got / total
+                            last = time.time()
+                            await broadcast(update_msg())
+        if total and got < total * 0.98:
+            raise RuntimeError("下載不完整")
+        UPDATE.update(state="installing", progress=1.0)
+        await broadcast(update_msg())
+        import subprocess
+        # /SILENT：顯示安裝進度；/RELAUNCH=1：裝完自動打開 (安裝程式會先關掉這個程式)
+        subprocess.Popen([str(path), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/RELAUNCH=1"],
+                         creationflags=0x00000008 | 0x00000200, close_fds=True)  # DETACHED_PROCESS | NEW_PROCESS_GROUP
+        await asyncio.sleep(1.5)
+        quit_app()
+    except Exception as e:
+        UPDATE.update(state="idle", progress=None, error="更新失敗：" + str(e)[:150])
+        print("[update] install failed", repr(e), flush=True)
+        await broadcast(update_msg())
+
+
+def open_update():
+    show_window()
+    if LOOP is not None:
+        asyncio.run_coroutine_threadsafe(broadcast({**update_msg(), "open": True}), LOOP)
+
+
+runtime.update(open_update=open_update, update=UPDATE)
+
+
+async def viz_pump():
+    """舞台頁面開著時，每 1/25 秒把頻譜和響度推過去 (背景、節拍脈動用)。"""
+    while True:
+        await asyncio.sleep(0.04)
+        viz = runtime.get("viz")
+        if not stage_clients or viz is None or not viz.fresh():
+            continue
+        data = json.dumps({"type": "viz", "levels": [round(v, 3) for v in viz.levels], "energy": round(viz.energy, 3)})
+        for ws in list(stage_clients):
+            try:
+                await ws.send_str(data)
+            except Exception:
+                stage_clients.discard(ws)
+
+
 async def on_startup(app):
     app["poller"] = asyncio.create_task(poll_loop())
+    app["updater"] = asyncio.create_task(update_loop())
+    app["viz_pump"] = asyncio.create_task(viz_pump())
+    if "playercap" in app:
+        app["pc_loop"] = asyncio.create_task(app["playercap"].loop())
 
 
 def accent_color(data: bytes):
@@ -941,7 +1252,7 @@ def accent_color(data: bytes):
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_NAME = "NowPlayingLyrics"
 STARTUP_LNK = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup",
-                           f"{APP_NAME}.lnk")
+                           "Now Playing Lyrics.lnk")  # 舊版 (1.2 以前) 的捷徑名稱
 
 
 def get_autostart() -> bool:
@@ -976,6 +1287,16 @@ def migrate_startup_shortcut():
             set_autostart(True)
         except Exception as e:
             print("[autostart]", e)
+    # 1.5 改名 (exe 檔名變了)：開機啟動還指著舊的 exe 的話，改指到現在這個
+    if FROZEN and get_autostart():
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+                cur = winreg.QueryValueEx(k, RUN_NAME)[0]
+            if sys.executable.lower() not in cur.lower():
+                set_autostart(True)
+        except OSError as e:
+            print("[autostart]", e)
 
 
 def start_tray():
@@ -998,6 +1319,12 @@ def start_tray():
             config_changed()
         return f
 
+    def notch_toggle(key):
+        def f(icon, item):
+            config["notch_opts"][key] = not config["notch_opts"][key]
+            save_config()
+        return f
+
     def unlock(icon, item):
         runtime["unlocked"] = not runtime["unlocked"]
         runtime["cfg_version"] += 1
@@ -1011,6 +1338,12 @@ def start_tray():
     P = pystray.MenuItem
     menu = pystray.Menu(
         P("開啟主視窗", lambda i, it: show_window(), default=True),
+        P("膠囊模式 (螢幕頂端)", lambda i, it: set_notch(not config["notch"]), checked=lambda it: config["notch"]),
+        P("膠囊選項", pystray.Menu(*[
+            P(label, notch_toggle(k), checked=(lambda k: lambda it: config["notch_opts"][k])(k))
+            for k, label in [("peek", "換歌時彈出歌名"), ("spectrum", "真實頻譜和光暈"),
+                             ("battery", "裝置電量 (藍牙 / 筆電)"), ("gestures", "滾輪調音量、左右滑切歌")]
+        ])),
         P("顯示浮動歌詞", toggle("enabled"), checked=lambda it: ov["enabled"]),
         P("解鎖位置 (可拖曳)", unlock, checked=lambda it: runtime["unlocked"]),
         P("位置", pystray.Menu(*[
@@ -1023,7 +1356,7 @@ def start_tray():
         pystray.Menu.SEPARATOR,
         P("結束", lambda i, it: quit_app(i)),
     )
-    icon = pystray.Icon("now-playing-lyrics", img, "Now Playing Lyrics", menu)
+    icon = pystray.Icon("hummi", img, APP_NAME, menu)
     threading.Thread(target=icon.run, daemon=True).start()
 
 
@@ -1036,6 +1369,278 @@ def show_window():
     if window is not None:
         window.show()
         window.restore()
+
+
+def set_notch(on):
+    """膠囊開關 (系統匣 / 膠囊設定)。膠囊跟主視窗是分開的：主視窗開著、關著膠囊都在。"""
+    config["notch"] = bool(on)
+    save_config()
+
+
+def to_notch():
+    """主視窗標題列的膠囊按鈕：把主視窗收起來，只留膠囊。"""
+    set_notch(True)
+    if window is not None:
+        window.hide()
+
+
+try:
+    MICA_OK = sys.getwindowsversion().build >= 22621  # Windows 11 22H2 以後才有系統背景材質
+except Exception:
+    MICA_OK = False
+
+
+def apply_window_style(win=None):
+    """主視窗 / 設定小視窗：Windows 11 圓角 + 深色邊框；背景選 Mica 時套用系統材質 (透出桌布色調)。"""
+    win = win or window
+    if win is None:
+        return
+    try:
+        import ctypes
+        from System import Action
+        from System.Drawing import Color, ColorTranslator
+        form = win.native
+    except Exception as e:
+        print("[style]", repr(e))
+        return
+    mica = MICA_OK and config["background"].get("mode") == "mica"
+
+    class MARGINS(ctypes.Structure):
+        _fields_ = [("l", ctypes.c_int), ("r", ctypes.c_int), ("t", ctypes.c_int), ("b", ctypes.c_int)]
+
+    def go():
+        try:
+            hwnd = ctypes.c_void_p(form.Handle.ToInt64())
+            dwm = ctypes.windll.dwmapi
+
+            def attr(a, v):
+                val = ctypes.c_int(v)
+                return dwm.DwmSetWindowAttribute(hwnd, a, ctypes.byref(val), 4)
+            attr(20, 1)   # 深色模式邊框
+            attr(33, 2)   # 圓角
+            m = -1 if mica else 0
+            dwm.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(MARGINS(m, m, m, m)))
+            attr(38, 2 if mica else 1)  # 系統背景：Mica / 無
+            form.BackColor = Color.Black if mica else ColorTranslator.FromHtml("#0b0b12")
+            form.webview.DefaultBackgroundColor = Color.Transparent if mica else ColorTranslator.FromHtml("#0b0b12")
+        except Exception as e:
+            print("[style]", repr(e), flush=True)
+    try:
+        form.Invoke(Action(go))
+    except Exception as e:
+        print("[style]", repr(e))
+
+
+def media_cmd(cmd, arg=None):
+    """膠囊的按鈕 (在別的執行緒) 呼叫：丟回 asyncio 執行緒控制播放器。"""
+    async def go():
+        s = media.current
+        if s is None:
+            return
+        if cmd == "toggle":
+            await s.try_toggle_play_pause_async()
+        elif cmd == "next":
+            await s.try_skip_next_async()
+        elif cmd == "prev":
+            await s.try_skip_previous_async()
+        elif cmd == "seek":
+            await s.try_change_playback_position_async(int(float(arg) * 10_000_000))
+    if LOOP is not None:
+        asyncio.run_coroutine_threadsafe(go(), LOOP)
+
+
+def set_option(key, value):
+    """膠囊裡的設定頁呼叫 (別的執行緒)。"""
+    value = bool(value)
+    if key in config["notch_opts"]:
+        config["notch_opts"][key] = value
+    elif key == "overlay":
+        config["overlay"]["enabled"] = value
+    elif key == "ai":
+        config["ai"]["enabled"] = value
+        if AI is not None and not value:
+            AI.set_job(None)
+    elif key == "autostart":
+        set_autostart(value)
+        return
+    elif key == "notch":
+        set_notch(value)
+        return
+    elif key == "folia":
+        config["folia"]["enabled"] = value
+        save_config()
+        return
+    config_changed()
+
+
+def get_option(key):
+    if key in config["notch_opts"]:
+        return config["notch_opts"][key]
+    if key == "overlay":
+        return config["overlay"]["enabled"]
+    if key == "ai":
+        return config["ai"]["enabled"]
+    if key == "autostart":
+        return get_autostart()
+    if key == "folia":
+        return config["folia"]["enabled"]
+    return False
+
+
+stage_window = None
+
+
+class StageApi:
+    """舞台視窗：全螢幕 (F / F11 / 設定裡的按鈕)。"""
+
+    def fullscreen(self):
+        if stage_window is not None:
+            stage_window.toggle_fullscreen()
+
+    def back(self):
+        """回主視窗：舞台收起來，主視窗叫出來。"""
+        if stage_window is not None:
+            stage_window.hide()
+        show_window()
+
+
+def open_stage():
+    """Hummi 舞台：全螢幕歌詞演出的視窗 (唱歌台；OBS 也可以直接用網址)。"""
+    global stage_window
+    if window is None:  # 瀏覽器除錯模式
+        webbrowser.open(f"http://127.0.0.1:{PORT}/stage")
+        return
+    try:
+        import webview
+        if stage_window is None:
+            stage_window = webview.create_window("Hummi 舞台", f"http://127.0.0.1:{PORT}/stage?v={VERSION}",
+                                                 width=1280, height=720, background_color="#05050a", js_api=StageApi())
+
+            def on_closing():
+                if quitting:
+                    return True
+                stage_window.hide()
+                show_window()  # 關掉舞台 = 回主視窗
+                return False
+            stage_window.events.closing += on_closing
+            stage_window.events.shown += lambda: apply_window_style(stage_window)
+        else:
+            stage_window.show()
+            stage_window.restore()
+        if window is not None:  # 舞台已經在演歌詞了：主視窗收起來 (膠囊還在，系統匣可以叫回來)
+            window.hide()
+    except Exception as e:
+        print("[stage]", repr(e), flush=True)
+
+
+settings_window = None
+
+
+class SettingsApi:
+    """設定小視窗的標題列按鈕。"""
+
+    def close(self):
+        if settings_window is not None:
+            settings_window.hide()
+
+    def expand(self):
+        """打開完整的主視窗 (設定面板也打開)，小視窗收起來。"""
+        self.close()
+        open_settings_main()
+
+
+def open_settings_main():
+    show_window()
+    if LOOP is not None:
+        asyncio.run_coroutine_threadsafe(broadcast({"type": "open_settings"}), LOOP)
+
+
+def open_settings():
+    """膠囊的「更多設定」：只跳出設定面板的小視窗 (在膠囊正下方)。"""
+    global settings_window
+    if window is None:  # 瀏覽器除錯模式：沒有獨立視窗
+        return open_settings_main()
+    try:
+        import ctypes
+        import webview
+        s = ctypes.windll.user32.GetDpiForSystem() / 96
+        sw = ctypes.windll.user32.GetSystemMetrics(0)
+        w, h = 440, 720
+        x, y = int(sw / s / 2 - w / 2), 64
+        if settings_window is None:
+            settings_window = webview.create_window(
+                "Hummi 設定", f"http://127.0.0.1:{PORT}/?app=1&settings=1&v={VERSION}", width=w, height=h, x=x, y=y,
+                frameless=True, easy_drag=False, on_top=True, background_color="#0b0b12", js_api=SettingsApi())
+
+            def on_closing():
+                if quitting:
+                    return True
+                settings_window.hide()
+                return False
+            settings_window.events.closing += on_closing
+            settings_window.events.shown += lambda: apply_window_style(settings_window)
+        else:
+            settings_window.show()
+            settings_window.restore()
+    except Exception as e:
+        print("[settings]", repr(e), flush=True)
+        open_settings_main()
+
+
+runtime.update(media_cmd=media_cmd, art=lambda tid: media.art.get(tid), open_main=show_window,
+               set_option=set_option, get_option=get_option, open_settings=open_settings,
+               can_autostart=FROZEN)
+
+
+def devices_msg():
+    svc = runtime.get("devices")
+    lst = svc.snapshot() if svc is not None else []
+    return {"type": "devices", "list": lst, "low": config.get("devices", {}).get("low", 15),
+            "tray": config.get("devices", {}).get("tray", True), "enabled": config["notch_opts"]["battery"]}
+
+
+def push_devices():
+    """裝置清單變了 (裝置服務的執行緒呼叫)：推給主視窗。"""
+    if LOOP is not None:
+        asyncio.run_coroutine_threadsafe(broadcast(devices_msg()), LOOP)
+
+
+def open_devices():
+    show_window()
+    if LOOP is not None:
+        asyncio.run_coroutine_threadsafe(broadcast({"type": "open_devices"}), LOOP)
+
+
+runtime["open_devices"] = open_devices
+
+
+def start_devices(tray=True):
+    try:
+        import devices
+        svc = devices.DeviceService(config, save_config, DATA).start()
+        svc.listeners.append(push_devices)
+        runtime["devices"] = svc
+        if tray:
+            import tray_devices
+            runtime["tray_devices"] = tray_devices.TrayDevices(svc, config, open_devices).start()
+    except Exception as e:
+        print("[devices] disabled:", repr(e))
+
+
+def start_notch():
+    import notch
+    try:
+        import viz
+        runtime["viz"] = viz.Visualizer(state, config, extra=lambda: bool(stage_clients)).start()
+    except Exception as e:
+        print("[viz] disabled:", repr(e))
+    start_devices()
+    try:
+        import folia_bridge
+        runtime["folia"] = folia_bridge.FoliaBridge(state, config, lambda tid: media.art.get(tid)).start()
+    except Exception as e:
+        print("[folia] disabled:", repr(e))
+    threading.Thread(target=notch.run, args=(state, config, runtime), daemon=True).start()
 
 
 def quit_app(icon=None):
@@ -1076,16 +1681,9 @@ class WindowApi:
         window.on_top = self._on_top
         return self._on_top
 
-    def mini(self, on):
-        """迷你模式：小視窗 + 置頂。"""
-        if on:
-            self._normal_size = (window.width, window.height)
-            window.resize(420, 600)
-        else:
-            window.resize(*self._normal_size)
-        self._on_top = bool(on)
-        window.on_top = self._on_top
-        return self._on_top
+    def notch(self):
+        """膠囊按鈕：主視窗收起來，只留螢幕頂端的小膠囊。"""
+        to_notch()
 
 
 def make_app():
@@ -1093,6 +1691,20 @@ def make_app():
     app.router.add_get("/", index)
     app.router.add_get("/ws", ws_handler)
     app.router.add_get("/art", art_handler)
+
+    import playercap  # 內嵌 Folia 歌詞效果的資料來源 (PlayerCap 格式) + /folia/ 靜態檔
+    hub = playercap.PlayerCapHub(state, config, VERSION)
+    hub.port = PORT
+    hub.routes(app, ROOT)
+    app["playercap"] = hub
+
+    async def stage_page(request):
+        return web.FileResponse(ROOT / "stage.html", headers={"Cache-Control": "no-store"})
+    app.router.add_get("/stage", stage_page)
+
+    async def icon_png(request):
+        return web.FileResponse(ROOT / "icon.png", headers={"Cache-Control": "max-age=86400"})
+    app.router.add_get("/icon.png", icon_png)
 
     async def show(request):
         show_window()
@@ -1261,6 +1873,7 @@ def main():
         print(f"[selftest] OK device={eng.device} in {time.time() - t0:.1f}s", flush=True)
         return
     import overlay
+    import notch
     import fonts
     fonts.start(str(DATA / "fonts_cache.json"))
 
@@ -1269,11 +1882,16 @@ def main():
         runtime["cfg_version"] += 1
     threading.Thread(target=_fonts_ready, daemon=True).start()
     migrate_startup_shortcut()
+    try:
+        init_whatsnew()
+    except Exception as e:
+        print("[whatsnew]", repr(e))
     if "--web" in sys.argv:  # 只開伺服器 (除錯用，用瀏覽器看)
         if "--headless" not in sys.argv:  # --headless：測試用，不開浮動歌詞和系統匣 (不跟已安裝的版本重複)
             threading.Thread(target=overlay.run, args=(state, config, runtime, save_config), daemon=True).start()
+            start_notch()
             start_tray()
-        print(f"🎵 Now Playing Lyrics → http://localhost:{PORT}", flush=True)
+        print(f"🎵 Hummi → http://localhost:{PORT}", flush=True)
         web.run_app(make_app(), host="127.0.0.1", port=PORT, print=None)
         return
 
@@ -1285,10 +1903,11 @@ def main():
     threading.Thread(target=serve_in_thread, args=(ready,), daemon=True).start()
     ready.wait(10)
     threading.Thread(target=overlay.run, args=(state, config, runtime, save_config), daemon=True).start()
+    start_notch()
     start_tray()
 
     window = webview.create_window(
-        "Now Playing Lyrics", f"http://127.0.0.1:{PORT}/?app=1&v={VERSION}",
+        APP_NAME, f"http://127.0.0.1:{PORT}/?app=1&v={VERSION}",
         width=1180, height=800, min_size=(380, 420),
         frameless=True, easy_drag=False, background_color="#0b0b12", js_api=WindowApi(),
     )
@@ -1306,6 +1925,7 @@ def main():
         # 保險：不管怎麼被啟動，都以正常大小建立 (縮小狀態下 WebView2 會空白)
         window.restore()
         window.resize(1180, 800)
+        apply_window_style()
         if background:
             window.hide()  # 先以正常大小建立好再藏起來，之後從系統匣叫出來才不會空白
     window.events.shown += on_shown

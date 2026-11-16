@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Now Playing Lyrics</title>
+<title>Hummi 哼哼</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -35,6 +35,13 @@ html,body{height:100%;overflow:hidden;background:#0b0b12;color:var(--fg);font-fa
 #bg[data-mode="image"] #bg-custom{opacity:1;inset:calc(var(--bg-blur,0px) * -1.5);filter:blur(var(--bg-blur,0px))}
 #bg:not([data-mode="album"]) .art{opacity:0!important}
 #bg.no-blobs .blob{display:none}
+/* Mica：Windows 11 系統材質 (背景透出桌布色調)，上面只留一點點專輯顏色 */
+html.mica,html.mica body{background:transparent}
+html.mica #bg{background:transparent}
+html.mica #bg[data-mode="mica"] .art.on{opacity:.22!important}
+html.mica #bg[data-mode="mica"] .blob{opacity:.18}
+html.mica #bg[data-mode="mica"]::after{background:rgba(0,0,0,.08)}
+html.mica #grain{display:none}
 #bg:not([data-mode="album"]) .blob{opacity:.35}
 #status-actions{display:none;gap:10px;flex-wrap:wrap;pointer-events:auto;margin-top:4px}
 #status-actions.show{display:flex}
@@ -79,6 +86,7 @@ html,body{height:100%;overflow:hidden;background:#0b0b12;color:var(--fg);font-fa
 #bg-image-row{display:flex;gap:10px;align-items:center}
 #bg-thumb{width:64px;height:40px;border-radius:8px;background:rgba(255,255,255,.08) center/cover;flex:none;border:1px solid var(--glass-b)}
 .seg.four{grid-template-columns:repeat(4,1fr)}
+.seg.five{grid-template-columns:repeat(5,1fr)}
 
 #grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.06;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
@@ -228,16 +236,134 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
   .line{font-size:24px}
 }
 @media (prefers-reduced-motion:reduce){.blob{animation:none}#lyrics,.line{transition:none}}
+
+/* ───── 裝置電量 ───── */
+.fi{font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";font-style:normal;font-weight:400;line-height:1}
+#dev-dialog .dialog{width:min(760px,calc(100vw - 32px))}
+#dev-dialog header h2{font:700 18px var(--font);margin:0 auto 0 6px;display:flex;align-items:center;gap:10px}
+#dev-dialog header .icon-btn{width:34px;height:34px;border-radius:10px;border:0;background:none;color:var(--dim);cursor:pointer;font-size:15px}
+#dev-dialog header .icon-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+.dev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px}
+.dev-card{position:relative;padding:18px 14px 14px;border-radius:18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
+  display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;transition:background .2s,transform .2s}
+.dev-card:hover{background:rgba(255,255,255,.08);transform:translateY(-2px)}
+.dev-card.off{opacity:.45}
+.dev-card.hidden{opacity:.35}
+.dev-ring{position:relative;width:96px;height:96px;margin-bottom:8px}
+.dev-ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.dev-ring .track{fill:none;stroke:rgba(255,255,255,.1);stroke-width:7}
+.dev-ring .bar{fill:none;stroke:var(--c);stroke-width:7;stroke-linecap:round;transition:stroke-dasharray .8s cubic-bezier(.2,.8,.2,1)}
+.dev-ring .glow{fill:none;stroke:var(--c);stroke-width:14;opacity:0;filter:blur(6px)}
+.dev-card.charging .bar{animation:breathe 2.4s ease-in-out infinite}
+.dev-card.charging .glow{animation:breathe-glow 2.4s ease-in-out infinite}
+.dev-card.low .bar{animation:blink-low 1.1s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes breathe-glow{0%,100%{opacity:0}50%{opacity:.55}}
+@keyframes blink-low{0%,100%{opacity:1}50%{opacity:.35}}
+.dev-ring .ico{position:absolute;inset:0;display:grid;place-items:center;font-size:30px;color:#fff}
+.dev-ring .bolt{position:absolute;right:2px;bottom:4px;width:24px;height:24px;border-radius:50%;background:var(--c);color:#06200f;
+  display:grid;place-items:center;font-size:12px;box-shadow:0 0 0 3px #1b1b25}
+.dev-name{font:700 14px var(--font);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev-pct{font:800 22px var(--font);color:var(--c);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.dev-sub{font:500 12px var(--font);color:var(--dim);min-height:16px}
+.dev-card .hide-btn{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;border:0;background:none;color:var(--dim);
+  cursor:pointer;opacity:0;transition:opacity .15s;font-size:13px}
+.dev-card:hover .hide-btn{opacity:1}
+.dev-card .hide-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.dev-sec{font:700 12px var(--font);letter-spacing:.08em;color:var(--dim);margin:6px 2px 0}
+.dev-empty{padding:30px 10px;text-align:center;color:var(--dim);font:500 14px/1.7 var(--font)}
+.dev-foot{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.07)}
+.dev-foot .row{border:0}
+.dev-foot .credit{grid-column:1/-1;font:400 11px var(--font);color:var(--dim)}
+.dev-foot .credit a{color:#b9a6ff}
+/* ───── 更新 ───── */
+#upd-bar{position:fixed;left:50%;top:46px;transform:translateX(-50%);z-index:12;display:none;align-items:center;gap:12px;padding:8px 8px 8px 16px;
+  border-radius:999px;background:rgba(30,30,44,.85);border:1px solid rgba(140,160,255,.35);backdrop-filter:blur(20px);
+  box-shadow:0 10px 40px rgba(0,0,0,.4);font:600 13px var(--font);white-space:nowrap}
+#upd-bar.show{display:flex;animation:pop .25s ease-out}
+#upd-bar .dot{width:8px;height:8px;border-radius:50%;background:#78aaff;box-shadow:0 0 10px #78aaff;animation:breathe 2s infinite}
+#upd-bar button{height:30px;padding:0 14px;border-radius:999px;border:0;font:700 12px var(--font);cursor:pointer}
+#upd-bar .ghost{background:none;color:#b9c8ff}
+#upd-bar .go{background:#78aaff;color:#0b1020}
+#upd-bar .x{background:none;color:var(--dim);padding:0 8px;font-size:16px}
+#upd-bar .prog{width:120px;height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
+#upd-bar .prog i{display:block;height:100%;width:0;background:#78aaff;transition:width .3s}
+.notes{font:400 14px/1.7 var(--font);color:rgba(255,255,255,.85)}
+.notes h4{font:700 15px var(--font);margin:12px 0 4px;color:#fff}
+.notes li{margin-left:20px}
+.notes code{font:12px Consolas,monospace;background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px}
+#new-dialog .dialog{width:min(560px,calc(100vw - 32px))}
+.new-hero{padding:26px 24px 6px;text-align:center}
+.new-hero img{width:72px;height:72px;border-radius:20px;box-shadow:0 10px 30px rgba(160,90,255,.45)}
+.new-hero .v{display:inline-block;margin-top:12px;padding:3px 10px;border-radius:999px;background:rgba(255,214,102,.15);color:#ffd666;font:700 12px var(--font)}
+.new-hero h2{font:800 20px/1.35 var(--font);margin:8px 0 0}
+.new-list{display:flex;flex-direction:column;gap:8px;padding:14px 20px;overflow:auto;min-height:0}
+.new-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.04)}
+.new-item .e{font-size:22px;line-height:1.2}
+.new-item b{display:block;font:700 14px var(--font);margin-bottom:2px}
+.new-item span{font:400 13px/1.6 var(--font);color:rgba(255,255,255,.7)}
+.new-foot{display:flex;gap:10px;justify-content:flex-end;padding:4px 20px 20px}
+.new-foot .msg{margin-right:auto;align-self:center;font:500 12px var(--font);color:#8fe3a6}
+
+/* ───── 只有設定的小視窗 (膠囊的「更多設定」) ───── */
+#set-bar{display:none}
+body.settings-only #app,body.settings-only #titlebar,body.settings-only #focus-exit,body.settings-only #conn,
+body.settings-only #upd-bar,body.settings-only #settings-close{display:none!important}
+body.settings-only #set-bar{display:flex;position:fixed;top:0;left:0;right:0;height:42px;z-index:20;align-items:center;user-select:none}
+#set-bar .drag{flex:1;height:100%;display:flex;align-items:center;gap:8px;padding-left:16px;font:700 13px var(--font);color:rgba(255,255,255,.75)}
+#set-bar .drag img{width:18px;height:18px;border-radius:5px}
+#set-bar button{width:44px;height:100%;border:0;background:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:13px}
+#set-bar button:hover{background:rgba(255,255,255,.1);color:#fff}
+#set-bar #set-close:hover{background:#e81123}
+body.settings-only #settings{display:block!important;position:fixed;inset:42px 0 0 0;width:auto;max-height:none;border-radius:0;
+  border:0;background:transparent;box-shadow:none;backdrop-filter:none;animation:none;padding:6px 20px 20px}
+
+/* ───── 整理過的控制列 ───── */
+#transport{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:-2px}
+#transport button{border:0;background:none;color:#fff;cursor:pointer;display:grid;place-items:center;border-radius:50%;
+  font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";transition:background .15s,transform .15s}
+#transport button:hover{background:rgba(255,255,255,.1)}
+#transport button:active{transform:scale(.92)}
+#transport .side{width:40px;height:40px;font-size:16px;color:rgba(255,255,255,.8)}
+#transport #btn-play{width:54px;height:54px;font-size:22px;background:#fff;color:#111}
+#transport #btn-play:hover{background:#fff;transform:scale(1.05)}
+#controls{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;justify-content:center;width:100%}
+.ibtn{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:58px;padding:8px 6px;border-radius:12px;border:0;background:none;
+  color:rgba(255,255,255,.72);font:500 11px var(--font);cursor:pointer;transition:background .15s,color .15s}
+.ibtn .fi{font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";font-size:17px;line-height:1}
+.ibtn:hover,.ibtn.on{background:rgba(255,255,255,.09);color:#fff}
+#lyr-src{display:block;width:100%;text-align:center;font-size:12px;color:var(--dim);margin-top:2px}
+#lyr-menu{position:fixed;z-index:12;display:none;min-width:250px;padding:6px;border-radius:14px;background:rgba(22,22,32,.92);
+  border:1px solid var(--glass-b);backdrop-filter:blur(24px);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#lyr-menu.open{display:block;animation:pop .15s ease-out}
+#lyr-menu > button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-radius:9px;background:none;color:#fff;
+  font:500 13px var(--font);cursor:pointer;text-align:left}
+#lyr-menu > button:hover{background:rgba(255,255,255,.08)}
+#lyr-menu .fi{font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";font-size:14px;width:18px;color:rgba(255,255,255,.7)}
+#lyr-menu .offset{display:flex;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid rgba(255,255,255,.07);margin-top:4px;font:500 13px var(--font)}
+#lyr-menu .offset span.lbl{flex:1;color:rgba(255,255,255,.75)}
+#lyr-menu .offset button{width:30px;height:30px;border-radius:8px;border:1px solid var(--glass-b);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;font-size:15px}
+#lyr-menu .offset button:hover{background:rgba(255,255,255,.12)}
+/* ───── 設定：分頁 ───── */
+#set-tabs{display:flex;gap:2px;padding:3px;margin:6px 0 4px;border-radius:12px;background:rgba(255,255,255,.06)}
+#set-tabs button{flex:1;height:32px;border:0;border-radius:9px;background:none;color:rgba(255,255,255,.6);font:600 12px var(--font);cursor:pointer;white-space:nowrap}
+#set-tabs button.on{background:rgba(255,255,255,.14);color:#fff}
+#settings .pane{display:none}
+#settings .pane.on{display:block;animation:fade .2s ease-out}
+#settings .pane > h3:first-child{margin-top:12px}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}}
 </style>
 </head>
 <body>
 <div id="bg" data-mode="album"><div class="art" id="bg-art"></div><div id="bg-custom"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
 <div id="grain"></div>
 
+<header id="set-bar"><div class="drag pywebview-drag-region"><img src="/icon.png" alt="">Hummi 設定</div>
+  <button id="set-expand" class="fi" title="打開完整視窗">&#xE740;</button><button id="set-close" class="fi" title="關閉">&#xE8BB;</button></header>
 <header id="titlebar">
-  <div id="tb-drag" class="pywebview-drag-region"><span class="note">♪</span>Now Playing Lyrics</div>
+  <div id="tb-drag" class="pywebview-drag-region"><span class="note">♪</span>Hummi 哼哼</div>
   <div class="tb-btns">
-    <button id="tb-mini" title="迷你模式（小視窗＋置頂）"><svg viewBox="0 0 14 14"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5"/><rect x="7" y="7" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg></button>
+    <button id="tb-mini" title="膠囊模式（縮到螢幕頂端，滑鼠移上去展開）"><svg viewBox="0 0 14 14"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5"/><rect x="7" y="7" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg></button>
     <button id="tb-pin" title="視窗置頂"><svg viewBox="0 0 14 14"><path d="M5 1.5h4l-.5 4 2 2h-7l2-2zM7 7.5v5"/></svg></button>
     <button id="tb-min" title="最小化"><svg viewBox="0 0 14 14"><path d="M2 7h10"/></svg></button>
     <button id="tb-max" title="最大化"><svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg></button>
@@ -256,16 +382,19 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
       <div id="bar" title="點擊跳轉"><div id="fill"></div></div>
       <div class="times"><span id="t-cur">0:00</span><span id="t-dur">0:00</span></div>
     </div>
+    <div id="transport">
+      <button class="side" id="btn-prev" title="上一首">&#xF8AC;</button>
+      <button id="btn-play" title="播放 / 暫停 (空白鍵)">&#xF5B0;</button>
+      <button class="side" id="btn-next" title="下一首">&#xF8AD;</button>
+    </div>
     <div id="controls">
-      <button class="chip icon" id="btn-play" title="播放 / 暫停 (空白鍵)">⏯</button>
-      <button class="chip icon" id="off-minus" title="歌詞提早 0.25 秒 (←)">−</button>
-      <span id="offset-val">±0.00s</span>
-      <button class="chip icon" id="off-plus" title="歌詞延後 0.25 秒 (→)">+</button>
-      <button class="chip" id="btn-refetch" title="重新搜尋歌詞">↻ 歌詞</button>
-      <button class="chip" id="btn-lyrsearch" title="手動搜尋、選擇或貼上歌詞">🔍 找歌詞</button>
-      <button class="chip icon" id="btn-focus" title="只顯示歌詞 (H)">⤢</button>
-      <button class="chip" id="btn-settings" title="設定 (字體、浮動歌詞、開機啟動)">⚙ 設定</button>
-      <span id="lyr-src"></span>
+      <button class="ibtn" id="btn-lyrmenu" title="重新找歌詞、手動搜尋、調整歌詞時間"><span class="fi">&#xE8D6;</span>歌詞</button>
+      <button class="ibtn" id="btn-stage" title="全螢幕歌詞演出 (唱歌台、OBS)"><span class="fi">&#xE7F4;</span>舞台</button>
+      <button class="ibtn" id="btn-devices" title="耳機、滑鼠、鍵盤、手把的電量"><span class="fi">&#xE7F6;</span>裝置</button>
+      <button class="ibtn" id="btn-focus" title="只顯示歌詞 (H)"><span class="fi">&#xE740;</span>專注</button>
+      <button class="ibtn" id="btn-settings" title="設定"><span class="fi">&#xE713;</span>設定</button>
+    </div>
+    <span id="lyr-src"></span>
     </div>
   </section>
 
@@ -277,8 +406,17 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
 </main>
 
 <div id="menu"></div>
+<div id="lyr-menu">
+  <button id="btn-refetch"><span class="fi">&#xE72C;</span>重新找歌詞</button>
+  <button id="btn-lyrsearch"><span class="fi">&#xE721;</span>手動搜尋歌詞</button>
+  <button id="btn-lyrpaste"><span class="fi">&#xE77F;</span>貼上 / 匯入 LRC</button>
+  <div class="offset"><span class="lbl">歌詞時間</span><button id="off-minus" title="歌詞提早 0.25 秒 (←)">−</button>
+    <span id="offset-val">±0.00s</span><button id="off-plus" title="歌詞延後 0.25 秒 (→)">+</button></div>
+</div>
 <aside id="settings" aria-label="設定">
   <h2>設定 <button id="settings-close" aria-label="關閉">×</button></h2>
+  <nav id="set-tabs"><button data-tab="look" class="on">外觀</button><button data-tab="overlay">浮動歌詞</button><button data-tab="ai">歌詞</button><button data-tab="stage">舞台</button><button data-tab="general">一般</button></nav>
+  <div class="pane on" data-pane="look">
   <h3>字體</h3>
   <button id="font-btn"><span class="fname" id="font-name">預設</span><span class="chev">▾</span></button>
   <div id="font-picker">
@@ -288,8 +426,8 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
   </div>
   <p class="hint" style="margin:8px 0 0">主視窗和浮動歌詞都會套用。字體沒有中文字時，中文會自動用微軟正黑體顯示。</p>
   <h3>背景</h3>
-  <div class="seg four" id="bg-modes">
-    <button data-bg="album">專輯封面</button><button data-bg="color">純色</button><button data-bg="gradient">漸層</button><button data-bg="image">圖片</button>
+  <div class="seg five" id="bg-modes">
+    <button data-bg="mica" title="Windows 11 的系統材質，透出桌布的顏色">Mica</button><button data-bg="album">專輯封面</button><button data-bg="color">純色</button><button data-bg="gradient">漸層</button><button data-bg="image">圖片</button>
   </div>
   <div class="row" id="bg-colors-row">顏色 <span id="bg-colors"><input type="color" data-bgk="color1" title="顏色 1"><input type="color" data-bgk="color2" title="顏色 2"></span></div>
   <div class="row" id="bg-image-row-wrap">圖片
@@ -299,6 +437,8 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
   <div class="row col"><div class="row" style="border:0;padding:0">模糊 <output id="o-bg-blur"></output></div><input type="range" min="0" max="150" step="2" data-bgk="blur"></div>
   <div class="row col"><div class="row" style="border:0;padding:0">變暗 <output id="o-bg-dim"></output></div><input type="range" min="0" max="90" step="5" data-bgk="dim"></div>
   <label class="row">流動光暈 <span class="switch"><input type="checkbox" data-bgk="blobs"><span></span></span></label>
+  </div>
+  <div class="pane" data-pane="overlay">
   <h3>浮動歌詞</h3>
   <p class="hint">歌詞浮在所有視窗最上層，滑鼠點擊會穿透，玩遊戲或工作都不受影響。系統匣圖示也能調整。</p>
   <label class="row">顯示浮動歌詞 <span class="switch"><input type="checkbox" data-k="enabled"><span></span></span></label>
@@ -313,17 +453,66 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
   <div class="row col"><div class="row" style="border:0;padding:0">背景深度 <output id="o-bg_opacity"></output></div><input type="range" min="0" max="90" step="5" data-k="bg_opacity"></div>
   <label class="row">顯示翻譯 <span class="switch"><input type="checkbox" data-k="show_translation"><span></span></span></label>
   <label class="row">顯示下一句 <span class="switch"><input type="checkbox" data-k="show_next"><span></span></span></label>
+  <label class="row" title="主視窗或舞台本來就在顯示歌詞，浮動歌詞先藏起來，畫面才不會同時好幾份歌詞">主視窗或舞台開著時自動隱藏 <span class="switch"><input type="checkbox" data-k="auto_hide"><span></span></span></label>
   <label class="row">用專輯配色 <span class="switch"><input type="checkbox" data-k="color" data-on="album" data-off="white"><span></span></span></label>
+  </div>
+  <div class="pane" data-pane="ai">
   <h3>AI 歌詞</h3>
   <p class="hint">四個歌詞來源都沒有同步歌詞時，AI 會聽正在播放的聲音：沒有歌詞就邊聽邊寫，有歌詞沒時間就自動對時。聽完整首後會存起來，下次播放就完全同步。</p>
   <label class="row">啟用 AI 歌詞 <span class="switch"><input type="checkbox" data-aik="enabled"><span></span></span></label>
   <label class="row" title="AI 只錄播放器的聲音，不會錄到遊戲；這個選項是為了不占用遊戲的顯示卡效能">玩全螢幕遊戲時暫停（省效能） <span class="switch"><input type="checkbox" data-aik="pause_fullscreen"><span></span></span></label>
   <div id="ai-status"></div>
-  <h3>其他</h3>
+  </div>
+  <div class="pane" data-pane="stage">
+  <h3>Hummi 舞台</h3>
+  <p class="hint">全螢幕的歌詞演出，有 Folia 的 17 種歌詞動畫，和 Hummi 自己的 13 種效果。舞台裡按「複製 OBS 網址」就能放進直播畫面。</p>
+  <div class="row">打開舞台 <button class="chip" id="open-stage">打開</button></div>
+  <h3>Folia 桌面版 (進階)</h3>
+  <p class="hint">如果你另外安裝了 <a href="#" id="folia-link" style="color:#b9a6ff">Folia</a>，也可以把歌和歌詞送進它的舞台模式 (要先在 Folia 設定裡開啟 Stage 模式)。一般不需要，Hummi 舞台已經內建 Folia 的效果。</p>
+  <label class="row">送到 Folia 桌面版 <span class="switch"><input type="checkbox" id="folia-on"><span></span></span></label>
+  <p class="hint" id="folia-status" style="margin:6px 0 0"></p>
+  </div>
+  <div class="pane" data-pane="general">
+  <h3>啟動與更新</h3>
   <label class="row" id="autostart-row">開機時自動啟動 <span class="switch"><input type="checkbox" id="autostart"><span></span></span></label>
+  <label class="row">自動檢查更新 <span class="switch"><input type="checkbox" id="auto-update"><span></span></span></label>
+  <div class="row">更新與分享 <span style="display:flex;gap:6px"><button class="chip" id="upd-check">檢查更新</button><button class="chip" id="share-btn">分享 Hummi</button></span></div>
+  <p class="hint" id="upd-check-msg" style="margin:4px 0 0"></p>
   <p class="hint" style="margin:12px 0 0">全域快捷鍵：<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd> 解鎖拖曳 · <kbd>H</kbd> 隱藏 · <kbd>←</kbd><kbd>→</kbd> 調整歌詞快慢</p>
   <div id="ver"></div>
+  </div>
 </aside>
+
+<div id="upd-bar"><span class="dot"></span><span id="upd-text"></span><span class="prog" id="upd-prog" hidden><i></i></span>
+  <button class="ghost" id="upd-notes">看更新內容</button><button class="go" id="upd-go">立即更新</button><button class="x" id="upd-x" aria-label="稍後">×</button></div>
+<div class="modal" id="dev-dialog" role="dialog" aria-label="裝置電量">
+  <div class="dialog">
+    <header><h2><span class="fi">&#xE772;</span>裝置電量</h2>
+      <button class="icon-btn fi" id="dev-refresh" title="重新讀取">&#xE72C;</button><button class="x" id="dev-close" aria-label="關閉">×</button></header>
+    <div class="body" id="dev-body"></div>
+    <div class="dev-foot">
+      <label class="row">讀取裝置電量 <span class="switch"><input type="checkbox" id="dev-enabled"><span></span></span></label>
+      <label class="row">系統匣顯示裝置圖示 <span class="switch"><input type="checkbox" id="dev-tray"><span></span></span></label>
+      <div class="row col" style="grid-column:1/-1;border:0;padding:0"><div class="row" style="border:0;padding:0">低電量提醒 <output id="o-dev-low"></output></div>
+        <input type="range" min="5" max="50" step="5" id="dev-low"></div>
+      <div class="credit">2.4G 接收器裝置 (羅技、Razer、SteelSeries…) 的讀取程式來自開源專案 <a href="#" id="halo-link">HaloBattery</a> (MIT 授權)。原廠軟體 (G HUB、Synapse) 開著時偶爾會讀不到。</div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="upd-dialog" role="dialog" aria-label="更新">
+  <div class="dialog">
+    <header><button class="tab on">有新版本 <span id="upd-v"></span></button><button class="x" id="upd-close" aria-label="關閉">×</button></header>
+    <div class="body notes" id="upd-body"></div>
+    <div class="new-foot"><span class="msg" id="upd-msg"></span><button class="chip" id="upd-page">前往下載頁</button><button class="chip primary" id="upd-go2">立即更新</button></div>
+  </div>
+</div>
+<div class="modal" id="new-dialog" role="dialog" aria-label="新功能">
+  <div class="dialog">
+    <div class="new-hero"><img src="/icon.png" alt=""><div class="v" id="new-v"></div><h2 id="new-title"></h2></div>
+    <div class="new-list" id="new-list"></div>
+    <div class="new-foot"><span class="msg" id="new-msg"></span><button class="chip" id="new-share">分享給朋友</button><button class="chip primary" id="new-ok">知道了</button></div>
+  </div>
+</div>
 <div id="conn">⚠ 與本機伺服器斷線，重新連線中…</div>
 <div class="modal" id="lyr-dialog" role="dialog" aria-label="找歌詞">
   <div class="dialog">
@@ -360,7 +549,14 @@ function connect(){
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.onopen = () => { $('#conn').classList.remove('show'); send({type:'hello', w: innerWidth, h: innerHeight, dpr: devicePixelRatio, app: document.body.classList.contains('app')}); };
   ws.onclose = () => { $('#conn').classList.add('show'); setTimeout(connect, 1000); };
-  ws.onmessage = e => { const m = JSON.parse(e.data); m.type === 'state' ? onState(m) : onLyrics(m); };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'open_settings'){ if (!settingsOnly){ panel.classList.add('open'); syncSettings(true); } return; }
+    if (m.type === 'open_devices'){ if (!settingsOnly) openDevices(); return; }
+    if (m.type === 'devices'){ devState = m; renderDevices(); return; }
+    if (m.type === 'update'){ onUpdate(m); return; }
+    m.type === 'state' ? onState(m) : onLyrics(m);
+  };
 }
 const send = o => ws?.readyState === 1 && ws.send(JSON.stringify(o));
 
@@ -368,9 +564,16 @@ function onState(m){
   sessions = m.sessions || []; pinned = m.pinned;
   if (m.config){
     cfg = m.config; unlocked = m.unlocked; autostart = !!m.autostart; canAutostart = !!m.can_autostart;
-    if (m.version) $('#ver').textContent = `Now Playing Lyrics v${m.version}`;
+    if (m.version) $('#ver').textContent = `Hummi 哼哼 v${m.version}`;
     aiStatus = m.ai; renderAiStatus();
     applyFont(cfg.font);
+    micaOK = !!m.mica && document.body.classList.contains('app');
+    if ($('#folia-on')){
+      if (performance.now() - foliaEdit > 1500) $('#folia-on').checked = !!cfg.folia?.enabled;
+      const fs = m.folia || {};
+      const dot = {connected: '🟢 ', waiting: '🟡 ', error: '🔴 '}[fs.state] || '';
+      $('#folia-status').textContent = cfg.folia?.enabled ? dot + (fs.detail || '正在連線…') : '';
+    }
     if (cfg.background) applyBackground(cfg.background);
     if (performance.now() - offsetEditedAt > 1500 && cfg.offset !== offset) setOffset(cfg.offset, false);
     syncSettings();
@@ -674,9 +877,17 @@ $('#source').onclick = e => {
   sessions.forEach(s => add(`${s.playing ? '▶ ' : '⏸ '}${s.source}`, `${s.title}${s.artist ? ' · ' + s.artist : ''}`, s.app));
   menu.classList.add('open');
 };
-addEventListener('click', () => { menu.classList.remove('open'); panel.classList.remove('open'); });
+addEventListener('click', () => { menu.classList.remove('open'); if (!settingsOnly) panel.classList.remove('open'); });
 
 // ───── 獨立視窗模式 ─────
+const settingsOnly = new URLSearchParams(location.search).has('settings');
+if (settingsOnly){  // 膠囊的「更多設定」：只顯示設定面板的小視窗
+  document.body.classList.add('settings-only');
+  panel.classList.add('open');
+  document.title = 'Hummi 設定';
+  $('#set-expand').onclick = () => window.pywebview?.api?.expand();
+  $('#set-close').onclick = () => window.pywebview?.api?.close();
+}
 if (new URLSearchParams(location.search).has('app')){
   document.body.classList.add('app');
   const api = () => window.pywebview?.api;
@@ -685,14 +896,7 @@ if (new URLSearchParams(location.search).has('app')){
   $('#tb-drag').ondblclick = () => api()?.toggle_maximize();
   $('#tb-close').onclick = () => api()?.hide();
   $('#tb-pin').onclick = async () => { const on = await api()?.toggle_on_top(); $('#tb-pin').classList.toggle('on', !!on); };
-  $('#tb-mini').onclick = async () => {
-    const mini = !document.body.classList.contains('mini');
-    document.body.classList.toggle('mini', mini);
-    $('#tb-mini').classList.toggle('on', mini);
-    const on = await api()?.mini(mini);
-    $('#tb-pin').classList.toggle('on', !!on);
-    activeIdx = -2;
-  };
+  $('#tb-mini').onclick = () => api()?.notch ? api().notch() : send({type: 'notch', value: true});
 }
 
 // ───── AI 歌詞 ─────
@@ -736,13 +940,16 @@ function applyBlobColors(){
   const cols = (m === 'color' || m === 'gradient') ? [bgCfg.color1, bgCfg.color2, bgCfg.color1] : albumColors;
   if (cols) cols.forEach((c,i) => document.documentElement.style.setProperty(`--c${i+1}`, c));
 }
+let micaOK = false;
 function applyBackground(b){
-  const key = JSON.stringify(b);
+  const key = JSON.stringify(b) + micaOK;
   if (key === bgKey) return;
   bgKey = key; bgCfg = b;
   const bg = $('#bg'), root = document.documentElement.style;
-  const mode = (b.mode === 'image' && !b.image) ? 'album' : b.mode;
+  let mode = (b.mode === 'image' && !b.image) ? 'album' : b.mode;
+  if (mode === 'mica' && !micaOK) mode = 'album';  // Windows 10 或瀏覽器：沒有 Mica
   bg.dataset.mode = mode;
+  document.documentElement.classList.toggle('mica', mode === 'mica');
   bg.classList.toggle('no-blobs', !b.blobs);
   root.setProperty('--bg1', b.color1); root.setProperty('--bg2', b.color2);
   root.setProperty('--bg-blur', b.blur + 'px'); root.setProperty('--bg-dim', b.dim / 100);
@@ -877,6 +1084,167 @@ $('#lyr-apply').onclick = async () => {
 
 connect();
 requestAnimationFrame(frame);
+
+// ───── 裝置電量 ─────
+const openUrl = u => send({type: 'open_url', url: u});  // 用系統瀏覽器打開
+let devState = {list: [], low: 15, tray: true, enabled: true};
+const DEV_ICON = {headphones:'\uE7F6', controller:'\uE7FC', mouse:'\uE962', keyboard:'\uE765', phone:'\uE8EA', laptop:'\uE7F8', speaker:'\uE7F5', pen:'\uE76D', device:'\uE772'};
+const devColor = (lv, ch) => ch || lv > 30 ? '#30d158' : lv > 15 ? '#ffb020' : '#ff453a';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function devSub(d){
+  if (!d.connected) return '沒有連線 · 上次 ' + d.level + '%';
+  if (d.charging) return d.level >= 100 ? '已充飽' : '充電中';
+  if (d.hours) return d.hours >= 2 ? `大約還能用 ${Math.round(d.hours)} 小時` : `大約還能用 ${Math.round(d.hours * 60)} 分鐘`;
+  return '';
+}
+function devCard(d){
+  const c = devColor(d.level, d.charging), C = 2 * Math.PI * 40, len = Math.max(.03, d.level / 100) * C;
+  const cls = ['dev-card', !d.connected && 'off', d.hidden && 'hidden', d.charging && 'charging', d.connected && !d.charging && d.level <= devState.low && 'low'].filter(Boolean).join(' ');
+  return `<div class="${cls}" style="--c:${c}">
+    <button class="hide-btn fi" data-hide="${esc(d.id)}" data-v="${d.hidden ? 0 : 1}" title="${d.hidden ? '顯示在系統匣和膠囊' : '不要顯示這個裝置'}">${d.hidden ? '\uE7B3' : '\uED1A'}</button>
+    <div class="dev-ring"><svg viewBox="0 0 96 96"><circle class="track" cx="48" cy="48" r="40"/>
+      <circle class="glow" cx="48" cy="48" r="40" stroke-dasharray="${len} ${C}"/>
+      <circle class="bar" cx="48" cy="48" r="40" stroke-dasharray="${len} ${C}"/></svg>
+      <div class="ico fi">${DEV_ICON[d.kind] || DEV_ICON.device}</div>${d.charging ? '<div class="bolt fi">\uE945</div>' : ''}</div>
+    <div class="dev-name" title="${esc(d.name)}">${esc(d.name)}</div>
+    <div class="dev-pct">${d.level}%</div><div class="dev-sub">${esc(devSub(d))}</div></div>`;
+}
+function renderDevices(){
+  const body = $('#dev-body');
+  if (!body) return;
+  const L = devState.list || [];
+  const on = L.filter(d => d.connected && !d.hidden), off = L.filter(d => !d.connected && !d.hidden), hid = L.filter(d => d.hidden);
+  if (!devState.enabled) body.innerHTML = '<div class="dev-empty">裝置電量已關閉。打開下面的「讀取裝置電量」就會開始讀。</div>';
+  else if (!L.length) body.innerHTML = '<div class="dev-empty">還沒找到有電量資訊的裝置。<br>藍牙耳機、鍵盤、手把，或羅技 / Razer / SteelSeries 等 2.4G 接收器的滑鼠、耳機，連上後就會出現在這裡。</div>';
+  else body.innerHTML =
+      (on.length ? `<div class="dev-grid">${on.map(devCard).join('')}</div>` : '<div class="dev-empty">目前沒有連線中的裝置</div>') +
+      (off.length ? `<div class="dev-sec">沒有連線</div><div class="dev-grid">${off.map(devCard).join('')}</div>` : '') +
+      (hid.length ? `<div class="dev-sec">已隱藏</div><div class="dev-grid">${hid.map(devCard).join('')}</div>` : '');
+  body.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => send({type:'devices', action:'hide', id:b.dataset.hide, value: b.dataset.v === '1'}));
+  $('#dev-enabled').checked = !!devState.enabled;
+  $('#dev-tray').checked = !!devState.tray;
+  if (performance.now() - devLowEdit > 800) $('#dev-low').value = devState.low;
+  $('#o-dev-low').textContent = devState.low + '%';
+}
+let devLowEdit = 0;
+function openDevices(){ $('#dev-dialog').classList.add('open'); send({type:'devices', action:'refresh'}); renderDevices(); }
+$('#dev-close').onclick = () => $('#dev-dialog').classList.remove('open');
+$('#dev-dialog').onclick = e => { if (e.target.id === 'dev-dialog') $('#dev-dialog').classList.remove('open'); };
+$('#dev-refresh').onclick = () => send({type:'devices', action:'refresh'});
+$('#dev-enabled').onchange = e => send({type:'devices', action:'enabled', value: e.target.checked});
+$('#dev-tray').onchange = e => send({type:'devices', action:'tray', value: e.target.checked});
+$('#dev-low').oninput = e => { devLowEdit = performance.now(); $('#o-dev-low').textContent = e.target.value + '%'; };
+$('#dev-low').onchange = e => send({type:'devices', action:'low', value: +e.target.value});
+$('#halo-link').onclick = e => { e.preventDefault(); openUrl('https://github.com/HeyOkay/HaloBattery'); };
+$('#btn-devices').onclick = openDevices;
+
+// ───── 更新 / 新功能 ─────
+let upd = null, updDismissed = '';
+function mdLite(t){
+  const lines = esc(t).split(/\r?\n/);
+  let out = '', inList = false;
+  for (let l of lines){
+    l = l.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '<code>$1</code>');
+    if (/^\s*[-*] /.test(l)){ if (!inList){ out += '<ul>'; inList = true; } out += '<li>' + l.replace(/^\s*[-*] /, '') + '</li>'; continue; }
+    if (inList){ out += '</ul>'; inList = false; }
+    if (/^#{1,6} /.test(l)) out += '<h4>' + l.replace(/^#+ /, '') + '</h4>';
+    else if (/^&gt; /.test(l)) out += '<p style="color:var(--dim)">' + l.slice(5) + '</p>';
+    else if (l.trim()) out += '<p>' + l + '</p>';
+  }
+  return out + (inList ? '</ul>' : '');
+}
+function onUpdate(m){
+  upd = m;
+  const av = m.available, bar = $('#upd-bar');
+  const busy = m.state === 'downloading' || m.state === 'installing';
+  if (av && (updDismissed !== av.version || busy)){
+    $('#upd-text').textContent = m.state === 'downloading' ? `正在下載 v${av.version}…` : m.state === 'installing' ? '正在安裝，馬上重新開啟…' : `有新版本 v${av.version}`;
+    $('#upd-prog').hidden = !busy;
+    $('#upd-prog i').style.width = Math.round((m.progress || 0) * 100) + '%';
+    $('#upd-go').hidden = busy; $('#upd-notes').hidden = busy; $('#upd-x').hidden = busy;
+    $('#upd-go').textContent = m.can_install && av.url ? '立即更新' : '前往下載';
+    bar.classList.add('show');
+  } else bar.classList.remove('show');
+  $('#upd-msg').textContent = m.error || '';
+  if (av){
+    $('#upd-v').textContent = 'v' + av.version;
+    $('#upd-body').innerHTML = mdLite(av.notes || '（這個版本沒有寫更新內容）');
+    $('#upd-go2').hidden = !(m.can_install && av.url) || busy;
+  }
+  if (m.open && av && !settingsOnly) $('#upd-dialog').classList.add('open');
+  else if (m.open && m.whatsnew) showWhatsNew(m.whatsnew);
+  if (m.whatsnew && !whatsNewShown && document.body.classList.contains('app') && !settingsOnly) showWhatsNew(m.whatsnew);
+  $('#upd-check-msg') && ($('#upd-check-msg').textContent = m.error ? m.error : av ? `有新版本 v${av.version}` : (m.state === 'idle' && updChecking ? '已經是最新版本' : ''));
+  if ($('#auto-update')) $('#auto-update').checked = !!m.auto;
+  updChecking = false;
+}
+let whatsNewShown = false, updChecking = false;
+function showWhatsNew(w){
+  whatsNewShown = true;
+  $('#new-v').textContent = 'v' + w.version + ' 新功能';
+  $('#new-title').textContent = w.title || '';
+  $('#new-list').innerHTML = (w.items || []).map(([e, t, d]) => `<div class="new-item"><div class="e">${e}</div><div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join('');
+  $('#new-dialog').classList.add('open');
+}
+const doUpdate = () => {
+  const av = upd && upd.available;
+  if (!av) return;
+  if (upd.can_install && av.url) send({type:'update', action:'install'});
+  else openUrl(av.page || upd.page);
+};
+$('#upd-go').onclick = doUpdate;
+$('#upd-go2').onclick = () => { doUpdate(); $('#upd-dialog').classList.remove('open'); };
+$('#upd-notes').onclick = () => $('#upd-dialog').classList.add('open');
+$('#upd-x').onclick = () => { updDismissed = upd?.available?.version || ''; $('#upd-bar').classList.remove('show'); };
+$('#upd-close').onclick = () => $('#upd-dialog').classList.remove('open');
+$('#upd-page').onclick = () => openUrl((upd && upd.available && upd.available.page) || (upd && upd.page));
+$('#new-ok').onclick = () => { $('#new-dialog').classList.remove('open'); send({type:'update', action:'seen'}); };
+const SHARE_URL = 'https://github.com/42102718/NowPlayingLyrics/releases/latest';
+async function share(msgEl){
+  const v = upd ? upd.current : '';
+  const text = `我在用 Hummi 哼哼${v ? ' v' + v : ''}：Spotify / YouTube Music 即時同步歌詞、螢幕頂端的小膠囊、耳機滑鼠電量都看得到。免費下載 👉 ${SHARE_URL}`;
+  try { await navigator.clipboard.writeText(text); msgEl.textContent = '已複製，貼給朋友就好！'; }
+  catch { msgEl.textContent = SHARE_URL; }
+}
+$('#new-share').onclick = () => share($('#new-msg'));
+
+$('#upd-check').onclick = () => { updChecking = true; $('#upd-check-msg').textContent = '正在檢查…'; send({type:'update', action:'check'}); };
+$('#share-btn').onclick = () => share($('#upd-check-msg'));
+$('#auto-update').onchange = e => send({type:'update', action:'auto', value: e.target.checked});
+let foliaEdit = 0;
+$('#folia-on').onchange = e => { foliaEdit = performance.now(); send({type: 'folia', value: e.target.checked}); };
+$('#folia-link').onclick = e => { e.preventDefault(); openUrl('https://github.com/chthollyphile/folia-major'); };
+const openStage = () => send({type: 'open_stage'});
+$('#btn-stage').onclick = openStage;
+$('#open-stage').onclick = openStage;
+
+// ───── 整理過的控制列 ─────
+$('#btn-prev').onclick = () => send({type: 'prev'});
+$('#btn-next').onclick = () => send({type: 'next'});
+const lyrMenu = $('#lyr-menu');
+$('#btn-lyrmenu').onclick = e => {
+  e.stopPropagation();
+  const r = $('#btn-lyrmenu').getBoundingClientRect();
+  lyrMenu.style.left = Math.max(8, r.left) + 'px';
+  lyrMenu.style.top = '';
+  lyrMenu.classList.toggle('open');
+  const h = lyrMenu.offsetHeight;
+  lyrMenu.style.top = Math.max(8, r.top - h - 8) + 'px';
+  $('#btn-lyrmenu').classList.toggle('on', lyrMenu.classList.contains('open'));
+};
+lyrMenu.onclick = e => { if (!e.target.closest('.offset')) { lyrMenu.classList.remove('open'); $('#btn-lyrmenu').classList.remove('on'); } e.stopPropagation(); };
+addEventListener('click', () => { lyrMenu.classList.remove('open'); $('#btn-lyrmenu').classList.remove('on'); });
+$('#btn-lyrpaste').onclick = () => openLyrDialog('paste');
+// 播放鍵：播放中顯示暫停
+setInterval(() => { const g = playing ? '\uF8AE' : '\uF5B0'; if ($('#btn-play').textContent !== g) $('#btn-play').textContent = g; }, 300);
+// 設定分頁 (記住上次看的)
+function setTab(name){
+  document.querySelectorAll('#set-tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  document.querySelectorAll('#settings .pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
+  try { localStorage.setItem('setTab', name); } catch {}
+}
+document.querySelectorAll('#set-tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+try { const t = localStorage.getItem('setTab'); if (t) setTab(t); } catch {}
 </script>
 </body>
 </html>

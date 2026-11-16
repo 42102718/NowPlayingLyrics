@@ -12,3 +12,7 @@ faster-whisper
 soundcard
 numpy
 comtypes
+hidapi
+pyusb
+libusb-package
+pyserial

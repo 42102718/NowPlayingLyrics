@@ -18,3 +18,11 @@ installer/wizard_*.bmp
 __pycache__/
 *.pyc
 .claude/
+
+# Folia 原始碼 (打包用，不 commit；版本記在 folia_web/FOLIA_SOURCE.txt)
+third_party/
+# 使用者安裝的 Folia 桌面版 (不是 Hummi 的一部分)
+Folia/
+
+# 裝置電量歷史 (開發時存在原始碼資料夾)
+battery_history.json

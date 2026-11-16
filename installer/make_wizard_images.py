@@ -34,8 +34,9 @@ def big(scale):
     img.alpha_composite(ic, (int((w - s) / 2), int(58 * scale)))
     d = ImageDraw.Draw(img)
     # 標題
-    f1 = ImageFont.truetype(FONT, int(17 * scale))
-    for i, line in enumerate(("Now Playing", "Lyrics")):
+    f1 = ImageFont.truetype(FONT, int(19 * scale))
+    f2 = ImageFont.truetype(os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "msjhbd.ttc"), int(15 * scale))
+    for i, (line, f1) in enumerate((("Hummi", f1), ("哼哼", f2))):
         tw = d.textlength(line, font=f1)
         d.text(((w - tw) / 2, 172 * scale + i * 22 * scale), line, font=f1, fill=(255, 255, 255, 255))
     # 歌詞線裝飾 (中間那條最亮，像正在唱的那句)

@@ -1,0 +1,1058 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hummi 舞台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Serif+TC:wght@600;900&family=Inter:wght@500;800;900&display=swap" rel="stylesheet">
+<style>
+/* ───────── Hummi 舞台：唱歌台 / OBS 用的歌詞演出 ─────────
+   ?obs=1 → OBS 瀏覽器來源 (沒有設定面板、滑鼠游標)，其他參數：mode、bg、size、tr、card、next、font */
+:root{
+  --accent:#ffffff; --accent2:#b9a6ff; --c1:#3a2a6a; --c2:#a04a7a; --c3:#1f4a7a; --c4:#2a6a5a;
+  --size:1; --beat:0; --energy:0;
+  --font:"Noto Sans TC","Inter",system-ui,sans-serif;
+  --dim:rgba(255,255,255,.32);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{width:100%;height:100%;overflow:hidden;background:#05050a;color:#fff;font-family:var(--font);-webkit-font-smoothing:antialiased}
+body.transparent,body.transparent html{background:transparent}
+body.obs{cursor:none}
+#bg,#bg canvas,#cover-bg{position:fixed;inset:0;width:100%;height:100%}
+#cover-bg{inset:-12%;width:124%;height:124%;background-size:cover;background-position:center;filter:blur(70px) saturate(1.5) brightness(.55);
+  opacity:0;transition:opacity 1.2s, background-image 1s;transform:scale(calc(1 + var(--beat) * .03))}
+body.bg-cover #cover-bg,body.bg-fluid #cover-bg,body.bg-particles #cover-bg{opacity:1}
+body.bg-fluid #cover-bg{opacity:.45}
+body.bg-particles #cover-bg{opacity:.35}
+body.transparent #cover-bg{display:none}
+body.scene #cover-bg{opacity:0!important}
+body.scene.transparent{background:#05050a}
+#vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 55%,transparent 40%,rgba(0,0,0,.55) 100%)}
+body.transparent #vignette{display:none}
+
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;perspective:1200px;overflow:hidden}
+.ln{position:absolute;left:5vw;right:5vw;top:50%;translate:0 -50%;text-align:center;font-weight:900;font-size:calc(7.6vmin * var(--size));line-height:1.22;
+  letter-spacing:.01em;will-change:transform,opacity,filter}
+.ln .tr{display:block;font-weight:700;font-size:.42em;margin-top:.45em;opacity:.75;letter-spacing:.02em}
+.w{display:inline-block;white-space:pre;will-change:transform}
+/* 共用：逐字填色 (--p = 這個字唱到幾成) */
+.fill .w{background:linear-gradient(90deg,var(--accent) calc(var(--p,0)*100%),var(--dim) calc(var(--p,0)*100% + .01%));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.shadow .w{filter:drop-shadow(0 .06em .18em rgba(0,0,0,.55))}
+
+/* 1. 浮空：一句一句從下方浮上來，帶景深模糊，唱的時候輕輕漂浮 */
+.m-float .ln{transition:transform 1.1s cubic-bezier(.2,.8,.2,1),opacity 1s,filter 1s}
+.m-float .ln.enter{transform:translateY(1.3em) scale(.92);opacity:0;filter:blur(14px)}
+.m-float .ln.cur{transform:translateY(0) scale(1);opacity:1;filter:blur(0);animation:bob 5s ease-in-out infinite}
+.m-float .ln.prev{transform:translateY(-1.6em) scale(.86);opacity:0;filter:blur(10px)}
+.m-float .ln.next{transform:translateY(1.9em) scale(.7);opacity:.28;filter:blur(2px)}
+.m-float .ln.cur .w.on{text-shadow:0 0 .4em color-mix(in srgb,var(--accent) 55%,transparent)}
+@keyframes bob{0%,100%{margin-top:0}50%{margin-top:-.12em}}
+
+/* 2. 飛入：每個字從四面八方飛進來，下一句來時往外散開 */
+.m-fly .ln{transition:opacity .6s}
+.m-fly .ln .w{opacity:0;transform:translate(var(--fx),var(--fy)) rotate(var(--fr)) scale(2.2);filter:blur(8px);
+  transition:transform .75s cubic-bezier(.18,1.35,.4,1),opacity .45s,filter .6s}
+.m-fly .ln .w.in{opacity:1;transform:none;filter:none}
+.m-fly .ln .w.on{color:var(--accent);text-shadow:0 0 .35em color-mix(in srgb,var(--accent) 60%,transparent)}
+.m-fly .ln.prev .w{opacity:0;transform:translate(calc(var(--fx) * -1.2),calc(var(--fy) * -1.2)) rotate(calc(var(--fr) * -1)) scale(.4);filter:blur(6px);
+  transition:transform .9s cubic-bezier(.5,0,.8,.4),opacity .8s,filter .8s}
+.m-fly .ln.next{opacity:0}
+.m-fly .ln .tr{transition:opacity .6s}
+.m-fly .ln.prev .tr,.m-fly .ln.enter .tr{opacity:0}
+
+/* 3. 逐字彈跳：唱到的字跳起來 */
+.m-bounce .ln{transition:transform .8s cubic-bezier(.2,.8,.2,1),opacity .6s}
+.m-bounce .ln.enter{transform:translateY(.8em);opacity:0}
+.m-bounce .ln.cur{transform:none;opacity:1}
+.m-bounce .ln.prev{transform:translateY(-1.1em) scale(.8);opacity:0}
+.m-bounce .ln.next{transform:translateY(1.5em) scale(.72);opacity:.3}
+.m-bounce .w{color:var(--dim);transition:color .2s}
+.m-bounce .w.on{color:var(--accent)}
+.m-bounce .w.hit{animation:hop .55s cubic-bezier(.3,1.6,.5,1)}
+@keyframes hop{0%{transform:translateY(0) scale(1)}35%{transform:translateY(-.42em) scale(1.18,1.12)}70%{transform:translateY(.04em) scale(.96,1.04)}100%{transform:none}}
+
+/* 4. 霓虹：發光燈管字，進場閃爍，唱過的字點亮 */
+.m-neon .ln{font-family:"Inter","Noto Sans TC",sans-serif;letter-spacing:.04em;transition:opacity .5s}
+.m-neon .ln.cur{animation:flicker 1.1s linear 1}
+.m-neon .ln.prev,.m-neon .ln.enter{opacity:0}
+.m-neon .ln.next{opacity:.22;transform:translateY(1.9em) scale(.7)}
+.m-neon .w{color:transparent;-webkit-text-stroke:.025em color-mix(in srgb,var(--accent) 70%,#fff);
+  text-shadow:0 0 .12em color-mix(in srgb,var(--accent) 35%,transparent);transition:color .25s,text-shadow .25s}
+.m-neon .w.on{color:#fff;-webkit-text-stroke:0;
+  text-shadow:0 0 .05em #fff,0 0 .18em var(--accent),0 0 .45em var(--accent),0 0 .9em var(--accent),0 0 1.6em color-mix(in srgb,var(--accent) 60%,transparent)}
+.m-neon .ln.cur{filter:brightness(calc(1 + var(--beat) * .35))}
+@keyframes flicker{0%,8%,14%,22%{opacity:.15}4%,11%,18%,26%,100%{opacity:1}}
+
+/* 5. 景深：歌詞排成立體的捲軸，正在唱的那句在焦點上 */
+.m-depth #stage{perspective:900px}
+.m-depth .ln{transition:transform .9s cubic-bezier(.2,.8,.2,1),opacity .9s,filter .9s;
+  transform:translateY(calc(var(--o) * 1.75em)) translateZ(calc(var(--a) * -180px)) rotateX(calc(var(--o) * -16deg)) scale(calc(1 - var(--a) * .1));
+  opacity:calc(1 - var(--a) * .3);filter:blur(calc(var(--a) * 2.4px))}
+.m-depth .ln.cur{text-shadow:0 0 .5em color-mix(in srgb,var(--accent) 40%,transparent)}
+.m-depth .ln .tr{position:absolute;left:0;right:0;top:100%;margin-top:.15em;opacity:0;transition:opacity .6s}
+.m-depth .ln.cur .tr{opacity:.75}
+
+/* 6. KTV：兩行交錯，粗描邊，逐字掃色 */
+.m-ktv .ln{font-size:calc(8vmin * var(--size));text-align:left;left:7vw;right:7vw;transition:opacity .4s}
+.m-ktv .ln.slot0{top:36%}
+.m-ktv .ln.slot1{top:64%;text-align:right}
+.m-ktv .ln.prev,.m-ktv .ln.enter{opacity:0}
+.m-ktv .ln .w{position:relative;color:#fff;
+  text-shadow:0 0 .06em #0a0a1e,.05em .05em 0 #0a0a1e,-.05em .05em 0 #0a0a1e,.05em -.05em 0 #0a0a1e,-.05em -.05em 0 #0a0a1e,
+              .06em 0 0 #0a0a1e,-.06em 0 0 #0a0a1e,0 .06em 0 #0a0a1e,0 -.06em 0 #0a0a1e,0 .12em .2em rgba(0,0,0,.6)}
+.m-ktv .ln .w::after{content:attr(data-t);position:absolute;left:0;top:0;width:calc(var(--p,0) * 100%);overflow:hidden;white-space:pre;
+  color:var(--accent);text-shadow:inherit}
+.m-ktv .ln .tr{display:none}
+
+
+/* 7. 霧窗：起霧的玻璃，唱到的字被手指抹開，透出後面清楚的光 (畫在 canvas 上) */
+.m-fog #stage,.m-fog #gap{display:none}
+
+/* 8. 雨夜：雨中的城市燈光，字像倒映在濕地上 */
+.m-rain .ln{transition:transform 1.2s cubic-bezier(.2,.8,.2,1),opacity 1s,filter 1s;
+  -webkit-box-reflect:below .02em linear-gradient(transparent 40%,rgba(255,255,255,.22))}
+.m-rain .ln.enter{transform:translateY(-.7em);opacity:0;filter:blur(12px)}
+.m-rain .ln.cur{opacity:1}
+.m-rain .ln.prev{transform:translateY(.8em);opacity:0;filter:blur(14px)}
+.m-rain .ln.next{opacity:0}
+.m-rain .w{color:rgba(255,255,255,.28);transition:color .4s,text-shadow .4s}
+.m-rain .w.on{color:#fff;text-shadow:0 0 .25em var(--accent),0 0 .8em color-mix(in srgb,var(--accent) 50%,transparent)}
+
+/* 9. 散字：一句話的字散成大大小小、歪歪斜斜的字雲，唱到才蹦出來 */
+.m-scatter .ln{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.05em .28em;transition:opacity .9s,filter .9s,transform .9s}
+.m-scatter .ln .w{font-size:calc(var(--ws) * 1em);opacity:0;transform:rotate(var(--wr)) translateY(var(--wy)) scale(0);
+  transition:transform .7s cubic-bezier(.2,1.6,.4,1),opacity .35s,color .3s}
+.m-scatter .ln .w.in{opacity:1;transform:rotate(var(--wr)) translateY(var(--wy)) scale(1)}
+.m-scatter .ln .w.on{color:var(--accent);text-shadow:0 0 .35em color-mix(in srgb,var(--accent) 45%,transparent)}
+.m-scatter .ln.prev{opacity:0;filter:blur(14px);transform:scale(1.25)}
+.m-scatter .ln.next{opacity:0}
+.m-scatter .ln .tr{flex-basis:100%;text-align:center}
+
+/* 10. 階梯：字一個一個往右下走下樓梯，鏡頭跟著唱到的字移動 */
+.m-stairs .ln{left:50%;right:auto;top:45%;translate:none;width:0;white-space:nowrap;text-align:left;
+  transition:transform 1s cubic-bezier(.2,.8,.2,1),opacity .8s}
+.m-stairs .ln .w{position:absolute;opacity:0;transform:translateY(-1.3em) rotate(-8deg);color:rgba(255,255,255,.4);
+  transition:transform .65s cubic-bezier(.2,1.5,.4,1),opacity .4s,color .3s}
+.m-stairs .ln .w.in{opacity:1;transform:none}
+.m-stairs .ln .w.on{color:var(--accent);text-shadow:0 0 .3em color-mix(in srgb,var(--accent) 50%,transparent)}
+.m-stairs .ln.prev{opacity:0}
+.m-stairs .ln.next,.m-stairs .ln .tr{display:none}
+
+/* 11. 迴環：字繞成一個圓圈慢慢轉，下一句在內圈 */
+.m-ring .ln{left:50%;right:auto;top:50%;translate:none;width:0;height:0;font-size:calc(4.6vmin * var(--size));
+  transition:transform 1.1s cubic-bezier(.2,.8,.2,1),opacity 1s,filter 1s}
+.m-ring .ln .spin{position:absolute;left:0;top:0;animation:spin 50s linear infinite}
+.m-ring .ln .w{position:absolute;left:0;top:0;transform-origin:0 0;white-space:pre;
+  transform:rotate(var(--ang)) translate(-50%, calc(var(--R) * -1));color:rgba(255,255,255,.3);transition:color .3s,text-shadow .3s}
+.m-ring .ln .w.on{color:var(--accent);text-shadow:0 0 .35em color-mix(in srgb,var(--accent) 55%,transparent)}
+.m-ring .ln.enter{transform:scale(.3) rotate(-60deg);opacity:0}
+.m-ring .ln.cur{transform:none;opacity:1}
+.m-ring .ln.next{transform:scale(.58) rotate(20deg);opacity:.32;filter:blur(1px)}
+.m-ring .ln.prev{transform:scale(1.7) rotate(40deg);opacity:0;filter:blur(8px)}
+.m-ring .ln .tr{position:absolute;left:0;top:0;translate:-50% -50%;width:44vmin;text-align:center;font-size:.62em}
+.m-ring .ln.next .tr{display:none}
+@keyframes spin{to{rotate:360deg}}
+
+/* 12. 霓虹街：像素風的夜晚城市 + 霓虹燈字 (字的樣式跟霓虹一樣) */
+.m-city .ln{top:30%}
+/* 13. 煙火：節拍一來就放煙火 */
+
+/* ───── 內嵌 Folia 的歌詞效果 (iframe)：用 Folia 的時候，Hummi 自己的畫面全部收起來 ───── */
+#folia-frame,#folia-shield{position:fixed;inset:0;width:100%;height:100%;border:0;display:none}
+#folia-shield{background:transparent;z-index:3}
+body.folia #folia-frame,body.folia #folia-shield{display:block}
+body.folia #stage,body.folia #bg,body.folia #cover-bg,body.folia #vignette,body.folia #intro,body.folia #gap{display:none!important}
+body.folia.no-folia-card #card{display:none}
+.grid.folia button.on{background:#8b6cff;border-color:#8b6cff;color:#fff}
+.src-note{font:500 11px "Noto Sans TC";color:rgba(255,255,255,.45);margin:6px 2px 0;line-height:1.5}
+
+/* ───── 舞台設定：分頁 ───── */
+#panel h2 button{background:none;border:0;color:rgba(255,255,255,.5);font-size:20px;cursor:pointer}
+#p-tabs,.seg2{display:flex;gap:2px;padding:3px;border-radius:12px;background:rgba(255,255,255,.07);margin-bottom:12px}
+#p-tabs button,.seg2 button{flex:1;height:32px;border:0;border-radius:9px;background:none;color:rgba(255,255,255,.6);font:700 12px "Noto Sans TC";cursor:pointer}
+#p-tabs button.on,.seg2 button.on{background:rgba(255,255,255,.16);color:#fff}
+.seg2{background:rgba(255,255,255,.04)}
+.ppane{display:none}.ppane.on{display:block}
+#panel .grid{grid-template-columns:repeat(3,1fr)}
+#panel .grid button{height:44px}
+#panel select{background:#222;color:#fff;border:1px solid #444;border-radius:8px;padding:4px 6px}
+#panel input[type=color]{width:34px;height:22px;border:0;background:none}
+/* 前奏 / 間奏 */
+#intro{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4em;pointer-events:none;
+  opacity:0;transition:opacity .8s,transform .8s;transform:scale(.96)}
+#intro.show{opacity:1;transform:none}
+#intro img{width:calc(26vmin * var(--size));height:calc(26vmin * var(--size));border-radius:6%;object-fit:cover;
+  box-shadow:0 2vmin 8vmin rgba(0,0,0,.5);transform:scale(calc(1 + var(--beat) * .04));transition:transform .1s}
+#intro .t{font-weight:900;font-size:calc(5vmin * var(--size));margin-top:.5em;text-align:center;padding:0 6vw}
+#intro .a{font-weight:700;font-size:calc(2.6vmin * var(--size));opacity:.65}
+#gap{position:fixed;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;font-size:calc(7vmin * var(--size));letter-spacing:.6em;
+  opacity:0;transition:opacity .6s;pointer-events:none}
+#gap.show{opacity:.7}
+#gap span{display:inline-block;animation:dot 1.4s ease-in-out infinite}
+#gap span:nth-child(2){animation-delay:.2s}#gap span:nth-child(3){animation-delay:.4s}
+@keyframes dot{0%,100%{transform:translateY(0);opacity:.35}50%{transform:translateY(-.3em);opacity:1}}
+
+/* 歌曲卡片 (左下) */
+#card{position:fixed;left:3vmin;bottom:3vmin;display:flex;align-items:center;gap:1.6vmin;padding:1.2vmin 2.2vmin 1.2vmin 1.2vmin;border-radius:2.2vmin;
+  background:rgba(10,10,20,.45);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);transform:translateY(160%);transition:transform .7s cubic-bezier(.2,.9,.2,1)}
+#card.show{transform:none}
+#card img{width:7vmin;height:7vmin;border-radius:1.2vmin;object-fit:cover}
+#card .t{font-weight:800;font-size:2.2vmin;max-width:40vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#card .a{font-weight:500;font-size:1.6vmin;opacity:.65;margin-top:.3vmin}
+#card .bar{height:.45vmin;border-radius:1vmin;background:rgba(255,255,255,.15);margin-top:.9vmin;overflow:hidden;width:24vmin}
+#card .bar i{display:block;height:100%;width:0;background:var(--accent)}
+body.no-card #card{display:none}
+
+/* 設定面板 */
+#gear{position:fixed;right:20px;top:20px;width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(20,20,30,.6);
+  backdrop-filter:blur(16px);color:#fff;font-size:20px;cursor:pointer;opacity:0;transition:opacity .3s;z-index:20}
+body.ui #gear,body.ui #home{opacity:1}
+#home{position:fixed;right:72px;top:20px;width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(20,20,30,.6);
+  backdrop-filter:blur(16px);color:#fff;font-size:20px;cursor:pointer;opacity:0;transition:opacity .3s;z-index:20}
+#panel{position:fixed;right:20px;top:76px;width:340px;max-height:calc(100vh - 96px);overflow:auto;padding:18px;border-radius:20px;z-index:20;
+  background:rgba(16,16,26,.82);backdrop-filter:blur(26px) saturate(1.4);border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 80px rgba(0,0,0,.5);
+  display:none;font-family:"Noto Sans TC","Inter",sans-serif}
+#panel.open{display:block}
+#panel h2{font:800 17px "Noto Sans TC";margin-bottom:12px;display:flex;justify-content:space-between}
+#panel h3{font:700 11px "Noto Sans TC";letter-spacing:.1em;color:rgba(255,255,255,.5);margin:14px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.grid button{height:56px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;
+  font:700 13px "Noto Sans TC";cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.grid button small{font:500 10px "Noto Sans TC";opacity:.55}
+.grid button.on{background:#fff;color:#111;border-color:#fff}
+.row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font:500 13px "Noto Sans TC";border-top:1px solid rgba(255,255,255,.06)}
+.row input[type=range]{width:150px}
+.row input[type=checkbox]{width:18px;height:18px;accent-color:#8b6cff}
+.btns{display:flex;gap:6px;margin-top:12px}
+.btns button{flex:1;height:38px;border-radius:12px;border:0;font:700 13px "Noto Sans TC";cursor:pointer;background:rgba(255,255,255,.1);color:#fff}
+.btns button.primary{background:#8b6cff}
+#msg{font:500 12px "Noto Sans TC";color:#8fe3a6;margin-top:8px;min-height:16px;word-break:break-all}
+#hint{position:fixed;left:50%;top:24px;transform:translateX(-50%);font:600 13px "Noto Sans TC";padding:8px 14px;border-radius:999px;
+  background:rgba(0,0,0,.45);opacity:0;transition:opacity .4s;pointer-events:none}
+body.ui #hint.show{opacity:1}
+body.obs #gear,body.obs #home,body.obs #panel,body.obs #hint{display:none!important}
+@media (prefers-reduced-motion:reduce){.ln,.w{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body class="ui">
+<div id="cover-bg"></div>
+<div id="bg"><canvas id="cv"></canvas></div>
+<div id="vignette"></div>
+<iframe id="folia-frame" title="Folia" allow="autoplay"></iframe><div id="folia-shield"></div>
+<div id="stage"></div>
+<div id="intro"><img id="intro-img" alt=""><div class="t" id="intro-t"></div><div class="a" id="intro-a"></div></div>
+<div id="gap"><span>♪</span><span>♪</span><span>♪</span></div>
+<div id="card"><img id="card-img" alt=""><div><div class="t" id="card-t"></div><div class="a" id="card-a"></div><div class="bar"><i id="card-bar"></i></div></div></div>
+<div id="hint">移動滑鼠顯示設定 · 按 F 全螢幕</div>
+<button id="home" title="回主視窗">⌂</button>
+<button id="gear" title="舞台設定">⚙</button>
+<aside id="panel">
+  <h2>舞台設定 <button id="p-close" aria-label="關閉">×</button></h2>
+  <nav id="p-tabs"><button data-t="fx" class="on">效果</button><button data-t="look">外觀</button><button data-t="live">直播</button></nav>
+  <div class="ppane on" data-p="fx">
+    <div class="seg2" id="engine"><button data-e="folia">Folia 效果</button><button data-e="hummi">Hummi 效果</button></div>
+    <div class="grid folia" id="fmodes"></div>
+    <div class="src-note" id="folia-note">歌詞動畫來自開源專案 Folia (AGPL-3.0)，第一次切換要載入一兩秒。</div>
+    <div id="hummi-fx">
+      <div class="grid" id="modes"></div>
+      <h3>背景</h3>
+      <div class="grid" id="bgs"></div>
+    </div>
+  </div>
+  <div class="ppane" data-p="look">
+    <label class="row">字體大小 <input type="range" id="o-size" min="0.6" max="1.8" step="0.05"></label>
+    <label class="row">字體 <select id="o-font"><option value="sans">黑體</option><option value="serif">明體</option><option value="latin">Inter</option></select></label>
+    <label class="row">用封面顏色 <input type="checkbox" id="o-album"></label>
+    <label class="row" id="color-row">歌詞顏色 <input type="color" id="o-color" value="#ffffff"></label>
+    <label class="row">顯示下一句 <input type="checkbox" id="o-next"></label>
+    <label class="row">換歌時顯示歌曲卡片 <input type="checkbox" id="o-card"></label>
+    <label class="row">跟著節拍脈動 <input type="checkbox" id="o-beat"></label>
+    <div class="src-note">字體大小兩種效果都有作用 (Folia 效果放開滑桿後會重新載入一下)；其他外觀設定只用在 Hummi 效果。</div>
+  </div>
+  <div class="ppane" data-p="live">
+    <label class="row">透明背景 (疊在直播畫面上) <input type="checkbox" id="o-transparent"></label>
+    <div class="btns"><button id="b-full">全螢幕 (F)</button><button class="primary" id="b-obs">複製 OBS 網址</button></div>
+    <div class="src-note">在 OBS 新增「瀏覽器」來源，貼上網址，寬高設 1920×1080。Hummi 要開著，OBS 才拿得到歌詞。</div>
+    <div id="msg"></div>
+  </div>
+</aside>
+<script>
+const $ = s => document.querySelector(s);
+const MODES = [['float','浮空','一句句浮上來'],['fly','飛入','字從四面飛來'],['bounce','彈跳','唱到的字跳起'],
+               ['neon','霓虹','發光燈管字'],['depth','景深','立體歌詞捲軸'],['ktv','KTV','兩行逐字掃色'],
+               ['fog','霧窗','抹開起霧的玻璃'],['rain','雨夜','雨中城市倒影'],['scatter','散字','大小不一的字雲'],
+               ['stairs','階梯','字走下樓梯'],['ring','圓環','繞成圓圈旋轉'],['city','霓虹街','像素夜城'],
+               ['fireworks','煙火','節拍放煙火']];
+// 這些效果自帶背景 (不管背景選什麼)
+const SCENE_MODES = {fog: 1, rain: 1, city: 1, fireworks: 1};
+// Folia 的歌詞效果 (內嵌，AGPL-3.0，github.com/chthollyphile/folia-major)
+const FOLIA_MODES = [['classic','流光'],['cadenza','心象'],['partita','雲階'],['fume','浮名'],['monet','莫奈'],['cappella','群唱'],
+  ['tilt','傾訴'],['claddagh','迴環'],['diorama','鏡台'],['pendolo','時計'],['sonnet','商籟'],['tempera','凝彩'],
+  ['lumiere','繪光'],['nebbia','霧箋'],['hanabi','花火'],['machi','町景'],['still','靜止']];
+const isFolia = m => m.startsWith('folia:');
+const foliaUrl = (mode, obs) => `http://${obs ? '127.0.0.1:' + location.port : location.host}/folia/?` + new URLSearchParams({
+  obs: 1, obsSource: 'playercap', host: obs ? '127.0.0.1:' + location.port : location.host, nxpcPlayer: 'hummi',
+  visualizer: mode.slice(6), cfg: JSON.stringify({lyricsFontScale: opt.size}), ...(opt.transparent ? {transparent: 1} : {})});
+const NOFILL = ['ktv', 'neon', 'bounce', 'rain', 'city', 'scatter', 'stairs', 'ring'];
+const REVEAL = ['fly', 'scatter', 'stairs'];  // 字要唱到 (前一點點) 才出現的效果
+const BGS = [['fluid','流動','專輯色流動'],['particles','粒子','光點飄浮'],['stars','星空','星光穿梭'],
+             ['cover','封面','模糊封面'],['aurora','極光','光帶起伏']];
+const FONTS = {sans:'"Noto Sans TC","Inter",system-ui,sans-serif', serif:'"Noto Serif TC","Noto Sans TC",serif', latin:'"Inter","Noto Sans TC",sans-serif'};
+const params = new URLSearchParams(location.search);
+const OBS = params.has('obs');
+let opt = {mode:'folia:classic', bg:'fluid', transparent:false, size:1, next:true, card:true, beat:true, album:true, color:'#ffffff', font:'sans'};
+try { Object.assign(opt, JSON.parse(localStorage.getItem('hummi.stage') || '{}')); } catch {}
+for (const k of Object.keys(opt)){
+  if (!params.has(k)) continue;
+  const v = params.get(k);
+  opt[k] = typeof opt[k] === 'boolean' ? v === '1' : typeof opt[k] === 'number' ? +v : v;
+}
+if (opt.bg === 'none'){ opt.bg = 'fluid'; opt.transparent = true; }  // 舊設定：背景選「透明」改成獨立的開關
+const save = () => { if (!OBS) try { localStorage.setItem('hummi.stage', JSON.stringify(opt)); } catch {} };
+if (OBS) document.body.classList.add('obs');
+
+// ───── 資料 ─────
+let track = null, lyr = null, lines = [], cfgOffset = 0;
+let anchorPos = 0, anchorAt = performance.now(), playing = false;
+let energy = 0, beat = 0, levels = [0,0,0,0], lastEnergy = 0, beatAvg = 0;
+const now = () => anchorPos + (playing ? (performance.now() - anchorAt) / 1000 : 0);
+let ws;
+function connect(){
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => ws.send(JSON.stringify({type:'hello', stage:true}));
+  ws.onclose = () => setTimeout(connect, 1000);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'state') onState(m);
+    else if (m.type === 'lyrics') onLyrics(m);
+    else if (m.type === 'viz') onViz(m);
+  };
+}
+function onState(m){
+  if (m.config) cfgOffset = +m.config.offset || 0;
+  const t = m.track;
+  if (!t){ if (track){ track = null; lines = []; rebuild(); } playing = false; return; }
+  const changed = !track || track.track_id !== t.track_id;
+  const pos = t.position + (t.playing ? Math.max(0, Date.now() / 1000 - t.ts) : 0);
+  if (changed || t.playing !== playing || Math.abs(now() - pos) > .35){ anchorPos = pos; anchorAt = performance.now(); }
+  playing = t.playing;
+  track = t;
+  if (changed){
+    lyr = null; lines = []; onTrack(t);
+    // 歌詞有時候比「正在播什麼」先到：先收著，現在套用
+    if (pendingLyr && pendingLyr.track_id === t.track_id){ lyr = pendingLyr; lines = lyr.synced ? normalize(lyr.lines || []) : []; }
+    pendingLyr = null;
+    rebuild();
+  }
+  if (t.has_art && !artLoaded) loadArt(t);
+}
+let pendingLyr = null;
+function onLyrics(m){
+  if (m.loading) return;
+  if (!track || m.track_id !== track.track_id){ pendingLyr = m; return; }
+  lyr = m;
+  lines = m.synced ? normalize(m.lines || []) : [];
+  rebuild();
+}
+function onViz(m){
+  levels = m.levels || levels;
+  const e = m.energy || 0;
+  energy += (e - energy) * .5;
+  beatAvg = beatAvg * .92 + e * .08;
+  if (e > beatAvg * 1.35 + .04 && e - lastEnergy > .03) beat = 1;  // 簡單的節拍偵測：比平均大很多就是一拍
+  lastEnergy = e;
+}
+
+// 歌詞整理：每句有開始、結束，每個字有時間 (沒有逐字時間就平均分配)
+const CJK = /[぀-ヿ㐀-鿿豈-﫿가-힯＀-￯]/;
+function tokens(text){
+  const out = [];
+  const re = /([぀-ヿ㐀-鿿豈-﫿가-힯＀-￯])|([^\s぀-ヿ㐀-鿿豈-﫿가-힯＀-￯]+\s*)|(\s+)/g;
+  let m;
+  while ((m = re.exec(text))){
+    if (m[3] && out.length){ out[out.length - 1] += m[3]; continue; }
+    out.push(m[0]);
+  }
+  return out;
+}
+// 作詞、作曲、製作人、版權這類資訊行：舞台上不顯示
+const CREDIT = /^(作词|作詞|作曲|编曲|編曲|制作|製作|监制|監製|混音|母带|母帶|和声|和聲|录音|錄音|吉他|贝斯|貝斯|鼓|键盘|鍵盤|弦乐|弦樂|出品|发行|發行|统筹|統籌|企划|企劃|策划|策劃|营销|營銷|宣传|宣傳|监修|監修|配唱|人声|人聲|版权|版權|OP|SP|ISRC|词|詞|曲|Lyricist|Lyrics|Composer|Arranger|Producer|Mixing|Mastering|Recording|Vocal|Guitar|Bass|Drums|Keyboard|Strings)[^:：]{0,24}[:：]/i;
+const CREDIT2 = /(produced|written|composed|arranged|mixed|mastered)\s+by|©|℗|版權所有|版权所有|未經許可|未经许可|^\s*\S{1,12}\s*[:：]\s*\S{1,20}\s*$/i;
+function isCredit(text, i){
+  const s = (text || '').trim();
+  return CREDIT.test(s) || CREDIT2.test(s) && (i < 10 || /by|©|℗|版權|版权|未經|未经/i.test(s));
+}
+function normalize(raw){
+  const L = raw.filter((l, i) => l.t != null && (l.text || '').trim() && !isCredit(l.text, i));
+  return L.map((l, i) => {
+    const nextT = i + 1 < L.length ? L[i + 1].t : l.t + 6;
+    const span = Math.max(.6, Math.min(nextT - l.t, (l.text || '').length * .36 + 1.8, 9));
+    let words;
+    if (l.w && l.w.length){
+      words = l.w.filter(w => w[2] !== '').map(w => ({t: w[0], d: Math.max(.08, w[1] || .25), s: w[2]}));
+    } else {
+      const tk = tokens(l.text);
+      const weight = tk.map(s => CJK.test(s) ? 1 : Math.max(1, s.trim().length * .45));
+      const total = weight.reduce((a, b) => a + b, 0) || 1;
+      let acc = l.t;
+      words = tk.map((s, j) => { const d = span * weight[j] / total; const w = {t: acc, d, s}; acc += d; return w; });
+    }
+    return {t: l.t, end: Math.max(nextT, l.t + .5), text: l.text, tr: l.tr || '', words};
+  });
+}
+
+// ───── 顏色 (封面取色) ─────
+let artLoaded = false, palette = ['#3a2a6a','#a04a7a','#1f4a7a','#2a6a5a'];
+function onTrack(t){
+  artLoaded = false;
+  $('#card-t').textContent = $('#intro-t').textContent = t.title || '';
+  $('#card-a').textContent = $('#intro-a').textContent = t.artist || '';
+  $('#card').classList.add('show');
+  clearTimeout(cardTimer); cardTimer = setTimeout(() => $('#card').classList.remove('show'), 9000);
+  if (!t.has_art){ $('#intro-img').removeAttribute('src'); $('#card-img').removeAttribute('src'); }
+}
+let cardTimer;
+function loadArt(t){
+  artLoaded = true;
+  const url = `/art?id=${encodeURIComponent(t.track_id)}&v=${Date.now()}`;
+  const img = new Image();
+  img.onload = () => {
+    $('#intro-img').src = $('#card-img').src = url;
+    $('#cover-bg').style.backgroundImage = `url("${url}")`;
+    palette = extract(img);
+    applyColors();
+  };
+  img.src = url;
+}
+function extract(img){
+  const c = document.createElement('canvas'); c.width = c.height = 24;
+  const x = c.getContext('2d'); x.drawImage(img, 0, 0, 24, 24);
+  const d = x.getImageData(0, 0, 24, 24).data, px = [];
+  for (let i = 0; i < d.length; i += 4){
+    const [r, g, b] = [d[i], d[i + 1], d[i + 2]];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    px.push({r, g, b, s: mx ? (mx - mn) / mx : 0, l: (mx + mn) / 510});
+  }
+  px.sort((a, b) => (b.s * (1 - Math.abs(b.l - .55))) - (a.s * (1 - Math.abs(a.l - .55))));
+  const pick = [];
+  for (const p of px){
+    if (pick.every(q => Math.abs(q.r - p.r) + Math.abs(q.g - p.g) + Math.abs(q.b - p.b) > 90)) pick.push(p);
+    if (pick.length === 4) break;
+  }
+  while (pick.length < 4) pick.push(px[pick.length * 37 % px.length]);
+  return pick.map(p => `rgb(${p.r},${p.g},${p.b})`);
+}
+function brighten(css){
+  const m = css.match(/\d+/g).map(Number);
+  const l = .3 * m[0] + .59 * m[1] + .11 * m[2];
+  const k = l < 170 ? (170 - l) / 170 : 0;
+  return `rgb(${m.map(v => Math.round(v + (255 - v) * k)).join(',')})`;
+}
+function applyColors(){
+  const r = document.documentElement.style;
+  palette.forEach((c, i) => r.setProperty(`--c${i + 1}`, c));
+  r.setProperty('--accent', opt.album ? brighten(palette[0]) : opt.color);
+}
+
+// ───── 歌詞畫面 ─────
+const stage = $('#stage');
+let shown = {};         // index → element
+let curIdx = -2;
+function lineEl(i){
+  const l = lines[i];
+  const el = document.createElement('div');
+  el.className = 'ln enter ' + (NOFILL.includes(opt.mode) ? '' : 'fill shadow');
+  el.dataset.i = i;
+  for (const w of l.words){
+    const s = document.createElement('span');
+    s.className = 'w'; s.textContent = w.s; s.dataset.t = w.s;
+    const a = Math.random() * Math.PI * 2, r = 2 + Math.random() * 3;
+    s.style.setProperty('--fx', (Math.cos(a) * r).toFixed(2) + 'em');
+    s.style.setProperty('--fy', (Math.sin(a) * r).toFixed(2) + 'em');
+    s.style.setProperty('--fr', ((Math.random() - .5) * 120).toFixed(0) + 'deg');
+    el.appendChild(s);
+  }
+  stage.appendChild(el);
+  layoutLine(el, l);
+  return el;
+}
+function layoutLine(el, l){
+  const ws = [...el.querySelectorAll('.w')];
+  if (opt.mode === 'scatter'){
+    // 字雲：每個字大小、角度、高低都不一樣 (重要的長字比較大)
+    ws.forEach((s, k) => {
+      const len = s.textContent.trim().length;
+      const big = Math.random() < .3 || len >= 5;
+      s.style.setProperty('--ws', (big ? 1.25 + Math.random() * .5 : .6 + Math.random() * .5).toFixed(2));
+      s.style.setProperty('--wr', ((Math.random() - .5) * 26).toFixed(0) + 'deg');
+      s.style.setProperty('--wy', ((Math.random() - .5) * .6).toFixed(2) + 'em');
+    });
+  } else if (opt.mode === 'stairs'){
+    // 樓梯：量每個字的寬高，往右下排
+    let x = 0, y = 0;
+    for (const s of ws){
+      s.style.left = x + 'px'; s.style.top = y + 'px';
+      const r = {width: s.offsetWidth, height: s.offsetHeight};  // 不受進場動畫的變形影響
+      s._cx = x + r.width / 2; s._cy = y + r.height / 2;
+      x += r.width * .96; y += r.height * .38;
+    }
+  } else if (opt.mode === 'ring'){
+    // 迴環：字依長度平均分在圓上
+    const spin = document.createElement('div'); spin.className = 'spin';
+    const total = ws.reduce((a, s) => a + Math.max(1, s.textContent.trim().length), 0) || 1;
+    const spread = Math.min(340, 40 + total * 14);
+    let acc = 0;
+    for (const s of ws){
+      const n = Math.max(1, s.textContent.trim().length);
+      s.style.setProperty('--ang', (-spread / 2 + spread * (acc + n / 2) / total).toFixed(1) + 'deg');
+      s.style.setProperty('--R', 'calc(30vmin * var(--size))');
+      acc += n;
+      spin.appendChild(s);
+    }
+    el.insertBefore(spin, el.firstChild);
+  }
+}
+let foliaSrc = '';
+function applyFolia(force){
+  const on = isFolia(opt.mode);
+  document.body.classList.toggle('folia', on);
+  const f = $('#folia-frame');
+  if (!on){ if (f.src !== 'about:blank' && f.getAttribute('src')){ f.src = 'about:blank'; foliaSrc = ''; } return; }
+  const url = foliaUrl(opt.mode, false);
+  if (force || url !== foliaSrc){ foliaSrc = url; f.src = url; }
+}
+function rebuild(){
+  applyFolia();
+  stage.innerHTML = ''; shown = {}; curIdx = -2;
+  document.body.className = document.body.className.replace(/\bm-\w+/g, '').trim() + ' m-' + opt.mode + (opt.mode === 'city' ? ' m-neon' : opt.mode === 'fireworks' ? ' m-float' : '');
+  fogPrev = null; fogLine = -1;
+}
+function findIdx(tt){
+  let lo = 0, hi = lines.length - 1, idx = -1;
+  while (lo <= hi){ const mid = (lo + hi) >> 1; if (lines[mid].t <= tt){ idx = mid; lo = mid + 1; } else hi = mid - 1; }
+  return idx;
+}
+function wanted(idx){
+  // 每種效果要同時顯示哪幾句
+  if (opt.mode === 'depth'){ const out = []; for (let k = -3; k <= 3; k++) if (idx + k >= 0 && idx + k < lines.length) out.push(idx + k); return out; }
+  if (opt.mode === 'ktv' || opt.mode === 'ring') return [idx, idx + 1].filter(i => i >= 0 && i < lines.length);
+  if (opt.mode === 'fog') return [];
+  if (opt.mode === 'stairs') return [idx];
+  const out = [idx];
+  if (idx - 1 >= 0) out.push(idx - 1);
+  if (opt.next && idx + 1 < lines.length) out.push(idx + 1);
+  return out.filter(i => i >= 0 && i < lines.length);
+}
+function frame(){
+  if (isFolia(opt.mode)){ requestAnimationFrame(frame); return; }  // Folia 自己畫，Hummi 這邊什麼都不用做
+  const tt = now() + cfgOffset;
+  const idx = lines.length ? findIdx(tt) : -1;
+  const inGap = idx >= 0 && tt > lines[idx].end - .05 && (idx + 1 >= lines.length || lines[idx + 1].t - tt > 2.5);
+  $('#intro').classList.toggle('show', !!track && (!lines.length || idx < 0));  // 前奏 / 沒有歌詞：大封面 + 歌名
+  $('#gap').classList.toggle('show', !!track && inGap && opt.mode !== 'depth' && opt.mode !== 'fog');
+  fogTT = tt; fogIdx = idx;
+  if (idx !== curIdx){
+    const want = new Set(wanted(Math.max(idx, 0)));
+    if (idx < 0) want.clear();
+    if (idx < 0 && lines.length && opt.mode === 'depth') [0, 1, 2].forEach(i => i < lines.length && want.add(i));
+    for (const [i, el] of Object.entries(shown)){
+      if (!want.has(+i)){ el.classList.add('prev'); el.classList.remove('cur', 'next'); setTimeout(() => el.remove(), 1200); delete shown[i]; }
+    }
+    for (const i of want) if (!shown[i]) shown[i] = lineEl(i);
+    requestAnimationFrame(() => {
+      for (const [i, el] of Object.entries(shown)){
+        const o = +i - idx;
+        el.classList.remove('enter', 'prev', 'cur', 'next', 'slot0', 'slot1');
+        el.style.setProperty('--o', o); el.style.setProperty('--a', Math.abs(o));
+        if (opt.mode === 'ktv'){ el.classList.add(+i % 2 ? 'slot1' : 'slot0'); el.classList.add(o === 0 ? 'cur' : 'next'); }
+        else el.classList.add(o === 0 ? 'cur' : o < 0 ? 'prev' : 'next');
+      }
+    });
+    curIdx = idx;
+  }
+  // 逐字進度
+  for (const [i, el] of Object.entries(shown)){
+    const l = lines[+i];
+    const ws = el.querySelectorAll('.w');
+    for (let k = 0; k < l.words.length; k++){
+      const w = l.words[k], s = ws[k];
+      const p = Math.max(0, Math.min(1, (tt - w.t) / w.d));
+      if (s._p !== p){ s.style.setProperty('--p', p.toFixed(3)); s._p = p; }
+      const on = tt >= w.t;
+      if (on !== s._on){
+        s.classList.toggle('on', on); s._on = on;
+        if (on && +i === idx){
+          if (opt.mode === 'bounce'){ s.classList.remove('hit'); void s.offsetWidth; s.classList.add('hit'); }
+        }
+      }
+      if (REVEAL.includes(opt.mode)){
+        const vin = tt >= w.t - .2 || +i < idx;
+        if (vin !== s._in){ s.classList.toggle('in', vin); s._in = vin; }
+      }
+    }
+    if (opt.mode === 'stairs' && +i === idx){  // 鏡頭跟著唱到的字
+      let k = l.words.findIndex(w => w.t > tt) - 1;
+      if (k < 0) k = tt >= l.words[0].t ? l.words.length - 1 : 0;
+      if (k !== el._cam && ws[k] && ws[k]._cx != null){ el._cam = k; el.style.transform = `translate(${-ws[k]._cx}px, ${-ws[k]._cy}px)`; }
+    }
+  }
+  // 卡片進度
+  if (track && track.duration) $('#card-bar').style.width = Math.min(100, now() / track.duration * 100) + '%';
+  // 節拍
+  beat *= .9;
+  const r = document.documentElement.style;
+  r.setProperty('--beat', opt.beat ? beat.toFixed(3) : 0);
+  r.setProperty('--energy', energy.toFixed(3));
+  drawBg();
+  requestAnimationFrame(frame);
+}
+
+// ───── 背景 ─────
+const cv = $('#cv'), cx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, parts = [], stars = [];
+function resize(){
+  DPR = Math.min(2, devicePixelRatio || 1);
+  W = cv.width = innerWidth * DPR; H = cv.height = innerHeight * DPR;
+  cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+  parts = Array.from({length: 70}, () => newPart(true));
+  stars = Array.from({length: 420}, () => newStar(true));
+  if (typeof sceneResize === 'function') sceneResize();
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+function newPart(any){ return {x: rnd(0, W), y: any ? rnd(0, H) : H + 40 * DPR, r: rnd(2, 14) * DPR, v: rnd(.2, 1.1) * DPR, c: Math.floor(rnd(0, 4)), tw: rnd(0, 6.28), sp: rnd(.5, 2)}; }
+function newStar(any){ return {x: rnd(-1, 1), y: rnd(-1, 1), z: any ? rnd(.05, 1) : 1, c: Math.floor(rnd(0, 4))}; }
+let tPrev = performance.now();
+function drawBg(){
+  const tnow = performance.now(), dt = Math.min(.05, (tnow - tPrev) / 1000); tPrev = tnow;
+  const t = tnow / 1000, e = energy, b = opt.beat ? beat : 0;
+  if (isFolia(opt.mode)) return;
+  if (SCENE_MODES[opt.mode]){ drawScene(opt.mode, t, dt, e, b); return; }
+  cx.clearRect(0, 0, W, H);
+  if (opt.bg === 'fluid'){
+    cx.globalCompositeOperation = 'source-over';
+    cx.fillStyle = 'rgba(6,6,14,.55)'; cx.fillRect(0, 0, W, H);
+    cx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 5; i++){
+      const px = W * (.5 + .38 * Math.sin(t * (.07 + i * .023) + i * 1.7));
+      const py = H * (.5 + .36 * Math.cos(t * (.06 + i * .019) + i * 2.3));
+      const rr = Math.max(W, H) * (.42 + .08 * Math.sin(t * .2 + i) + e * .12 + b * .05);
+      const g = cx.createRadialGradient(px, py, 0, px, py, rr);
+      g.addColorStop(0, palette[i % 4].replace('rgb', 'rgba').replace(')', ',.75)'));
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+    }
+    cx.globalCompositeOperation = 'source-over';
+  } else if (opt.bg === 'particles'){
+    cx.fillStyle = 'rgba(4,4,10,.45)'; cx.fillRect(0, 0, W, H);
+    cx.globalCompositeOperation = 'lighter';
+    for (const p of parts){
+      p.y -= p.v * (1 + e * 3 + b * 4) * 60 * dt; p.x += Math.sin(t * .6 + p.tw) * .3 * DPR;
+      if (p.y < -40 * DPR) Object.assign(p, newPart(false));
+      const a = .25 + .25 * Math.sin(t * p.sp + p.tw) + e * .3;
+      const g = cx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * (1 + b * .6));
+      g.addColorStop(0, palette[p.c].replace('rgb', 'rgba').replace(')', `,${Math.min(1, a).toFixed(2)})`));
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.arc(p.x, p.y, p.r * (1 + b * .6), 0, 6.283); cx.fill();
+    }
+    cx.globalCompositeOperation = 'source-over';
+  } else if (opt.bg === 'stars'){
+    cx.fillStyle = '#03030a'; cx.fillRect(0, 0, W, H);
+    const sp = (.08 + e * .9 + b * 1.4) * dt;
+    cx.globalCompositeOperation = 'lighter';
+    for (const s of stars){
+      const z0 = s.z; s.z -= sp;
+      if (s.z <= .02) Object.assign(s, newStar(false));
+      const k = .5 / s.z, k0 = .5 / Math.max(z0, .02);
+      const x = W / 2 + s.x * W * k, y = H / 2 + s.y * H * k;
+      const x0 = W / 2 + s.x * W * k0, y0 = H / 2 + s.y * H * k0;
+      if (x < 0 || x > W || y < 0 || y > H){ Object.assign(s, newStar(false)); continue; }
+      const a = Math.min(1, (1 - s.z) * 1.3);
+      cx.strokeStyle = palette[s.c].replace('rgb', 'rgba').replace(')', `,${a.toFixed(2)})`);
+      cx.lineWidth = Math.max(1, (1 - s.z) * 3.2 * DPR);
+      cx.beginPath(); cx.moveTo(x0, y0); cx.lineTo(x, y); cx.stroke();
+    }
+    cx.globalCompositeOperation = 'source-over';
+  } else if (opt.bg === 'aurora'){
+    cx.fillStyle = '#04040c'; cx.fillRect(0, 0, W, H);
+    cx.globalCompositeOperation = 'lighter';
+    for (let band = 0; band < 4; band++){
+      const base = H * (.25 + band * .14);
+      const grad = cx.createLinearGradient(0, base - H * .3, 0, base + H * .25);
+      const c = palette[band % 4];
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(.55, c.replace('rgb', 'rgba').replace(')', `,${(.28 + e * .3 + b * .2).toFixed(2)})`));
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      cx.fillStyle = grad;
+      cx.beginPath(); cx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 24 * DPR){
+        const y = base + Math.sin(x / W * 6 + t * (.4 + band * .13) + band) * H * .06
+                       + Math.sin(x / W * 13 - t * .7 + band * 2) * H * .025 * (1 + e * 2);
+        cx.lineTo(x, y);
+      }
+      cx.lineTo(W, H); cx.closePath(); cx.fill();
+    }
+    cx.globalCompositeOperation = 'source-over';
+  }
+}
+
+// ═════════ 自帶背景的效果 (霧窗、雨夜、霓虹街、煙火) ═════════
+let fogTT = 0, fogIdx = -1, fogPrev = null, fogLine = -1, fogSwitch = 0;
+const off = () => document.createElement('canvas');
+const sceneC = off(), sceneX = sceneC.getContext('2d');      // 霧窗：清楚的燈光 (半解析度)
+const blurC = off(), blurX = blurC.getContext('2d');         // 霧窗：起霧後的樣子 (1/6 解析度再放大 = 很糊)
+const maskC = off(), maskX = maskC.getContext('2d');         // 霧窗：被抹開的地方
+const trailC = off(), trailX = trailC.getContext('2d');      // 霧窗：水滴流下來的痕跡
+const tmpC = off(), tmpX = tmpC.getContext('2d');
+const cityC = off(), cityX = cityC.getContext('2d');         // 霓虹街：低解析度像素畫
+let bokeh = [], drips = [], rain = [], city = null, rockets = [], sparks = [], nextRocket = 0, splashes = [];
+function sceneResize(){
+  for (const [c, k] of [[sceneC, 2], [blurC, 6], [maskC, 1], [trailC, 1], [tmpC, 1]]){ c.width = Math.ceil(W / k); c.height = Math.ceil(H / k); }
+  bokeh = Array.from({length: 34}, () => ({x: Math.random(), y: Math.random() * .9 + .05, r: rnd(.02, .09), c: Math.floor(rnd(0, 4)), sp: rnd(.2, 1), ph: rnd(0, 6.28)}));
+  rain = Array.from({length: 260}, () => ({x: rnd(0, W), y: rnd(-H, H), l: rnd(10, 34) * DPR, v: rnd(900, 1500) * DPR, c: Math.floor(rnd(0, 4)), a: rnd(.15, .5)}));
+  drips = []; splashes = []; city = null;
+}
+const rgba = (css, a) => css.replace('rgb', 'rgba').replace(')', `,${Math.max(0, Math.min(1, a)).toFixed(3)})`);
+function drawScene(mode, t, dt, e, b){
+  if (mode === 'fog') return drawFog(t, dt, e, b);
+  if (mode === 'rain') return drawRain(t, dt, e, b);
+  if (mode === 'city') return drawCity(t, dt, e, b);
+  if (mode === 'fireworks') return drawFireworks(t, dt, e, b);
+}
+
+// 散景燈光 (霧窗、雨夜共用)
+function drawBokeh(x, w, h, t, e, b, sharp){
+  const g = x.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#05060d'); g.addColorStop(1, rgba(palette[1], .35));
+  x.fillStyle = '#04050a'; x.fillRect(0, 0, w, h);
+  x.fillStyle = g; x.fillRect(0, 0, w, h);
+  x.globalCompositeOperation = 'lighter';
+  for (const p of bokeh){
+    const px = (p.x + Math.sin(t * .03 * p.sp + p.ph) * .02) * w, py = p.y * h;
+    const r = p.r * Math.max(w, h) * (1 + b * .15 + e * .1);
+    const a = (.35 + .25 * Math.sin(t * p.sp + p.ph) + e * .2) * (sharp ? 1 : .9);
+    const gr = x.createRadialGradient(px, py, 0, px, py, r);
+    gr.addColorStop(0, rgba(palette[p.c], a)); gr.addColorStop(sharp ? .55 : .3, rgba(palette[p.c], a * .6)); gr.addColorStop(1, rgba(palette[p.c], 0));
+    x.fillStyle = gr; x.beginPath(); x.arc(px, py, r, 0, 6.283); x.fill();
+  }
+  x.globalCompositeOperation = 'source-over';
+}
+
+// 霧窗的字要怎麼排：中文短句直排 (像寫在窗上)，其他橫排
+function fogLayout(l, w, h){
+  const chars = [];
+  for (const wd of l.words){
+    const arr = [...wd.s];
+    arr.forEach((c, j) => chars.push({c, t: wd.t + wd.d * j / arr.length}));
+  }
+  const vis = chars.filter(c => c.c.trim());
+  const cjkOnly = vis.length && vis.every(c => CJK.test(c.c) || /[，。、！？,.!?]/.test(c.c));
+  let fs = Math.min(w, h) * .115 * opt.size;
+  if (cjkOnly && vis.length <= 20){  // 直排：整欄要放得進畫面
+    const per = vis.length > 7 ? Math.ceil(vis.length / 2) : vis.length;
+    fs = Math.min(fs, h * .72 / (per * 1.08), w * .3);
+  }
+  const out = [];
+  if (cjkOnly && vis.length <= 20){
+    const perCol = vis.length > 7 ? Math.ceil(vis.length / 2) : vis.length;
+    const cols = Math.ceil(vis.length / perCol);
+    const x0 = w / 2 + (cols - 1) * fs * .75;
+    vis.forEach((c, k) => {
+      const col = Math.floor(k / perCol), row = k % perCol;
+      out.push({...c, x: x0 - col * fs * 1.5, y: h / 2 - (perCol - 1) * fs * 1.08 / 2 + row * fs * 1.08, fs});
+    });
+  } else {
+    const font = `900 ${fs}px ${FONTS[opt.font] || FONTS.sans}`;
+    maskX.font = font;
+    const maxW = w * .82;
+    const rows = [[]];
+    let rw = 0;
+    for (const c of chars){
+      const cw = maskX.measureText(c.c).width;
+      if (rw + cw > maxW && c.c === ' '){ rows.push([]); rw = 0; continue; }
+      rows[rows.length - 1].push({...c, cw}); rw += cw;
+    }
+    rows.forEach((row, ri) => {
+      const tw = row.reduce((a, c) => a + c.cw, 0);
+      let x = w / 2 - tw / 2;
+      for (const c of row){ out.push({...c, x: x + c.cw / 2, y: h / 2 + (ri - (rows.length - 1) / 2) * fs * 1.25, fs}); x += c.cw; }
+    });
+  }
+  return out;
+}
+function drawFog(t, dt, e, b){
+  // 1. 清楚的燈光 + 起霧的版本
+  drawBokeh(sceneX, sceneC.width, sceneC.height, t, e, b, true);
+  blurX.filter = 'blur(3px)'; blurX.drawImage(sceneC, 0, 0, blurC.width, blurC.height); blurX.filter = 'none';
+  cx.imageSmoothingEnabled = true;
+  cx.drawImage(blurC, 0, 0, W, H);
+  cx.fillStyle = 'rgba(200,210,232,.34)'; cx.fillRect(0, 0, W, H);      // 霧的白 (濃一點，抹開的字才看得清楚)
+  if (!fogGrain){                                                       // 細細的水氣顆粒
+    const gc = off(); gc.width = gc.height = 256; const gx = gc.getContext('2d');
+    for (let i = 0; i < 2600; i++){ gx.fillStyle = `rgba(255,255,255,${Math.random() * .22})`; gx.fillRect(Math.random() * 256, Math.random() * 256, 1.4, 1.4); }
+    fogGrain = cx.createPattern(gc, 'repeat');
+  }
+  cx.fillStyle = fogGrain; cx.fillRect(0, 0, W, H);
+  // 2. 換句：舊的字慢慢再起霧
+  if (fogIdx !== fogLine || fogSize !== W + 'x' + H){
+    fogSize = W + 'x' + H;
+    if (fogLine >= 0 && lines[fogLine]) fogPrev = {lay: fogLayout(lines[fogLine], W, H), at: t};
+    fogLine = fogIdx; fogSwitch = t;
+    fogCur = fogIdx >= 0 && lines[fogIdx] ? fogLayout(lines[fogIdx], W, H) : [];
+  }
+  // 3. 遮罩：被抹開的字 + 水痕
+  maskX.clearRect(0, 0, W, H);
+  trailX.globalCompositeOperation = 'destination-out';
+  trailX.fillStyle = `rgba(0,0,0,${(dt * .12).toFixed(4)})`; trailX.fillRect(0, 0, W, H);  // 水痕慢慢又起霧
+  trailX.globalCompositeOperation = 'source-over';
+  maskX.drawImage(trailC, 0, 0);
+  const drawChars = (lay, mul) => {
+    for (const c of lay){
+      const a = Math.max(0, Math.min(1, (fogTT - c.t) / .45)) * mul;
+      if (a <= 0) continue;
+      maskX.font = `900 ${c.fs}px ${FONTS[opt.font] || FONTS.sans}`;
+      maskX.textAlign = 'center'; maskX.textBaseline = 'middle';
+      maskX.shadowColor = `rgba(255,255,255,${a})`; maskX.shadowBlur = c.fs * .12;
+      maskX.fillStyle = `rgba(255,255,255,${a})`;
+      maskX.fillText(c.c, c.x, c.y);
+      if (a > .9 && !c.dripped){                       // 抹開後偶爾流下一道水
+        c.dripped = true;
+        if (Math.random() < .45 && c.c.trim()) drips.push({x: c.x + rnd(-.25, .25) * c.fs, y: c.y + c.fs * .45, v: rnd(18, 55) * DPR, life: rnd(2.5, 6), w: rnd(1.5, 3.2) * DPR});
+      }
+    }
+  };
+  if (fogPrev){
+    const k = 1 - (t - fogPrev.at) / 2.2;
+    if (k <= 0) fogPrev = null; else drawChars(fogPrev.lay, k);
+  }
+  drawChars(fogCur || [], 1);
+  maskX.shadowBlur = 0;
+  // 水滴往下流，留下清楚的痕跡
+  trailX.strokeStyle = 'rgba(255,255,255,.9)'; trailX.lineCap = 'round';
+  for (const d of drips){
+    const y0 = d.y; d.v *= .995; d.y += d.v * dt; d.life -= dt;
+    trailX.lineWidth = d.w; trailX.beginPath(); trailX.moveTo(d.x, y0); trailX.lineTo(d.x + Math.sin(d.y * .05) * .4, d.y); trailX.stroke();
+  }
+  drips = drips.filter(d => d.life > 0 && d.y < H);
+  // 4. 透過遮罩看到清楚的燈光
+  tmpX.globalCompositeOperation = 'source-over';
+  tmpX.clearRect(0, 0, W, H);
+  tmpX.drawImage(sceneC, 0, 0, W, H);
+  tmpX.globalCompositeOperation = 'destination-in';
+  tmpX.drawImage(maskC, 0, 0);
+  tmpX.globalCompositeOperation = 'source-over';
+  // 抹開的地方：玻璃後面比較暗、比較清楚 (先壓暗再放清楚的燈光)
+  cx.save(); cx.globalCompositeOperation = 'destination-out'; cx.globalAlpha = .55; cx.drawImage(maskC, 0, 0); cx.restore();
+  cx.drawImage(tmpC, 0, 0);
+  cx.save(); cx.globalAlpha = .55; cx.drawImage(maskC, 0, 0); cx.restore();   // 擦乾淨的玻璃反光：字才讀得出來
+  // 5. 水滴頭
+  for (const d of drips){
+    cx.fillStyle = 'rgba(255,255,255,.35)'; cx.beginPath(); cx.arc(d.x, d.y, d.w * 1.3, 0, 6.283); cx.fill();
+  }
+}
+let fogCur = [], fogGrain = null, fogSize = '';
+
+function drawRain(t, dt, e, b){
+  drawBokeh(cx, W, H, t, e, b, false);
+  // 地面的反光
+  const g = cx.createLinearGradient(0, H * .72, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, rgba(palette[0], .18 + e * .1));
+  cx.fillStyle = g; cx.fillRect(0, H * .72, W, H * .28);
+  cx.lineCap = 'round';
+  const wind = .18;
+  for (const r of rain){
+    r.y += r.v * dt * (1 + e * .5); r.x += r.v * wind * dt;
+    if (r.y > H * .96){
+      if (Math.random() < .25) splashes.push({x: r.x, y: H * rnd(.9, .99), r: 0, a: .5, c: r.c});
+      r.y = rnd(-H * .3, 0); r.x = rnd(-W * .2, W);
+    }
+    cx.strokeStyle = rgba(palette[r.c], r.a); cx.lineWidth = 1.2 * DPR;
+    cx.beginPath(); cx.moveTo(r.x, r.y); cx.lineTo(r.x - r.l * wind, r.y - r.l); cx.stroke();
+  }
+  for (const s of splashes){
+    s.r += 40 * DPR * dt; s.a -= dt * 1.2;
+    cx.strokeStyle = rgba(palette[s.c], s.a); cx.lineWidth = DPR;
+    cx.beginPath(); cx.ellipse(s.x, s.y, s.r, s.r * .25, 0, 0, 6.283); cx.stroke();
+  }
+  splashes = splashes.filter(s => s.a > 0);
+}
+
+// 霓虹街：320×180 的像素城市，放大成全螢幕 (不平滑 = 像素感)
+function buildCity(){
+  const w = 320, h = 180;
+  cityC.width = w; cityC.height = h;
+  const layers = [];
+  for (let L = 0; L < 3; L++){
+    const bs = [];
+    let x = -20;
+    while (x < w * 2){
+      const bw = Math.round(rnd(14, 34) - L * 3), bh = Math.round(rnd(40, 120) * (1 - L * .25) + L * 10);
+      const wins = [];
+      for (let wy = 6; wy < bh - 4; wy += 5) for (let wx = 3; wx < bw - 3; wx += 4) wins.push({x: wx, y: wy, on: Math.random() < .35, c: Math.random() < .7 ? 0 : 1 + Math.floor(Math.random() * 3)});
+      bs.push({x, w: bw, h: bh, wins, sign: Math.random() < .25 ? {c: Math.floor(rnd(0, 4)), y: Math.round(rnd(8, Math.max(9, bh - 20))), w: Math.round(rnd(6, bw - 4))} : null});
+      x += bw + Math.round(rnd(0, 4));
+    }
+    layers.push({bs, speed: [1.5, 4, 8][L], shade: [.45, .7, 1][L], w: x});
+  }
+  city = {w, h, layers, drops: Array.from({length: 90}, () => ({x: rnd(0, w), y: rnd(0, h), v: rnd(80, 140)}))};
+}
+function drawCity(t, dt, e, b){
+  if (!city) buildCity();
+  const x = cityX, {w, h} = city;
+  const sky = x.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#05030f'); sky.addColorStop(.7, rgba(palette[1], .55)); sky.addColorStop(1, rgba(palette[0], .7));
+  x.fillStyle = '#05030f'; x.fillRect(0, 0, w, h); x.fillStyle = sky; x.fillRect(0, 0, w, h);
+  x.fillStyle = 'rgba(255,240,220,.85)'; x.fillRect(250, 22, 10, 10);   // 月亮
+  for (let i = 0; i < 40; i++){ x.fillStyle = `rgba(255,255,255,${.3 + .3 * Math.sin(t * 2 + i)})`; x.fillRect((i * 73) % w, (i * 37) % 70, 1, 1); }
+  for (const L of city.layers){
+    const off = (t * L.speed) % L.w;
+    for (const bd of L.bs){
+      const bx = Math.round(bd.x - off + (bd.x - off < -40 ? L.w : 0));
+      if (bx > w || bx + bd.w < 0) continue;
+      const by = h - bd.h;
+      x.fillStyle = `rgb(${Math.round(12 * L.shade)},${Math.round(10 * L.shade)},${Math.round(24 * L.shade)})`;
+      x.fillRect(bx, by, bd.w, bd.h);
+      for (const wn of bd.wins){
+        if (L.shade < 1 && Math.random() < .0008) wn.on = !wn.on;
+        if (b > .7 && Math.random() < .02) wn.on = !wn.on;               // 節拍：燈閃一閃
+        if (!wn.on) continue;
+        x.fillStyle = wn.c ? rgba(palette[wn.c], .9 * L.shade) : `rgba(255,214,140,${.85 * L.shade})`;
+        x.fillRect(bx + wn.x, by + wn.y, 2, 2);
+      }
+      if (bd.sign){
+        x.fillStyle = rgba(palette[bd.sign.c], (.7 + .3 * Math.sin(t * 6 + bd.x)) * L.shade);
+        x.fillRect(bx + 2, by + bd.sign.y, Math.min(bd.sign.w, bd.w - 4), 3);
+      }
+    }
+  }
+  x.fillStyle = 'rgba(180,200,255,.35)';
+  for (const d of city.drops){ d.y += d.v * dt; d.x -= d.v * .15 * dt; if (d.y > h){ d.y = 0; d.x = rnd(0, w + 20); } x.fillRect(Math.round(d.x), Math.round(d.y), 1, 3); }
+  cx.imageSmoothingEnabled = false;
+  cx.drawImage(cityC, 0, 0, W, H);
+  cx.imageSmoothingEnabled = true;
+  // 霓虹的光暈
+  cx.globalCompositeOperation = 'lighter';
+  const gl = cx.createRadialGradient(W / 2, H * .3, 0, W / 2, H * .3, W * .5);
+  gl.addColorStop(0, rgba(palette[0], .12 + b * .12)); gl.addColorStop(1, 'rgba(0,0,0,0)');
+  cx.fillStyle = gl; cx.fillRect(0, 0, W, H);
+  cx.globalCompositeOperation = 'source-over';
+}
+
+function drawFireworks(t, dt, e, b){
+  cx.globalCompositeOperation = 'source-over';
+  cx.fillStyle = 'rgba(3,3,10,.22)'; cx.fillRect(0, 0, W, H);   // 不清空 = 留下拖尾
+  // 地平線的光
+  const g = cx.createLinearGradient(0, H * .8, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, rgba(palette[1], .08));
+  cx.fillStyle = g; cx.fillRect(0, H * .8, W, H * .2);
+  if (t > nextRocket || (b > .9 && rockets.length < 4)){
+    rockets.push({x: rnd(.15, .85) * W, y: H, vx: rnd(-60, 60) * DPR, vy: -rnd(780, 1050) * DPR, c: Math.floor(rnd(0, 4)), top: rnd(.15, .45) * H});
+    nextRocket = t + rnd(.7, 1.6) / (1 + e);
+  }
+  cx.globalCompositeOperation = 'lighter';
+  for (const r of rockets){
+    r.x += r.vx * dt; r.y += r.vy * dt; r.vy += 420 * DPR * dt;
+    cx.fillStyle = rgba(palette[r.c], .9); cx.beginPath(); cx.arc(r.x, r.y, 2.2 * DPR, 0, 6.283); cx.fill();
+    if (r.y <= r.top || r.vy >= 0){
+      r.done = true;
+      const n = Math.round(rnd(60, 110)), sp = rnd(220, 420) * DPR, ring = Math.random() < .3;
+      for (let i = 0; i < n; i++){
+        const a = i / n * 6.283 + rnd(0, .1), v = ring ? sp : sp * Math.sqrt(Math.random());
+        sparks.push({x: r.x, y: r.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rnd(1.1, 2), max: 2, c: Math.random() < .8 ? r.c : (r.c + 1) % 4});
+      }
+    }
+  }
+  rockets = rockets.filter(r => !r.done);
+  for (const p of sparks){
+    p.vx *= .985; p.vy = p.vy * .985 + 160 * DPR * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    const a = Math.min(1, p.life / 1.2) * (.6 + .4 * Math.random());
+    cx.fillStyle = rgba(palette[p.c], a); cx.beginPath(); cx.arc(p.x, p.y, 1.8 * DPR, 0, 6.283); cx.fill();
+  }
+  sparks = sparks.filter(p => p.life > 0);
+  cx.globalCompositeOperation = 'source-over';
+}
+
+function applyBg(){
+  document.body.classList.remove('bg-fluid', 'bg-particles', 'bg-stars', 'bg-cover', 'bg-aurora', 'bg-none', 'transparent');
+  document.body.classList.add('bg-' + opt.bg);
+  if (opt.transparent) document.body.classList.add('transparent');
+  const scene = SCENE_MODES[opt.mode];
+  cv.style.display = scene || (!opt.transparent && opt.bg !== 'cover') ? 'block' : 'none';
+  document.body.classList.toggle('scene', !!scene);
+}
+
+// ───── 設定面板 ─────
+let engine = isFolia(opt.mode) ? 'folia' : 'hummi';
+function renderPanel(){
+  document.querySelectorAll('#engine button').forEach(b => b.classList.toggle('on', b.dataset.e === engine));
+  $('#fmodes').hidden = $('#folia-note').hidden = engine !== 'folia';
+  $('#hummi-fx').hidden = engine !== 'hummi';
+  $('#fmodes').innerHTML = FOLIA_MODES.map(([k, n]) => `<button data-m="folia:${k}" class="${opt.mode === 'folia:' + k ? 'on' : ''}">${n}</button>`).join('');
+  $('#modes').innerHTML = MODES.map(([k, n, d]) => `<button data-m="${k}" class="${opt.mode === k ? 'on' : ''}" title="${d}">${n}</button>`).join('');
+  $('#bgs').innerHTML = BGS.map(([k, n, d]) => `<button data-b="${k}" class="${opt.bg === k ? 'on' : ''}" title="${d}">${n}</button>`).join('');
+  const pick = b => { opt.mode = b.dataset.m; save(); renderPanel(); rebuild(); applyBg(); };
+  $('#fmodes').querySelectorAll('button').forEach(b => b.onclick = () => pick(b));
+  $('#modes').querySelectorAll('button').forEach(b => b.onclick = () => pick(b));
+  $('#bgs').querySelectorAll('button').forEach(b => b.onclick = () => { opt.bg = b.dataset.b; save(); renderPanel(); applyBg(); });
+  $('#o-size').value = opt.size; $('#o-next').checked = opt.next; $('#o-card').checked = opt.card; $('#o-transparent').checked = opt.transparent;
+  $('#o-beat').checked = opt.beat; $('#o-album').checked = opt.album; $('#o-color').value = opt.color; $('#o-font').value = opt.font;
+  $('#color-row').hidden = opt.album;
+}
+document.querySelectorAll('#engine button').forEach(b => b.onclick = () => { engine = b.dataset.e; renderPanel(); });
+document.querySelectorAll('#p-tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#p-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.ppane').forEach(x => x.classList.toggle('on', x.dataset.p === b.dataset.t));
+});
+$('#p-close').onclick = () => $('#panel').classList.remove('open');
+function applyOpts(){
+  const r = document.documentElement.style;
+  r.setProperty('--size', opt.size);
+  r.setProperty('--font', FONTS[opt.font] || FONTS.sans);
+  document.body.classList.toggle('no-card', !opt.card);
+  applyColors();
+}
+$('#o-size').oninput = e => { opt.size = +e.target.value; applyOpts(); save(); };
+$('#o-size').onchange = () => { if (isFolia(opt.mode)) applyFolia(true); };  // Folia 要重新載入才會套用 (放開滑桿時)
+$('#o-font').onchange = e => { opt.font = e.target.value; applyOpts(); save(); };
+$('#o-album').onchange = e => { opt.album = e.target.checked; applyOpts(); save(); $('#color-row').hidden = opt.album; };
+$('#o-color').oninput = e => { opt.color = e.target.value; opt.album = false; $('#o-album').checked = false; applyOpts(); save(); };
+$('#o-next').onchange = e => { opt.next = e.target.checked; save(); rebuild(); };
+$('#o-transparent').onchange = e => { opt.transparent = e.target.checked; save(); applyBg(); if (isFolia(opt.mode)) applyFolia(true); };
+$('#o-card').onchange = e => { opt.card = e.target.checked; applyOpts(); save(); };
+$('#o-beat').onchange = e => { opt.beat = e.target.checked; save(); };
+$('#home').onclick = e => { e.stopPropagation(); window.pywebview?.api?.back ? window.pywebview.api.back() : (location.href = '/?app=1'); };
+$('#gear').onclick = e => { e.stopPropagation(); $('#panel').classList.toggle('open'); };
+$('#panel').onclick = e => e.stopPropagation();
+addEventListener('click', () => $('#panel').classList.remove('open'));
+// App 的舞台視窗用 App 自己的全螢幕 (網頁的全螢幕在 App 視窗裡沒有作用)；瀏覽器 / OBS 用網頁的
+const fullscreen = () => window.pywebview?.api?.fullscreen ? window.pywebview.api.fullscreen()
+  : document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
+$('#b-full').onclick = fullscreen;
+addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F' || e.key === 'F11') && !e.target.closest?.('input,select')){ e.preventDefault(); fullscreen(); } if (e.key === 'Escape') $('#panel').classList.remove('open'); });
+$('#b-obs').onclick = async () => {
+  if (isFolia(opt.mode)){  // Folia 效果：直接給 Folia 頁面的網址 (Hummi 要開著)
+    const url = foliaUrl(opt.mode, true);
+    try { await navigator.clipboard.writeText(url); $('#msg').textContent = '已複製 Folia 效果的網址！在 OBS 新增「瀏覽器」來源貼上，寬高設 1920×1080。'; }
+    catch { $('#msg').textContent = url; }
+    return;
+  }
+  const q = new URLSearchParams({obs: 1, mode: opt.mode, bg: opt.bg, size: opt.size, font: opt.font, transparent: +opt.transparent, next: +opt.next,
+                                 card: +opt.card, beat: +opt.beat, album: +opt.album, color: opt.color});
+  const url = `http://${location.host}/stage?${q}`;
+  try { await navigator.clipboard.writeText(url); $('#msg').textContent = '已複製！在 OBS 新增「瀏覽器」來源，貼上網址，寬高設 1920×1080。'; }
+  catch { $('#msg').textContent = url; }
+};
+let uiTimer;
+const poke = () => { document.body.classList.add('ui'); $('#hint').classList.add('show');
+  clearTimeout(uiTimer); uiTimer = setTimeout(() => { if (!$('#panel').classList.contains('open')){ document.body.classList.remove('ui'); $('#hint').classList.remove('show'); } }, 2500); };
+addEventListener('mousemove', poke);
+
+addEventListener('resize', resize);
+resize(); applyBg(); applyOpts(); renderPanel(); rebuild(); poke();
+connect();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

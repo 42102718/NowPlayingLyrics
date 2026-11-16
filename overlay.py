@@ -63,6 +63,11 @@ user32.RegisterHotKey.argtypes = [wt.HWND, ctypes.c_int, wt.UINT, wt.UINT]
 user32.ShowWindow.argtypes = [wt.HWND, ctypes.c_int]
 user32.GetWindowRect.argtypes = [wt.HWND, ctypes.POINTER(wt.RECT)]
 user32.SystemParametersInfoW.argtypes = [wt.UINT, wt.UINT, wt.LPVOID, wt.UINT]
+user32.FindWindowW.argtypes = [wt.LPCWSTR, wt.LPCWSTR]
+user32.FindWindowW.restype = wt.HWND
+user32.GetWindowThreadProcessId.argtypes = [wt.HWND, ctypes.POINTER(wt.DWORD)]
+user32.IsWindowVisible.argtypes = [wt.HWND]
+user32.IsIconic.argtypes = [wt.HWND]
 gdi32.CreateCompatibleDC.restype = wt.HDC
 gdi32.CreateCompatibleDC.argtypes = [wt.HDC]
 gdi32.CreateDIBSection.restype = wt.HBITMAP
@@ -468,6 +473,10 @@ class Overlay:
         self.layout()
         self.prev_block = None
 
+    def covered(self, now):
+        """主視窗 (沒縮小) 或舞台開著時，它們已經在顯示歌詞了：浮動歌詞先藏起來，避免畫面上同時好幾份歌詞。"""
+        return self.config["overlay"].get("auto_hide", True) and lyrics_window_open()
+
     def commit_drag(self):
         """拖曳結束：存成自訂位置。"""
         self.moved = False
@@ -480,7 +489,7 @@ class Overlay:
     def run(self):
         self.create()
         msg = wt.MSG()
-        frame = 1 / 40
+        frame = 1 / 30  # 30 fps：掃光一樣順，CPU 少四分之一
         while True:
             t0 = time.perf_counter()
             while user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 1):
@@ -494,7 +503,8 @@ class Overlay:
                     self.commit_drag()
                     self.sync_config()
                 t, pos = self.position()
-                want = self.config["overlay"]["enabled"] and not self.hidden_by_hotkey and (t is not None or self.unlocked)
+                want = self.config["overlay"]["enabled"] and not self.hidden_by_hotkey and (t is not None or self.unlocked) \
+                    and not (self.covered(t0) and not self.unlocked)
                 if want:
                     self.present(self.render(t, pos))
                     if t0 - self.last_topmost > 1.5:  # 有些遊戲會搶最上層，定期搶回來
@@ -506,6 +516,29 @@ class Overlay:
                 print("[overlay]", repr(e))
                 busy = False
             time.sleep(max(0.002, (frame if busy else 0.2) - (time.perf_counter() - t0)))
+
+
+_lw_cache = [0.0, False]
+
+
+def lyrics_window_open():
+    """主視窗 (沒縮小) 或舞台視窗開著嗎？(0.5 秒內重用結果；浮動歌詞和膠囊共用)"""
+    now = time.perf_counter()
+    if now - _lw_cache[0] < 0.5:
+        return _lw_cache[1]
+    cov = False
+    pid = os.getpid()
+    for title in ("Hummi 哼哼", "Hummi 舞台"):
+        h = user32.FindWindowW(None, title)
+        if not h:
+            continue
+        owner = wt.DWORD()
+        user32.GetWindowThreadProcessId(h, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(h) and not user32.IsIconic(h):
+            cov = True
+            break
+    _lw_cache[0], _lw_cache[1] = now, cov
+    return cov
 
 
 def run(state, config, runtime, save_config):

@@ -1,0 +1,1 @@
+import{Lc as e}from"../lucide-icons-BO9B8C78.js";var t={name:`line-dot-top-vertical`,size:24,node:[[`path`,{d:`M12 9v12`,key:`10tdml`}],[`circle`,{cx:`12`,cy:`6`,r:`3`,key:`1gm2ql`}]]};t.node;var n=e(t);export{t as __iconData,n as default};
