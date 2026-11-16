@@ -1,6 +1,16 @@
-"""每一版的新功能 (更新後第一次打開時給使用者看)。最新的放最上面。"""
+"""每一版的新功能 (更新後第一次打開時給使用者看)。最新的放最上面。
+跳過好幾版才更新的人 (例如從 1.4 直接裝 1.5.1)，會把中間每一版的新功能合在一起看到。"""
+import re
 
 NOTES = {
+    "1.5.1": {
+        "title": "開台更安心，主視窗不再被擠掉",
+        "items": [
+            ("🔒", "只偵測音樂 App", "預設不再讀瀏覽器、抖音、影片播放器在播什麼，開台時不會露出其他分頁的標題。"
+                                  "用瀏覽器分頁聽 YouTube Music 的話，到 設定 → 一般 → 隱私 關掉。"),
+            ("🪟", "主視窗版面", "歌名很長或視窗比較矮時，下面的功能按鈕不會再被擠出畫面。"),
+        ],
+    },
     "1.5.0": {
         "title": "改名 Hummi 哼哼，還有螢幕頂端的小膠囊",
         "items": [
@@ -20,5 +30,19 @@ NOTES = {
 }
 
 
-def notes_for(version):
-    return NOTES.get(version)
+def _ver(s):
+    out = [int(x) for x in re.findall(r"\d+", str(s or ""))[:3]]
+    return tuple(out + [0] * (3 - len(out)))
+
+
+def notes_for(version, since=None):
+    """version 這一版的新功能；給了 since (上次看過的版本) 就把中間每一版都合在一起，最新的在上面。"""
+    if since is None:
+        return NOTES.get(version)
+    vs = sorted((v for v in NOTES if _ver(since) < _ver(v) <= _ver(version)), key=_ver, reverse=True)
+    if not vs:
+        return None
+    items = []
+    for v in vs:
+        items += NOTES[v]["items"]
+    return {"title": NOTES[vs[-1]]["title"] if len(vs) > 1 else NOTES[vs[0]]["title"], "items": items}

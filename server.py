@@ -41,7 +41,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (desktop lyrics app)"
 
@@ -52,6 +52,7 @@ CONFIG_PATH = DATA / "config.json"
 DEFAULT_CONFIG = {
     "offset": 0.0,
     "notch": True,   # 螢幕頂端的小膠囊 (跟主視窗分開，一直都在)
+    "music_only": True,  # 只偵測音樂 App：不讀瀏覽器、抖音、影片播放器 (開台時不會露出其他分頁的標題)
     "notch_opts": {
         "battery": True,    # 藍牙裝置 / 筆電電量
         "peek": True,       # 換歌時彈出封面和歌名
@@ -95,6 +96,7 @@ def load_config():
         saved = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         cfg["offset"] = float(saved.get("offset", 0))
         cfg["notch"] = bool(saved.get("notch", True))
+        cfg["music_only"] = bool(saved.get("music_only", True))
         cfg["notch_opts"].update({k: bool(v) for k, v in saved.get("notch_opts", {}).items() if k in cfg["notch_opts"]})
         cfg["font"] = str(saved.get("font", "") or "")
         cfg["background"].update({k: v for k, v in saved.get("background", {}).items() if k in cfg["background"]})
@@ -181,6 +183,13 @@ MUSIC_CHANNEL = re.compile(r"\s-\sTopic$|VEVO$|\bmusic\b|\brecords?\b|音樂|音
 
 
 SHORT_APPS = ("douyin", "tiktok", "kuaishou", "instagram", "xiaohongshu")
+
+
+def is_music_app(app_id, src):
+    """「只偵測音樂 App」開著時，只有這些會被讀：Spotify、YouTube Music 桌面版、已知的音樂播放器。"""
+    a = (app_id or "").lower()
+    return src in ("Spotify", "YouTube Music") or any(m in a for m in MUSIC_APPS)
+
 MUSIC_APPS = ("applemusic", "apple music", "itunes", "zunemusic", "tidal", "deezer", "amazon music", "amazonmusic",
               "cloudmusic", "netease", "qqmusic", "kugou", "kuwo", "foobar", "musicbee", "aimp", "winamp",
               "kkbox", "soundcloud", "pandora", "audirvana", "dopamine", "plexamp", "cider")
@@ -708,6 +717,8 @@ class Media:
                 continue
             app = s.source_app_user_model_id
             src = classify_source(app, p.title, p.artist)
+            if config.get("music_only", True) and not is_music_app(app, src):
+                continue  # 瀏覽器、抖音、影片播放器：不讀 (隱私，開台時不會露出其他東西)
             playing = pb.playback_status == PLAYING
             pos = tl.position.total_seconds()
             dur = (tl.end_time - tl.start_time).total_seconds()
@@ -1038,6 +1049,9 @@ async def ws_handler(request):
                 elif act == "auto":
                     config["auto_update"] = bool(d.get("value"))
                     save_config()
+            elif d.get("type") == "music_only":
+                config["music_only"] = bool(d.get("value"))
+                save_config()
             elif d.get("type") == "folia":
                 set_option("folia", bool(d.get("value")))
             elif d.get("type") == "open_stage":
@@ -1104,7 +1118,7 @@ def init_whatsnew():
     """剛更新完：準備好「這版有什麼新功能」，主視窗和膠囊都會顯示一次。"""
     import whatsnew
     if _ver(config.get("seen_version")) < _ver(VERSION):
-        n = whatsnew.notes_for(VERSION)
+        n = whatsnew.notes_for(VERSION, config.get("seen_version"))  # 跳過好幾版的人：中間每一版都給他看
         if n:
             UPDATE["whatsnew"] = {"version": VERSION, **n}
             runtime["notch_event"] = ("updated", VERSION)

@@ -92,8 +92,8 @@ html.mica #grain{display:none}
 
 /* ───── 版面 ───── */
 #app{position:relative;z-index:2;height:100%;display:grid;grid-template-columns:minmax(300px,38%) 1fr;gap:clamp(24px,4vw,72px);padding:clamp(24px,5vh,64px) clamp(24px,5vw,80px)}
-#left{display:flex;flex-direction:column;justify-content:center;gap:28px;min-width:0}
-#cover-wrap{position:relative;width:min(100%,46vh,440px);aspect-ratio:1;align-self:flex-start}
+#left{display:flex;flex-direction:column;justify-content:center;gap:clamp(12px,2.4vh,26px);min-width:0;min-height:0}
+#cover-wrap{position:relative;width:clamp(96px,calc(100vh - 520px),min(100%,440px));aspect-ratio:1;align-self:flex-start;flex:none}
 #cover{width:100%;height:100%;border-radius:22px;object-fit:cover;background:var(--glass);box-shadow:0 40px 80px -20px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08) inset;transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .5s}
 #cover-wrap.paused #cover{transform:scale(.92);opacity:.75}
 #cover-glow{position:absolute;inset:8%;border-radius:30px;background-size:cover;filter:blur(40px) saturate(1.8);opacity:.6;z-index:-1;transform:translateY(18px)}
@@ -105,7 +105,7 @@ html.mica #grain{display:none}
 #source.paused .dot{animation:none;opacity:.4;box-shadow:none}
 #source .dot{animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{50%{transform:scale(.6);opacity:.6}}
-#title{font:800 clamp(26px,3.2vw,44px)/1.1 var(--font);letter-spacing:-.02em;margin-top:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#title{font:800 clamp(24px,min(3vw,4.6vh),42px)/1.12 var(--font);letter-spacing:-.02em;margin-top:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 #artist{font:500 clamp(15px,1.4vw,19px) var(--font);color:rgba(255,255,255,.7);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 #progress{margin-top:4px}
@@ -473,6 +473,9 @@ body.settings-only #settings{display:block!important;position:fixed;inset:42px 0
   <p class="hint" id="folia-status" style="margin:6px 0 0"></p>
   </div>
   <div class="pane" data-pane="general">
+  <h3>隱私</h3>
+  <label class="row" title="開著時只讀 Spotify、YouTube Music 桌面版和音樂播放器；瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi (開台時不會露出其他分頁的標題)">只偵測音樂 App <span class="switch"><input type="checkbox" id="music-only"><span></span></span></label>
+  <p class="hint" style="margin:4px 0 0">開著時，瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi、膠囊、舞台和 OBS 上。用瀏覽器分頁聽 YouTube Music 的話要關掉，或改用 YouTube Music 桌面版。</p>
   <h3>啟動與更新</h3>
   <label class="row" id="autostart-row">開機時自動啟動 <span class="switch"><input type="checkbox" id="autostart"><span></span></span></label>
   <label class="row">自動檢查更新 <span class="switch"><input type="checkbox" id="auto-update"><span></span></span></label>
@@ -568,6 +571,7 @@ function onState(m){
     aiStatus = m.ai; renderAiStatus();
     applyFont(cfg.font);
     micaOK = !!m.mica && document.body.classList.contains('app');
+    if ($('#music-only') && performance.now() - musicOnlyEdit > 1500) $('#music-only').checked = cfg.music_only !== false;
     if ($('#folia-on')){
       if (performance.now() - foliaEdit > 1500) $('#folia-on').checked = !!cfg.folia?.enabled;
       const fs = m.folia || {};
@@ -1245,6 +1249,8 @@ function setTab(name){
 }
 document.querySelectorAll('#set-tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 try { const t = localStorage.getItem('setTab'); if (t) setTab(t); } catch {}
+let musicOnlyEdit = 0;
+$('#music-only').onchange = e => { musicOnlyEdit = performance.now(); send({type: 'music_only', value: e.target.checked}); };
 </script>
 </body>
 </html>

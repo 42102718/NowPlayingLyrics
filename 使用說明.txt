@@ -1,11 +1,12 @@
-﻿Hummi 哼哼 v1.5.0  (1.4 以前叫 Now Playing Lyrics)
+﻿Hummi 哼哼 v1.5.1  (1.4 以前叫 Now Playing Lyrics)
 即時顯示 Spotify / YouTube Music 正在播放的歌詞，還有可以浮在遊戲上的浮動歌詞。
 
 ────────────────────────
 需求
 ────────────────────────
 ・Windows 10 或 11 (64 位元)
-・Spotify 桌面版，或用瀏覽器 / YouTube Music App 播放音樂
+・Spotify 桌面版，或 YouTube Music App 播放音樂
+  (為了開台隱私，預設不讀瀏覽器和抖音在播什麼；用瀏覽器分頁聽歌的話，到 設定 → 一般 → 隱私 關掉「只偵測音樂 App」)
 ・不需要安裝 Python，也不用登入任何帳號
 
 ────────────────────────
