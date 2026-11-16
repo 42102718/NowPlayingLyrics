@@ -41,7 +41,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (desktop lyrics app)"
 
@@ -1691,9 +1691,18 @@ class WindowApi:
             window._maxed = True
 
     def toggle_on_top(self):
-        self._on_top = not self._on_top
-        window.on_top = self._on_top
-        return self._on_top
+        self._on_top = on = not self._on_top
+        # 不能用 window.on_top = ...：pywebview 會在這條 (js_api) 執行緒直接改 WinForms 的 TopMost，
+        # 跨執行緒改視窗 → 整個程式卡死 (Windows 回報「沒有回應」)。直接用 Win32 非同步設定，不會等 UI 執行緒。
+        import ctypes, ctypes.wintypes as wt
+        u = ctypes.windll.user32
+        u.FindWindowW.restype = wt.HWND
+        u.SetWindowPos.argtypes = [wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wt.UINT]
+        hwnd = u.FindWindowW(None, APP_NAME)
+        if hwnd:
+            # HWND_TOPMOST(-1) / HWND_NOTOPMOST(-2)；SWP_NOSIZE|NOMOVE|NOACTIVATE|ASYNCWINDOWPOS
+            u.SetWindowPos(hwnd, wt.HWND(-1 if on else -2), 0, 0, 0, 0, 0x1 | 0x2 | 0x10 | 0x4000)
+        return on
 
     def notch(self):
         """膠囊按鈕：主視窗收起來，只留螢幕頂端的小膠囊。"""
