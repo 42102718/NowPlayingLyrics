@@ -73,6 +73,9 @@ def _load():
         _methods_ = [
             COMMETHOD([], HRESULT, "Activate", (["in"], ctypes.POINTER(GUID), "iid"), (["in"], wt.DWORD, "ctx"),
                       (["in"], ctypes.c_void_p, "p"), (["out"], ctypes.POINTER(ctypes.POINTER(IUnknown)), "o")),
+            COMMETHOD([], HRESULT, "OpenPropertyStore", (["in"], wt.DWORD, "a"), (["out"], ctypes.POINTER(ctypes.c_void_p), "p")),
+            COMMETHOD([], HRESULT, "GetId", (["out"], ctypes.POINTER(ctypes.c_void_p), "id")),
+            COMMETHOD([], HRESULT, "GetState", (["out"], ctypes.POINTER(wt.DWORD), "s")),
         ]
 
     class IMMDeviceEnumerator(IUnknown):
@@ -81,6 +84,8 @@ def _load():
             COMMETHOD([], HRESULT, "EnumAudioEndpoints", (["in"], ctypes.c_int, "f"), (["in"], wt.DWORD, "m"),
                       (["out"], ctypes.POINTER(ctypes.c_void_p), "d")),
             COMMETHOD([], HRESULT, "GetDefaultAudioEndpoint", (["in"], ctypes.c_int, "f"), (["in"], ctypes.c_int, "r"),
+                      (["out"], ctypes.POINTER(ctypes.POINTER(IMMDevice)), "d")),
+            COMMETHOD([], HRESULT, "GetDevice", (["in"], ctypes.c_wchar_p, "id"),
                       (["out"], ctypes.POINTER(ctypes.POINTER(IMMDevice)), "d")),
         ]
 
@@ -190,6 +195,34 @@ def session_pid(app_id):
     """播放器發出聲音的程序 (給頻譜錄音用；找不到 exe 的 Store App 也找得到)。"""
     s = _sessions(app_id, with_pid=True)
     return s[0][0] if s else None
+
+
+def _enum():
+    comtypes, GUID, IMMDeviceEnumerator, *_ = _load()
+    ctypes.windll.ole32.CoInitializeEx(None, 0)
+    return comtypes.CoCreateInstance(GUID("{BCDE0395-E52F-467C-8E3D-C4579291692E}"), IMMDeviceEnumerator,
+                                     comtypes.CLSCTX_ALL)
+
+
+def default_output_id():
+    """預設播放裝置的 ID (耳機拔掉、藍牙斷線時會換成別的)。沒有任何輸出裝置時回傳 None。"""
+    try:
+        dev = _enum().GetDefaultAudioEndpoint(0, 1)  # eRender, eMultimedia
+        p = dev.GetId()
+        try:
+            return ctypes.wstring_at(p)
+        finally:
+            ctypes.windll.ole32.CoTaskMemFree(ctypes.c_void_p(p))
+    except Exception:
+        return None
+
+
+def device_active(dev_id):
+    """這個播放裝置還在不在 (拔掉 / 斷線就不是 ACTIVE)。"""
+    try:
+        return _enum().GetDevice(dev_id).GetState() == 1  # DEVICE_STATE_ACTIVE
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":

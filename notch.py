@@ -171,6 +171,7 @@ class Notch:
         self.hover_since = self.leave_since = None
         self.last_frame = time.perf_counter()
         self.last_topmost = self.last_fs_check = 0.0
+        self.picker, self.mon_rect = None, None
         self.fullscreen = False
         # 時鐘
         self.anchor_pos, self.anchor_at, self.playing, self.track_id = 0.0, time.perf_counter(), False, None
@@ -988,20 +989,22 @@ class Notch:
                 self.page = "main"
 
     def check_fullscreen(self, now):
+        """膠囊那個螢幕上有全螢幕遊戲 / 影片：膠囊先藏起來。順便跟著設定換螢幕。"""
         if now - self.last_fs_check < 0.5:
             return
         self.last_fs_check = now
-        fg = user32.GetForegroundWindow()
-        full = False
-        if fg and fg != self.hwnd:
-            r = wt.RECT()
-            user32.GetWindowRect(fg, ctypes.byref(r))
-            buf = ctypes.create_unicode_buffer(64)
-            user32.GetClassNameW(fg, buf, 64)
-            sw, sh = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-            full = (r.left <= 0 and r.top <= 0 and r.right >= sw and r.bottom >= sh
-                    and buf.value not in ("Progman", "WorkerW", "Shell_TrayWnd"))
-        self.fullscreen = full
+        import screens
+        if self.picker is None:
+            self.picker = screens.Picker([self.hwnd])
+        mon = self.picker.pick(self.config.get("notch_monitor", "primary"))
+        if mon["rect"] != self.mon_rect:
+            self.mon_rect = mon["rect"]
+            l, t, r, b = mon["rect"]
+            self.x, self.y = l + (r - l - self.W) // 2, t
+            w = self.dib_size[0] or self.W  # 畫面沒變時不會重畫：直接把視窗搬過去
+            user32.SetWindowPos(self.hwnd, None, self.x + (self.W - w) // 2, self.y, 0, 0, 0x1 | 0x4 | 0x10)
+            self.static_sig = None
+        self.fullscreen = screens.fullscreen_app(self.mon_rect, own=[self.hwnd])
 
     # ───── 主迴圈 ─────
     def run(self):
@@ -1129,4 +1132,6 @@ def fmt(sec):
 
 
 def run(state, config, runtime):
-    Notch(state, config, runtime).run()
+    n = Notch(state, config, runtime)
+    runtime["notch_obj"] = n  # 全域快捷鍵調音量時用
+    n.run()

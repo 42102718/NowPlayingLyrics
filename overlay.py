@@ -214,6 +214,8 @@ class TextLayer:
 
 class Overlay:
     def __init__(self, state, config, runtime, save_config):
+        self.picker, self.mon_rect = None, None
+        self.alpha, self.fs_at, self.fs_now = 255, 0.0, False
         self.state, self.config, self.runtime, self.save_config = state, config, runtime, save_config
         self.hwnd = None
         self.W = self.H = 0
@@ -284,7 +286,7 @@ class Overlay:
         data = Image.merge("RGBA", (ImageChops.multiply(b, a), ImageChops.multiply(g, a),
                                     ImageChops.multiply(r, a), a)).tobytes()  # 預乘 alpha 的 BGRA
         ctypes.memmove(self.bits, data, len(data))
-        blend = BLENDFUNCTION(0, 0, 255, 1)
+        blend = BLENDFUNCTION(0, 0, self.alpha, 1)
         user32.UpdateLayeredWindow(self.hwnd, self.screen_dc, ctypes.byref(wt.POINT(self.x, self.y)),
                                    ctypes.byref(wt.SIZE(self.W, self.H)), self.mem_dc,
                                    ctypes.byref(wt.POINT(0, 0)), 0, ctypes.byref(blend), 2)
@@ -314,8 +316,9 @@ class Overlay:
             H += int(self.fs * 0.6 * 1.5)
         self.ensure_dib(W, H)
 
-        wa = wt.RECT()
-        user32.SystemParametersInfoW(0x30, 0, ctypes.byref(wa), 0)  # SPI_GETWORKAREA
+        mon = self.monitor()
+        self.mon_rect = mon["rect"]
+        wa = wt.RECT(*mon["work"])  # 選的那個螢幕的工作區域 (扣掉工作列)
         margin = int(20 * s)
         p = ov["preset"]
         self.valign = "top" if p == "top-center" else "bottom"
@@ -473,6 +476,22 @@ class Overlay:
         self.layout()
         self.prev_block = None
 
+    def monitor(self):
+        if self.picker is None:
+            import screens
+            self.picker = screens.Picker([self.hwnd])
+        return self.picker.pick(self.config["overlay"].get("monitor", "primary"))
+
+    def game_mode(self, now):
+        """全螢幕遊戲 / 影片在浮動歌詞那個螢幕上：照常 / 變淡 / 先藏起來。"""
+        if now - self.fs_at > 0.5:
+            self.fs_at = now
+            import screens
+            self.fs_now = screens.fullscreen_app(self.mon_rect, own=[self.hwnd])
+        mode = self.config["overlay"].get("fullscreen", "dim")
+        self.alpha = 120 if (self.fs_now and mode == "dim") else 255
+        return self.fs_now and mode == "hide"
+
     def covered(self, now):
         """主視窗 (沒縮小) 或舞台開著時，它們已經在顯示歌詞了：浮動歌詞先藏起來，避免畫面上同時好幾份歌詞。"""
         return self.config["overlay"].get("auto_hide", True) and lyrics_window_open()
@@ -502,9 +521,11 @@ class Overlay:
                 if self.moved:
                     self.commit_drag()
                     self.sync_config()
+                if self.config["overlay"].get("preset") != "custom" and self.monitor()["rect"] != self.mon_rect:
+                    self.layout()  # 換螢幕了 (跟著前景 / 滑鼠，或螢幕插拔)
                 t, pos = self.position()
                 want = self.config["overlay"]["enabled"] and not self.hidden_by_hotkey and (t is not None or self.unlocked) \
-                    and not (self.covered(t0) and not self.unlocked)
+                    and not (self.covered(t0) and not self.unlocked) and not (self.game_mode(t0) and not self.unlocked)
                 if want:
                     self.present(self.render(t, pos))
                     if t0 - self.last_topmost > 1.5:  # 有些遊戲會搶最上層，定期搶回來

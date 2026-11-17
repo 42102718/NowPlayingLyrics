@@ -9,16 +9,18 @@
 <style>
 :root{
   --c1:#3a2a6a; --c2:#a04a7a; --c3:#1f4a7a;
-  --fg:#fff; --dim:rgba(255,255,255,.42);
-  --glass:rgba(255,255,255,.08); --glass-b:rgba(255,255,255,.14);
+  --ink:255,255,255; --fg:#fff; --hi:#fff; --dim:rgba(var(--ink),.42);
+  --bg0:#0b0b12; --panel:20,20,30; --dialog:#16161f; --pill:#fff; --pill-fg:#111;
+  --accent:#b9a6ff; --accent2:#7c5cff; --shade:0,0,0;
+  --glass:rgba(var(--ink),.08); --glass-b:rgba(var(--ink),.14);
   --font:"Inter","Noto Sans TC",system-ui,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none!important}
-html,body{height:100%;overflow:hidden;background:#0b0b12;color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased}
+html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased}
 
 /* ───── 背景 ───── */
-#bg{position:fixed;inset:0;z-index:0;overflow:hidden;background:#0b0b12}
+#bg{position:fixed;inset:0;z-index:0;overflow:hidden;background:var(--bg0)}
 #bg .art{position:absolute;inset:-20%;background-size:cover;background-position:center;filter:blur(var(--bg-blur,90px)) saturate(1.6) brightness(.75);transform:scale(1.2);opacity:0;transition:opacity 1.2s ease, background-image 1s}
 #bg .art.on{opacity:.85}
 .blob{position:absolute;width:70vmax;height:70vmax;border-radius:50%;filter:blur(110px);opacity:.55;mix-blend-mode:screen;transition:background 1.6s ease}
@@ -28,7 +30,7 @@ html,body{height:100%;overflow:hidden;background:#0b0b12;color:var(--fg);font-fa
 @keyframes drift1{50%{transform:translate(18vw,14vh) scale(1.15)}}
 @keyframes drift2{50%{transform:translate(-20vw,-12vh) scale(.9)}}
 @keyframes drift3{50%{transform:translate(-14vw,16vh) scale(1.2)}}
-#bg::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,transparent 0%,rgba(0,0,0,.3) 75%),rgba(0,0,0,var(--bg-dim,.35));}
+#bg::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,transparent 0%,rgba(var(--shade),.3) 75%),rgba(var(--shade),var(--bg-dim,.35));}
 #bg-custom{position:absolute;inset:0;opacity:0;transition:opacity .8s ease;background-size:cover;background-position:center}
 #bg[data-mode="color"] #bg-custom{opacity:1;background:var(--bg1)}
 #bg[data-mode="gradient"] #bg-custom{opacity:1;background:linear-gradient(135deg,var(--bg1),var(--bg2))}
@@ -47,28 +49,28 @@ html.mica #grain{display:none}
 #status-actions.show{display:flex}
 #status.hide #status-actions{pointer-events:none}
 #status-actions .chip{font-size:14px;height:38px;padding:0 16px}
-#status-actions .chip.primary{background:#fff;color:#111;border-color:#fff}
-#lyr-src button{background:none;border:0;color:#b9a6ff;font:inherit;cursor:pointer;text-decoration:underline;padding:0 0 0 6px}
+#status-actions .chip.primary{background:var(--pill);color:var(--pill-fg);border-color:var(--pill)}
+#lyr-src button{background:none;border:0;color:var(--accent);font:inherit;cursor:pointer;text-decoration:underline;padding:0 0 0 6px}
 .modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
 .modal.open{display:flex;animation:pop .18s ease-out}
-.dialog{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 80px);display:flex;flex-direction:column;border-radius:20px;background:#16161f;border:1px solid var(--glass-b);box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden}
+.dialog{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 80px);display:flex;flex-direction:column;border-radius:20px;background:var(--dialog);border:1px solid var(--glass-b);box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden}
 .dialog header{display:flex;align-items:center;gap:6px;padding:14px 16px 0}
 .dialog header .tab{height:34px;padding:0 14px;border-radius:10px;border:0;background:none;color:var(--dim);font:600 14px var(--font);cursor:pointer}
-.dialog header .tab.on{background:rgba(255,255,255,.1);color:#fff}
+.dialog header .tab.on{background:rgba(var(--ink),.1);color:var(--hi)}
 .dialog header .x{margin-left:auto;background:none;border:0;color:var(--dim);font-size:22px;cursor:pointer}
 .dialog .body{padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0}
 .dialog .q{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
 .dialog input[type=text],.dialog textarea{width:100%;padding:0 12px;height:40px;border-radius:10px;border:1px solid var(--glass-b);background:rgba(0,0,0,.25);color:var(--fg);font:500 14px var(--font);outline:none}
-.dialog input[type=text]:focus,.dialog textarea:focus{border-color:#7c5cff}
+.dialog input[type=text]:focus,.dialog textarea:focus{border-color:var(--accent2)}
 .dialog textarea{height:260px;padding:10px 12px;resize:vertical;font:500 13px/1.6 Consolas,"Microsoft JhengHei",monospace}
-.dialog .btn{height:40px;padding:0 18px;border-radius:10px;border:0;background:#7c5cff;color:#fff;font:600 14px var(--font);cursor:pointer;white-space:nowrap}
-.dialog .btn.ghost{background:rgba(255,255,255,.1)}
+.dialog .btn{height:40px;padding:0 18px;border-radius:10px;border:0;background:var(--accent2);color:#fff;font:600 14px var(--font);cursor:pointer;white-space:nowrap}
+.dialog .btn.ghost{background:rgba(var(--ink),.1)}
 .dialog .btn:disabled{opacity:.5;cursor:default}
 .dialog .msg{font:500 13px var(--font);color:var(--dim);min-height:18px}
 .dialog .msg.err{color:#ff8a8a}
 #lyr-results{display:flex;flex-direction:column;gap:4px}
-#lyr-results button{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid transparent;background:rgba(255,255,255,.04);color:var(--fg);cursor:pointer}
-#lyr-results button:hover{background:rgba(255,255,255,.1);border-color:var(--glass-b)}
+#lyr-results button{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid transparent;background:rgba(var(--ink),.04);color:var(--fg);cursor:pointer}
+#lyr-results button:hover{background:rgba(var(--ink),.1);border-color:var(--glass-b)}
 #lyr-results button:disabled{opacity:.5}
 #lyr-results .src{font:700 11px var(--font);padding:3px 8px;border-radius:6px;white-space:nowrap}
 #lyr-results .src.lrclib{background:#2f6f5e}#lyr-results .src.netease{background:#a3262a}#lyr-results .src.kugou{background:#1f5fbf}#lyr-results .src.qq{background:#1f9d55}#lyr-results .src.lyricsplus{background:#c2185b}
@@ -76,15 +78,15 @@ html.mica #grain{display:none}
 #lyr-results .a{display:block;font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #lyr-results .d{font:500 12px var(--font);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 #lyr-results .d .ok{color:#7ee2a8}
-.dialog footer{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.07)}
+.dialog footer{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid rgba(var(--ink),.07)}
 .dialog footer .hint{margin:0 auto 0 0;font:400 12px/1.5 var(--font);color:var(--dim)}
 #bg-colors{display:flex;gap:10px;align-items:center}
 #ai-status{font:500 12px/1.5 var(--font);color:var(--dim);padding:2px 0 8px}
-#ai-status b{color:#b9a6ff;font-weight:600}
-.ai-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#b9a6ff;margin-right:6px;vertical-align:1px;animation:pulse 1.4s ease-in-out infinite}
+#ai-status b{color:var(--accent);font-weight:600}
+.ai-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:1px;animation:pulse 1.4s ease-in-out infinite}
 #bg-colors input[type=color]{width:44px;height:32px;border:1px solid var(--glass-b);border-radius:8px;background:none;padding:2px;cursor:pointer}
 #bg-image-row{display:flex;gap:10px;align-items:center}
-#bg-thumb{width:64px;height:40px;border-radius:8px;background:rgba(255,255,255,.08) center/cover;flex:none;border:1px solid var(--glass-b)}
+#bg-thumb{width:64px;height:40px;border-radius:8px;background:rgba(var(--ink),.08) center/cover;flex:none;border:1px solid var(--glass-b)}
 .seg.four{grid-template-columns:repeat(4,1fr)}
 .seg.five{grid-template-columns:repeat(5,1fr)}
 
@@ -94,7 +96,7 @@ html.mica #grain{display:none}
 #app{position:relative;z-index:2;height:100%;display:grid;grid-template-columns:minmax(300px,38%) 1fr;gap:clamp(24px,4vw,72px);padding:clamp(24px,5vh,64px) clamp(24px,5vw,80px)}
 #left{display:flex;flex-direction:column;justify-content:center;gap:clamp(12px,2.4vh,26px);min-width:0;min-height:0}
 #cover-wrap{position:relative;width:clamp(96px,calc(100vh - 520px),min(100%,440px));aspect-ratio:1;align-self:flex-start;flex:none}
-#cover{width:100%;height:100%;border-radius:22px;object-fit:cover;background:var(--glass);box-shadow:0 40px 80px -20px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08) inset;transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .5s}
+#cover{width:100%;height:100%;border-radius:22px;object-fit:cover;background:var(--glass);box-shadow:0 40px 80px -20px rgba(0,0,0,.6),0 0 0 1px rgba(var(--ink),.08) inset;transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .5s}
 #cover-wrap.paused #cover{transform:scale(.92);opacity:.75}
 #cover-glow{position:absolute;inset:8%;border-radius:30px;background-size:cover;filter:blur(40px) saturate(1.8);opacity:.6;z-index:-1;transform:translateY(18px)}
 .meta{min-width:0}
@@ -106,19 +108,19 @@ html.mica #grain{display:none}
 #source .dot{animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{50%{transform:scale(.6);opacity:.6}}
 #title{font:800 clamp(24px,min(3vw,4.6vh),42px)/1.12 var(--font);letter-spacing:-.02em;margin-top:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-#artist{font:500 clamp(15px,1.4vw,19px) var(--font);color:rgba(255,255,255,.7);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#artist{font:500 clamp(15px,1.4vw,19px) var(--font);color:rgba(var(--ink),.7);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 #progress{margin-top:4px}
-#bar{position:relative;height:6px;border-radius:6px;background:rgba(255,255,255,.15);cursor:pointer;overflow:hidden}
+#bar{position:relative;height:6px;border-radius:6px;background:rgba(var(--ink),.15);cursor:pointer;overflow:hidden}
 #bar:hover{height:8px;margin:-1px 0}
-#fill{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,rgba(255,255,255,.75),#fff);border-radius:6px;box-shadow:0 0 12px rgba(255,255,255,.6)}
+#fill{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,rgba(var(--ink),.75),var(--hi));border-radius:6px;box-shadow:0 0 12px rgba(var(--ink),.6)}
 .times{display:flex;justify-content:space-between;margin-top:8px;font:500 12px var(--font);color:var(--dim);font-variant-numeric:tabular-nums}
 
 #controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-b);color:var(--fg);font:500 13px var(--font);cursor:pointer;backdrop-filter:blur(20px);transition:background .2s}
-.chip:hover{background:rgba(255,255,255,.16)}
+.chip:hover{background:rgba(var(--ink),.16)}
 .chip.icon{width:34px;padding:0;justify-content:center}
-#offset-val{font-variant-numeric:tabular-nums;min-width:52px;text-align:center;font-size:13px;color:rgba(255,255,255,.8)}
+#offset-val{font-variant-numeric:tabular-nums;min-width:52px;text-align:center;font-size:13px;color:rgba(var(--ink),.8)}
 #lyr-src{font-size:12px;color:var(--dim);margin-left:auto}
 
 /* ───── 歌詞 ───── */
@@ -129,56 +131,58 @@ html.mica #grain{display:none}
 .line{font:800 clamp(24px,2.9vw,42px)/1.28 var(--font);letter-spacing:-.01em;padding:clamp(10px,1.4vh,16px) 12px;margin:0 -12px;border-radius:14px;color:var(--dim);
   transform-origin:left center;transform:scale(.94);cursor:pointer;
   transition:transform .6s cubic-bezier(.22,.9,.24,1),color .4s,filter .6s,opacity .6s;}
-.line:hover{background:rgba(255,255,255,.06)}
+.line:hover{background:rgba(var(--ink),.06)}
 .line .tr{display:block;font:600 .55em/1.35 var(--font);margin-top:.3em;opacity:.8}
 .line.active{transform:scale(1);color:transparent;filter:none!important;opacity:1!important}
-.line.active .txt{background:linear-gradient(90deg,#fff calc(var(--p,0)*100% - 6%),rgba(255,255,255,.55) calc(var(--p,0)*100% + 6%));-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
-.line.active .tr{color:rgba(255,255,255,.85)}
-.line.past{color:rgba(255,255,255,.5)}
+.line.active .txt{background:linear-gradient(90deg,var(--hi) calc(var(--p,0)*100% - 6%),rgba(var(--ink),.55) calc(var(--p,0)*100% + 6%));-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
+.line.active .tr{color:rgba(var(--ink),.85)}
+.line.past{color:rgba(var(--ink),.5)}
 .line.empty{min-height:.6em}
 .interlude{display:flex;gap:.35em;padding:20px 0;height:clamp(40px,6vh,64px);align-items:center}
-.interlude i{width:.45em;height:.45em;border-radius:50%;background:#fff;opacity:.3;font-size:clamp(24px,2.9vw,42px);transition:opacity .3s, transform .3s}
+.interlude i{width:.45em;height:.45em;border-radius:50%;background:var(--hi);opacity:.3;font-size:clamp(24px,2.9vw,42px);transition:opacity .3s, transform .3s}
 .interlude.on i{animation:breathe 1.8s ease-in-out infinite}
 .interlude.on i:nth-child(2){animation-delay:.25s}.interlude.on i:nth-child(3){animation-delay:.5s}
 @keyframes breathe{50%{opacity:1;transform:scale(1.3)}}
-.plain .line{transform:none;color:rgba(255,255,255,.85);cursor:default;font-size:clamp(20px,2.2vw,30px)}
+.plain .line{transform:none;color:rgba(var(--ink),.85);cursor:default;font-size:clamp(20px,2.2vw,30px)}
 #right.scroll{overflow-y:auto;-webkit-mask-image:none;mask-image:none}
 #right.scroll #lyrics{position:static;transform:none!important;padding:10vh 0}
 
-#status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px;font:700 clamp(22px,2.4vw,34px) var(--font);color:rgba(255,255,255,.55);pointer-events:none;transition:opacity .4s}
+#status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px;font:700 clamp(22px,2.4vw,34px) var(--font);color:rgba(var(--ink),.55);pointer-events:none;transition:opacity .4s}
 #status small{font:500 15px var(--font);color:var(--dim)}
 #status.hide{opacity:0}
-.spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;animation:spin .9s linear infinite}
+.spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(var(--ink),.2);border-top-color:var(--hi);animation:spin .9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* 來源選單 */
-#menu{position:fixed;z-index:10;min-width:280px;max-width:420px;padding:6px;border-radius:16px;background:rgba(20,20,30,.75);border:1px solid var(--glass-b);backdrop-filter:blur(30px) saturate(1.4);box-shadow:0 20px 60px rgba(0,0,0,.5);display:none}
+#menu{position:fixed;z-index:10;min-width:280px;max-width:420px;padding:6px;border-radius:16px;background:rgba(var(--panel),.75);border:1px solid var(--glass-b);backdrop-filter:blur(30px) saturate(1.4);box-shadow:0 20px 60px rgba(0,0,0,.5);display:none}
 #menu.open{display:block;animation:pop .18s ease-out}
 @keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.98)}}
 #menu button{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:10px 12px;border:0;border-radius:10px;background:none;color:var(--fg);font:500 14px var(--font);cursor:pointer}
-#menu button:hover,#menu button.sel{background:rgba(255,255,255,.1)}
+#menu button:hover,#menu button.sel{background:rgba(var(--ink),.1)}
 #menu button span{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-#settings{position:fixed;z-index:9;right:clamp(16px,3vw,40px);bottom:clamp(16px,3vh,40px);width:min(360px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:20px;border-radius:20px;background:rgba(18,18,28,.72);border:1px solid var(--glass-b);backdrop-filter:blur(30px) saturate(1.4);box-shadow:0 30px 80px rgba(0,0,0,.55);display:none}
+#settings{position:fixed;z-index:9;right:clamp(16px,3vw,40px);bottom:clamp(16px,3vh,40px);width:min(360px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:20px;border-radius:20px;background:rgba(var(--panel),.72);border:1px solid var(--glass-b);backdrop-filter:blur(30px) saturate(1.4);box-shadow:0 30px 80px rgba(0,0,0,.55);display:none}
 #settings.open{display:block;animation:pop .2s ease-out}
 body.app #settings{max-height:calc(100vh - 38px - 2*clamp(16px,3vh,40px))}
 #settings h2{font:700 17px var(--font);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
 #settings h2 button{background:none;border:0;color:var(--dim);font-size:20px;cursor:pointer}
 #settings .hint{font:400 12px/1.5 var(--font);color:var(--dim);margin-bottom:14px}
-.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.07);font:500 14px var(--font)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid rgba(var(--ink),.07);font:500 14px var(--font)}
 .row.col{flex-direction:column;align-items:stretch}
+.row select{max-width:62%;height:32px;padding:0 10px;border-radius:9px;border:1px solid var(--glass-b);background:rgba(var(--ink),.06);color:var(--fg);font:500 13px var(--font);outline:none;cursor:pointer}
+.row select option{background:var(--dialog);color:var(--fg)}
 .row output{font-variant-numeric:tabular-nums;color:var(--dim);font-size:13px}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .seg button{height:34px;border-radius:10px;border:1px solid var(--glass-b);background:var(--glass);color:var(--fg);font:500 13px var(--font);cursor:pointer}
-.seg button.on{background:#fff;color:#111;border-color:#fff}
+.seg button.on{background:var(--pill);color:var(--pill-fg);border-color:var(--pill)}
 .switch{position:relative;width:42px;height:24px;flex:none}
 .switch input{opacity:0;width:0;height:0}
-.switch span{position:absolute;inset:0;border-radius:24px;background:rgba(255,255,255,.18);transition:.2s;cursor:pointer}
+.switch span{position:absolute;inset:0;border-radius:24px;background:rgba(var(--ink),.18);transition:.2s;cursor:pointer}
 .switch span::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
-.switch input:checked+span{background:#7c5cff}
+.switch input:checked+span{background:var(--accent2)}
 .switch input:checked+span::after{transform:translateX(18px)}
-input[type=range]{width:100%;accent-color:#fff}
-#unlock.on{background:#7c5cff;border-color:#7c5cff;color:#fff}
+input[type=range]{width:100%;accent-color:var(--hi)}
+#unlock.on{background:var(--accent2);border-color:var(--accent2);color:#fff}
 #settings h3{font:700 12px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:18px 0 6px}
 #font-btn{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--glass-b);background:var(--glass);color:var(--fg);cursor:pointer;text-align:left}
 #font-btn .fname{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -188,28 +192,65 @@ input[type=range]{width:100%;accent-color:#fff}
 #font-picker.open{display:block}
 #font-search{width:100%;height:38px;padding:0 12px;border:0;border-bottom:1px solid var(--glass-b);background:transparent;color:var(--fg);font:500 14px var(--font);outline:none}
 #font-search::placeholder{color:var(--dim)}
-.font-filter{display:flex;align-items:center;gap:8px;padding:8px 12px;font:500 12px var(--font);color:var(--dim);border-bottom:1px solid rgba(255,255,255,.07)}
+.font-filter{display:flex;align-items:center;gap:8px;padding:8px 12px;font:500 12px var(--font);color:var(--dim);border-bottom:1px solid rgba(var(--ink),.07)}
 #font-list{max-height:280px;overflow-y:auto}
 #font-list button{display:block;width:100%;text-align:left;padding:9px 12px;border:0;background:none;color:var(--fg);cursor:pointer}
-#font-list button:hover{background:rgba(255,255,255,.08)}
+#font-list button:hover{background:rgba(var(--ink),.08)}
 #font-list button.sel{background:rgba(124,92,255,.35)}
 #font-list .pv{display:block;font-size:19px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #font-list .nm{display:block;font:500 11px "Inter","Noto Sans TC",sans-serif;color:var(--dim);margin-top:2px}
-#font-list .tag{display:inline-block;margin-left:6px;padding:0 5px;border-radius:4px;background:rgba(255,255,255,.12);font-size:10px}
+#font-list .tag{display:inline-block;margin-left:6px;padding:0 5px;border-radius:4px;background:rgba(var(--ink),.12);font-size:10px}
 #font-list .empty{padding:14px 12px;font:500 13px var(--font);color:var(--dim)}
 .row.disabled{opacity:.45}
 #ver{font:500 11px var(--font);color:var(--dim);margin-top:14px;text-align:right}
-kbd{font:600 11px var(--font);padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15)}
+kbd{font:600 11px var(--font);padding:2px 6px;border-radius:5px;background:rgba(var(--ink),.12);border:1px solid rgba(var(--ink),.15)}
+/* ───── 用歌詞找歌 ───── */
+#find-dialog .dialog{width:min(620px,calc(100vw - 32px))}
+#find-dialog header h2{font:700 18px var(--font);margin:0 auto 0 6px}
+#find-form{display:flex;gap:8px}
+#find-q{flex:1;height:42px;padding:0 14px;border-radius:12px;border:1px solid var(--glass-b);background:rgba(var(--ink),.06);color:var(--fg);font:500 15px var(--font);outline:none}
+#find-q:focus{border-color:rgba(185,166,255,.6)}
+#find-list{display:flex;flex-direction:column;gap:6px}
+.fr{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 12px;border-radius:12px;background:rgba(var(--ink),.04)}
+.fr:hover{background:rgba(var(--ink),.08)}
+.fr .t{font:700 15px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fr .a{font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fr .l{grid-column:1/-1;font:500 13px var(--font);color:rgba(var(--ink),.62);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fr .l::before{content:"♪ ";color:var(--accent)}
+.fr .go{grid-row:1/3;grid-column:2;display:flex;gap:6px;align-items:center}
+.fr .go button{height:30px;padding:0 10px;border-radius:9px;border:1px solid var(--glass-b);background:rgba(var(--ink),.06);color:var(--fg);font:600 12px var(--font);cursor:pointer}
+.fr .go button:hover{background:rgba(var(--ink),.14)}
+.fr .tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;font:700 10px var(--font);background:rgba(var(--ink),.1);color:var(--dim);vertical-align:2px}
+.fr .tag.heard{background:rgba(126,226,168,.18);color:#7ee2a8}
+.fr .tag.guess{background:rgba(185,166,255,.2);color:#cdbfff}
+#find-common{display:none;align-items:center;gap:8px;font:500 13px var(--font);color:var(--dim)}
+#find-common.show{display:flex}
+.dim-path{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font:500 12px var(--font);direction:rtl;text-align:left}
+.cfg-in{width:200px;height:32px;padding:0 10px;border-radius:9px;border:1px solid var(--glass-b);background:rgba(var(--ink),.06);color:var(--fg);font:500 13px var(--font);outline:none}
+.cfg-in:focus{border-color:rgba(185,166,255,.6)}
+#share-name{width:180px;height:32px;padding:0 10px;border-radius:9px;border:1px solid var(--glass-b);background:rgba(var(--ink),.06);color:var(--fg);font:500 13px var(--font);outline:none}
+/* ───── 快捷鍵表 ───── */
+#keys-dialog .dialog{width:min(560px,calc(100vw - 32px))}
+#keys-dialog header h2{font:700 18px var(--font);margin:0 auto 0 6px}
+.keys{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;padding:4px 18px 18px;overflow:auto}
+.keys h4{grid-column:1/-1;margin:12px 0 2px;font:700 12px var(--font);letter-spacing:.06em;color:var(--dim)}
+.keys div{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;font:500 13px var(--font);color:rgba(var(--ink),.85);border-bottom:1px solid rgba(var(--ink),.05)}
+.keys kbd{white-space:nowrap}
+@media (max-width:520px){.keys{grid-template-columns:1fr}}
+.hint.warn{color:#ffb86b}
 /* ───── 獨立視窗標題列 ───── */
 #titlebar{position:fixed;top:0;left:0;right:0;height:38px;z-index:20;display:none;align-items:center;user-select:none}
 body.app #titlebar{display:flex}
 body.app #app{padding-top:calc(38px + clamp(8px,3vh,40px))}
-#tb-drag{flex:1;height:100%;display:flex;align-items:center;padding-left:14px;font:600 12px var(--font);letter-spacing:.04em;color:rgba(255,255,255,.55);cursor:default}
+#tb-drag{flex:1;height:100%;display:flex;align-items:center;padding-left:14px;font:600 12px var(--font);letter-spacing:.04em;color:rgba(var(--ink),.55);cursor:default}
 #tb-drag .note{margin-right:8px;opacity:.8}
+/* 標題列可拖曳 (WebView2 原生標題列區域)；按鈕不算 */
+[data-drag]{app-region:drag;-webkit-app-region:drag}
+.tb-btns,#set-bar button{app-region:no-drag;-webkit-app-region:no-drag}
 .tb-btns{display:flex;height:100%}
-.tb-btns button{width:44px;height:100%;border:0;background:none;color:rgba(255,255,255,.7);font:400 14px var(--font);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
-.tb-btns button:hover{background:rgba(255,255,255,.1);color:#fff}
-.tb-btns button.on{color:#b9a6ff}
+.tb-btns button{width:44px;height:100%;border:0;background:none;color:rgba(var(--ink),.7);font:400 14px var(--font);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
+.tb-btns button:hover{background:rgba(var(--ink),.1);color:var(--hi)}
+.tb-btns button.on{color:var(--accent)}
 #tb-close:hover{background:#e81123!important;color:#fff}
 .tb-btns svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.4}
 body.mini #controls #lyr-src{display:none}
@@ -242,16 +283,16 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
 #dev-dialog .dialog{width:min(760px,calc(100vw - 32px))}
 #dev-dialog header h2{font:700 18px var(--font);margin:0 auto 0 6px;display:flex;align-items:center;gap:10px}
 #dev-dialog header .icon-btn{width:34px;height:34px;border-radius:10px;border:0;background:none;color:var(--dim);cursor:pointer;font-size:15px}
-#dev-dialog header .icon-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+#dev-dialog header .icon-btn:hover{background:rgba(var(--ink),.08);color:var(--hi)}
 .dev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px}
-.dev-card{position:relative;padding:18px 14px 14px;border-radius:18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
+.dev-card{position:relative;padding:18px 14px 14px;border-radius:18px;background:rgba(var(--ink),.05);border:1px solid rgba(var(--ink),.07);
   display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;transition:background .2s,transform .2s}
-.dev-card:hover{background:rgba(255,255,255,.08);transform:translateY(-2px)}
+.dev-card:hover{background:rgba(var(--ink),.08);transform:translateY(-2px)}
 .dev-card.off{opacity:.45}
 .dev-card.hidden{opacity:.35}
 .dev-ring{position:relative;width:96px;height:96px;margin-bottom:8px}
 .dev-ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
-.dev-ring .track{fill:none;stroke:rgba(255,255,255,.1);stroke-width:7}
+.dev-ring .track{fill:none;stroke:rgba(var(--ink),.1);stroke-width:7}
 .dev-ring .bar{fill:none;stroke:var(--c);stroke-width:7;stroke-linecap:round;transition:stroke-dasharray .8s cubic-bezier(.2,.8,.2,1)}
 .dev-ring .glow{fill:none;stroke:var(--c);stroke-width:14;opacity:0;filter:blur(6px)}
 .dev-card.charging .bar{animation:breathe 2.4s ease-in-out infinite}
@@ -269,13 +310,13 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
 .dev-card .hide-btn{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;border:0;background:none;color:var(--dim);
   cursor:pointer;opacity:0;transition:opacity .15s;font-size:13px}
 .dev-card:hover .hide-btn{opacity:1}
-.dev-card .hide-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.dev-card .hide-btn:hover{background:rgba(var(--ink),.1);color:var(--hi)}
 .dev-sec{font:700 12px var(--font);letter-spacing:.08em;color:var(--dim);margin:6px 2px 0}
 .dev-empty{padding:30px 10px;text-align:center;color:var(--dim);font:500 14px/1.7 var(--font)}
-.dev-foot{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.07)}
+.dev-foot{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;padding:12px 16px 16px;border-top:1px solid rgba(var(--ink),.07)}
 .dev-foot .row{border:0}
 .dev-foot .credit{grid-column:1/-1;font:400 11px var(--font);color:var(--dim)}
-.dev-foot .credit a{color:#b9a6ff}
+.dev-foot .credit a{color:var(--accent)}
 /* ───── 更新 ───── */
 #upd-bar{position:fixed;left:50%;top:46px;transform:translateX(-50%);z-index:12;display:none;align-items:center;gap:12px;padding:8px 8px 8px 16px;
   border-radius:999px;background:rgba(30,30,44,.85);border:1px solid rgba(140,160,255,.35);backdrop-filter:blur(20px);
@@ -286,22 +327,22 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
 #upd-bar .ghost{background:none;color:#b9c8ff}
 #upd-bar .go{background:#78aaff;color:#0b1020}
 #upd-bar .x{background:none;color:var(--dim);padding:0 8px;font-size:16px}
-#upd-bar .prog{width:120px;height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
+#upd-bar .prog{width:120px;height:6px;border-radius:3px;background:rgba(var(--ink),.12);overflow:hidden}
 #upd-bar .prog i{display:block;height:100%;width:0;background:#78aaff;transition:width .3s}
-.notes{font:400 14px/1.7 var(--font);color:rgba(255,255,255,.85)}
-.notes h4{font:700 15px var(--font);margin:12px 0 4px;color:#fff}
+.notes{font:400 14px/1.7 var(--font);color:rgba(var(--ink),.85)}
+.notes h4{font:700 15px var(--font);margin:12px 0 4px;color:var(--hi)}
 .notes li{margin-left:20px}
-.notes code{font:12px Consolas,monospace;background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px}
+.notes code{font:12px Consolas,monospace;background:rgba(var(--ink),.08);padding:1px 5px;border-radius:4px}
 #new-dialog .dialog{width:min(560px,calc(100vw - 32px))}
 .new-hero{padding:26px 24px 6px;text-align:center}
 .new-hero img{width:72px;height:72px;border-radius:20px;box-shadow:0 10px 30px rgba(160,90,255,.45)}
 .new-hero .v{display:inline-block;margin-top:12px;padding:3px 10px;border-radius:999px;background:rgba(255,214,102,.15);color:#ffd666;font:700 12px var(--font)}
 .new-hero h2{font:800 20px/1.35 var(--font);margin:8px 0 0}
 .new-list{display:flex;flex-direction:column;gap:8px;padding:14px 20px;overflow:auto;min-height:0}
-.new-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.04)}
+.new-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:rgba(var(--ink),.04)}
 .new-item .e{font-size:22px;line-height:1.2}
 .new-item b{display:block;font:700 14px var(--font);margin-bottom:2px}
-.new-item span{font:400 13px/1.6 var(--font);color:rgba(255,255,255,.7)}
+.new-item span{font:400 13px/1.6 var(--font);color:rgba(var(--ink),.7)}
 .new-foot{display:flex;gap:10px;justify-content:flex-end;padding:4px 20px 20px}
 .new-foot .msg{margin-right:auto;align-self:center;font:500 12px var(--font);color:#8fe3a6}
 
@@ -310,58 +351,101 @@ body.focus .line{font-size:clamp(30px,4.2vw,64px)}
 body.settings-only #app,body.settings-only #titlebar,body.settings-only #focus-exit,body.settings-only #conn,
 body.settings-only #upd-bar,body.settings-only #settings-close{display:none!important}
 body.settings-only #set-bar{display:flex;position:fixed;top:0;left:0;right:0;height:42px;z-index:20;align-items:center;user-select:none}
-#set-bar .drag{flex:1;height:100%;display:flex;align-items:center;gap:8px;padding-left:16px;font:700 13px var(--font);color:rgba(255,255,255,.75)}
+#set-bar .drag{flex:1;height:100%;display:flex;align-items:center;gap:8px;padding-left:16px;font:700 13px var(--font);color:rgba(var(--ink),.75)}
 #set-bar .drag img{width:18px;height:18px;border-radius:5px}
-#set-bar button{width:44px;height:100%;border:0;background:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:13px}
-#set-bar button:hover{background:rgba(255,255,255,.1);color:#fff}
+#set-bar button{width:44px;height:100%;border:0;background:none;color:rgba(var(--ink),.7);cursor:pointer;font-size:13px}
+#set-bar button:hover{background:rgba(var(--ink),.1);color:var(--hi)}
 #set-bar #set-close:hover{background:#e81123}
 body.settings-only #settings{display:block!important;position:fixed;inset:42px 0 0 0;width:auto;max-height:none;border-radius:0;
   border:0;background:transparent;box-shadow:none;backdrop-filter:none;animation:none;padding:6px 20px 20px}
 
 /* ───── 整理過的控制列 ───── */
 #transport{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:-2px}
-#transport button{border:0;background:none;color:#fff;cursor:pointer;display:grid;place-items:center;border-radius:50%;
+#transport button{border:0;background:none;color:var(--hi);cursor:pointer;display:grid;place-items:center;border-radius:50%;
   font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";transition:background .15s,transform .15s}
-#transport button:hover{background:rgba(255,255,255,.1)}
+#transport button:hover{background:rgba(var(--ink),.1)}
 #transport button:active{transform:scale(.92)}
-#transport .side{width:40px;height:40px;font-size:16px;color:rgba(255,255,255,.8)}
-#transport #btn-play{width:54px;height:54px;font-size:22px;background:#fff;color:#111}
-#transport #btn-play:hover{background:#fff;transform:scale(1.05)}
+#transport .side{width:40px;height:40px;font-size:16px;color:rgba(var(--ink),.8)}
+#transport #btn-play{width:54px;height:54px;font-size:22px;background:var(--pill);color:var(--pill-fg)}
+#transport #btn-play:hover{background:var(--pill);transform:scale(1.05)}
 #controls{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;justify-content:center;width:100%}
 .ibtn{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:58px;padding:8px 6px;border-radius:12px;border:0;background:none;
-  color:rgba(255,255,255,.72);font:500 11px var(--font);cursor:pointer;transition:background .15s,color .15s}
+  color:rgba(var(--ink),.72);font:500 11px var(--font);cursor:pointer;transition:background .15s,color .15s}
 .ibtn .fi{font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";font-size:17px;line-height:1}
-.ibtn:hover,.ibtn.on{background:rgba(255,255,255,.09);color:#fff}
+.ibtn:hover,.ibtn.on{background:rgba(var(--ink),.09);color:var(--hi)}
 #lyr-src{display:block;width:100%;text-align:center;font-size:12px;color:var(--dim);margin-top:2px}
-#lyr-menu{position:fixed;z-index:12;display:none;min-width:250px;padding:6px;border-radius:14px;background:rgba(22,22,32,.92);
+#lyr-menu{position:fixed;z-index:12;display:none;min-width:250px;padding:6px;border-radius:14px;background:rgba(var(--panel),.92);
   border:1px solid var(--glass-b);backdrop-filter:blur(24px);box-shadow:0 20px 60px rgba(0,0,0,.5)}
 #lyr-menu.open{display:block;animation:pop .15s ease-out}
-#lyr-menu > button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-radius:9px;background:none;color:#fff;
+#lyr-menu > button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-radius:9px;background:none;color:var(--hi);
   font:500 13px var(--font);cursor:pointer;text-align:left}
-#lyr-menu > button:hover{background:rgba(255,255,255,.08)}
-#lyr-menu .fi{font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";font-size:14px;width:18px;color:rgba(255,255,255,.7)}
-#lyr-menu .offset{display:flex;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid rgba(255,255,255,.07);margin-top:4px;font:500 13px var(--font)}
-#lyr-menu .offset span.lbl{flex:1;color:rgba(255,255,255,.75)}
-#lyr-menu .offset button{width:30px;height:30px;border-radius:8px;border:1px solid var(--glass-b);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;font-size:15px}
-#lyr-menu .offset button:hover{background:rgba(255,255,255,.12)}
+#lyr-menu > button:hover{background:rgba(var(--ink),.08)}
+#lyr-menu .fi{font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";font-size:14px;width:18px;color:rgba(var(--ink),.7)}
+#lyr-menu .offset{display:flex;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid rgba(var(--ink),.07);margin-top:4px;font:500 13px var(--font)}
+#lyr-menu .offset span.lbl{flex:1;color:rgba(var(--ink),.75)}
+#lyr-menu .offset button{width:30px;height:30px;border-radius:8px;border:1px solid var(--glass-b);background:rgba(var(--ink),.05);color:var(--hi);cursor:pointer;font-size:15px}
+#lyr-menu .offset button:hover{background:rgba(var(--ink),.12)}
 /* ───── 設定：分頁 ───── */
-#set-tabs{display:flex;gap:2px;padding:3px;margin:6px 0 4px;border-radius:12px;background:rgba(255,255,255,.06)}
-#set-tabs button{flex:1;height:32px;border:0;border-radius:9px;background:none;color:rgba(255,255,255,.6);font:600 12px var(--font);cursor:pointer;white-space:nowrap}
-#set-tabs button.on{background:rgba(255,255,255,.14);color:#fff}
+#set-tabs{display:flex;gap:2px;padding:3px;margin:6px 0 4px;border-radius:12px;background:rgba(var(--ink),.06)}
+#set-tabs button{flex:1;height:32px;border:0;border-radius:9px;background:none;color:rgba(var(--ink),.6);font:600 12px var(--font);cursor:pointer;white-space:nowrap}
+#set-tabs button.on{background:rgba(var(--ink),.14);color:var(--hi)}
 #settings .pane{display:none}
 #settings .pane.on{display:block;animation:fade .2s ease-out}
 #settings .pane > h3:first-child{margin-top:12px}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}}
+
+/* ───── 風格 (設定 → 外觀) ───── */
+/* 晨霧：明亮的毛玻璃 */
+body[data-theme="dawn"]{--ink:22,22,38;--fg:#17172a;--hi:#0f0f1c;--dim:rgba(22,22,38,.5);--glass:rgba(255,255,255,.55);--glass-b:rgba(22,22,38,.12);
+  --bg0:#eceff6;--panel:250,250,253;--dialog:#fbfbfe;--pill:#17172a;--pill-fg:#fff;--accent:#6a4cff;--accent2:#6a4cff;--shade:255,255,255}
+body[data-theme="dawn"] #bg .art.on{opacity:.55;filter:blur(var(--bg-blur,90px)) saturate(1.3) brightness(1.15)}
+body[data-theme="dawn"] .blob{mix-blend-mode:multiply;opacity:.28}
+body[data-theme="dawn"] #bg::after{background:rgba(255,255,255,calc(.35 + var(--bg-dim,.35) * .5))}
+body[data-theme="dawn"] #grain{opacity:.03}
+body[data-theme="dawn"] .modal{background:rgba(230,232,240,.6)}
+body[data-theme="dawn"] #cover{box-shadow:0 30px 60px -20px rgba(40,40,80,.35),0 0 0 1px rgba(22,22,38,.06)}
+/* 極簡：純黑、沒有光暈和顆粒，線條乾淨 */
+body[data-theme="mono"]{--bg0:#000;--panel:10,10,10;--dialog:#0d0d0d;--accent:#fff;--accent2:#3a3a3a;--glass:rgba(255,255,255,.05);--glass-b:rgba(255,255,255,.1)}
+body[data-theme="mono"] .blob,body[data-theme="mono"] #grain,body[data-theme="mono"] #cover-glow{display:none}
+body[data-theme="mono"] #bg .art.on{opacity:.18;filter:blur(var(--bg-blur,90px)) grayscale(1) brightness(.6)}
+body[data-theme="mono"] #cover{border-radius:10px}
+body[data-theme="mono"] .dialog,body[data-theme="mono"] #settings,body[data-theme="mono"] #lyr-menu,body[data-theme="mono"] #menu{border-radius:12px;backdrop-filter:none}
+/* 霓虹：深藍夜色，現在這句會發光 */
+body[data-theme="neon"]{--bg0:#06051a;--panel:14,10,44;--dialog:#100c2e;--accent:#22f0ff;--accent2:#ff2bd6;--glass-b:rgba(34,240,255,.22)}
+body[data-theme="neon"] .line.active .txt{filter:drop-shadow(0 0 10px rgba(34,240,255,.55)) drop-shadow(0 0 26px rgba(255,43,214,.35))}
+body[data-theme="neon"] #title{text-shadow:0 0 18px rgba(34,240,255,.45)}
+body[data-theme="neon"] #transport #btn-play{background:linear-gradient(135deg,#22f0ff,#ff2bd6);color:#06051a;box-shadow:0 0 24px rgba(34,240,255,.45)}
+body[data-theme="neon"] .seg button.on{background:#22f0ff;color:#06051a;border-color:#22f0ff}
+body[data-theme="neon"] #bg .art.on{opacity:.5;filter:blur(var(--bg-blur,90px)) saturate(2) hue-rotate(-10deg) brightness(.6)}
+body[data-theme="neon"] #fill{background:linear-gradient(90deg,#22f0ff,#ff2bd6)}
+/* 紙本：米色紙張、墨色文字 */
+body[data-theme="paper"]{--ink:58,42,26;--fg:#2c2116;--hi:#1c140b;--dim:rgba(58,42,26,.5);--glass:rgba(255,250,240,.55);--glass-b:rgba(58,42,26,.14);
+  --bg0:#f1eadb;--panel:250,245,235;--dialog:#faf5ea;--pill:#2c2116;--pill-fg:#faf5ea;--accent:#b0532c;--accent2:#b0532c;--shade:241,234,219}
+body[data-theme="paper"] .blob{display:none}
+body[data-theme="paper"] #bg .art.on{opacity:.16;filter:blur(var(--bg-blur,90px)) sepia(.7) saturate(.8)}
+body[data-theme="paper"] #bg::after{background:rgba(241,234,219,.55)}
+body[data-theme="paper"] #grain{opacity:.14;mix-blend-mode:multiply}
+body[data-theme="paper"] #cover{border-radius:6px;box-shadow:0 18px 40px -16px rgba(60,40,20,.45),0 0 0 6px #fffaf0,0 0 0 7px rgba(58,42,26,.12)}
+body[data-theme="paper"] .modal{background:rgba(120,100,70,.3)}
+html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{transition:none!important}
+/* 風格選擇卡片 */
+#themes{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+#themes button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:12px;border:1px solid var(--glass-b);background:var(--glass);
+  color:var(--fg);font:600 12px var(--font);cursor:pointer}
+#themes button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+#themes .sw{width:100%;height:34px;border-radius:8px;position:relative;overflow:hidden}
+#themes .sw i{position:absolute;left:8px;right:22px;height:4px;border-radius:2px;bottom:9px}
+#themes .sw b{position:absolute;left:8px;width:40%;height:4px;border-radius:2px;bottom:17px;opacity:.5}
 </style>
 </head>
 <body>
 <div id="bg" data-mode="album"><div class="art" id="bg-art"></div><div id="bg-custom"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
 <div id="grain"></div>
 
-<header id="set-bar"><div class="drag pywebview-drag-region"><img src="/icon.png" alt="">Hummi 設定</div>
+<header id="set-bar"><div class="drag" data-drag><img src="/icon.png" alt="">Hummi 設定</div>
   <button id="set-expand" class="fi" title="打開完整視窗">&#xE740;</button><button id="set-close" class="fi" title="關閉">&#xE8BB;</button></header>
 <header id="titlebar">
-  <div id="tb-drag" class="pywebview-drag-region"><span class="note">♪</span>Hummi 哼哼</div>
+  <div id="tb-drag" data-drag><span class="note">♪</span>Hummi 哼哼</div>
   <div class="tb-btns">
     <button id="tb-mini" title="膠囊模式（縮到螢幕頂端，滑鼠移上去展開）"><svg viewBox="0 0 14 14"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5"/><rect x="7" y="7" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg></button>
     <button id="tb-pin" title="視窗置頂"><svg viewBox="0 0 14 14"><path d="M5 1.5h4l-.5 4 2 2h-7l2-2zM7 7.5v5"/></svg></button>
@@ -410,6 +494,8 @@ body.settings-only #settings{display:block!important;position:fixed;inset:42px 0
   <button id="btn-refetch"><span class="fi">&#xE72C;</span>重新找歌詞</button>
   <button id="btn-lyrsearch"><span class="fi">&#xE721;</span>手動搜尋歌詞</button>
   <button id="btn-lyrpaste"><span class="fi">&#xE77F;</span>貼上 / 匯入 LRC</button>
+  <button id="btn-find"><span class="fi">&#xE8B6;</span>用一句歌詞找歌</button>
+  <button id="btn-publish" title="把這首歌的同步歌詞公開上傳到 LRCLIB 開放歌詞資料庫，所有人之後都查得到"><span class="fi">&#xE898;</span>上傳到 LRCLIB (公開)</button>
   <div class="offset"><span class="lbl">歌詞時間</span><button id="off-minus" title="歌詞提早 0.25 秒 (←)">−</button>
     <span id="offset-val">±0.00s</span><button id="off-plus" title="歌詞延後 0.25 秒 (→)">+</button></div>
 </div>
@@ -417,6 +503,14 @@ body.settings-only #settings{display:block!important;position:fixed;inset:42px 0
   <h2>設定 <button id="settings-close" aria-label="關閉">×</button></h2>
   <nav id="set-tabs"><button data-tab="look" class="on">外觀</button><button data-tab="overlay">浮動歌詞</button><button data-tab="ai">歌詞</button><button data-tab="stage">舞台</button><button data-tab="general">一般</button></nav>
   <div class="pane on" data-pane="look">
+  <h3>風格</h3>
+  <div id="themes">
+    <button data-theme="night"><span class="sw" style="background:linear-gradient(135deg,#2a1f5c,#0b0b12)"><b style="background:#fff"></b><i style="background:#fff"></i></span>夜光</button>
+    <button data-theme="dawn"><span class="sw" style="background:linear-gradient(135deg,#dfe4f3,#f7f2fa)"><b style="background:#17172a"></b><i style="background:#6a4cff"></i></span>晨霧</button>
+    <button data-theme="mono"><span class="sw" style="background:#000;border:1px solid #222"><b style="background:#fff"></b><i style="background:#fff"></i></span>極簡</button>
+    <button data-theme="neon"><span class="sw" style="background:linear-gradient(135deg,#06051a,#1a0b3a)"><b style="background:#ff2bd6"></b><i style="background:#22f0ff;box-shadow:0 0 6px #22f0ff"></i></span>霓虹</button>
+    <button data-theme="paper"><span class="sw" style="background:#f1eadb"><b style="background:#2c2116"></b><i style="background:#b0532c"></i></span>紙本</button>
+  </div>
   <h3>字體</h3>
   <button id="font-btn"><span class="fname" id="font-name">預設</span><span class="chev">▾</span></button>
   <div id="font-picker">
@@ -448,6 +542,10 @@ body.settings-only #settings{display:block!important;position:fixed;inset:42px 0
       <button data-p="top-center">上方中間</button><button data-p="custom">自訂</button><button id="unlock">🔓 拖曳</button>
     </div>
   </div>
+  <label class="row">顯示在 <select class="mon-select" data-mon="overlay"></select></label>
+  <div class="row col" title="遊戲、影片或簡報全螢幕的時候">全螢幕遊戲時
+    <div class="seg" id="ov-fs"><button data-fs="normal">照常顯示</button><button data-fs="dim">變淡</button><button data-fs="hide">先藏起來</button></div>
+  </div>
   <div class="row col"><div class="row" style="border:0;padding:0">文字大小 <output id="o-font_size"></output></div><input type="range" min="18" max="80" step="1" data-k="font_size"></div>
   <div class="row col"><div class="row" style="border:0;padding:0">寬度 <output id="o-width"></output></div><input type="range" min="400" max="1800" step="20" data-k="width"></div>
   <div class="row col"><div class="row" style="border:0;padding:0">背景深度 <output id="o-bg_opacity"></output></div><input type="range" min="0" max="90" step="5" data-k="bg_opacity"></div>
@@ -462,11 +560,27 @@ body.settings-only #settings{display:block!important;position:fixed;inset:42px 0
   <label class="row">啟用 AI 歌詞 <span class="switch"><input type="checkbox" data-aik="enabled"><span></span></span></label>
   <label class="row" title="AI 只錄播放器的聲音，不會錄到遊戲；這個選項是為了不占用遊戲的顯示卡效能">玩全螢幕遊戲時暫停（省效能） <span class="switch"><input type="checkbox" data-aik="pause_fullscreen"><span></span></span></label>
   <div id="ai-status"></div>
+  <h3>和朋友共享歌詞</h3>
+  <p class="hint">你和朋友選同一個雲端硬碟的共用資料夾 (OneDrive、Google 雲端硬碟、Dropbox 都可以)。AI 聽完的歌詞、你手動選好的歌詞會自動放一份進去，朋友播同一首歌時直接用，AI 不用再聽一次。</p>
+  <div class="row">共享資料夾 <span style="display:flex;gap:6px;align-items:center;min-width:0"><span id="share-folder" class="dim-path">還沒設定</span><button class="chip" id="share-pick">選擇…</button><button class="chip" id="share-off" hidden>停用</button></span></div>
+  <label class="row">分享時顯示的名字 <input type="text" id="share-name" maxlength="20" placeholder="例如：小明 (可留空)"></label>
+  <p class="hint" id="share-msg" style="margin:4px 0 0"></p>
   </div>
   <div class="pane" data-pane="stage">
   <h3>Hummi 舞台</h3>
   <p class="hint">全螢幕的歌詞演出，有 Folia 的 17 種歌詞動畫，和 Hummi 自己的 13 種效果。舞台裡按「複製 OBS 網址」就能放進直播畫面。</p>
   <div class="row">打開舞台 <button class="chip" id="open-stage">打開</button></div>
+  <h3>直播聊天室點歌指令</h3>
+  <p class="hint">觀眾在 Twitch 聊天室打 <b>!song</b>，舞台 / OBS 畫面右上角會跳出現在播的歌。再填聊天機器人的權杖，也會直接在聊天室回覆。</p>
+  <label class="row">Twitch 頻道 <input type="text" class="cfg-in" id="chat-channel" placeholder="你的頻道 ID" maxlength="40"></label>
+  <label class="row">指令 <input type="text" class="cfg-in" id="chat-cmds" placeholder="!song !歌名" maxlength="200"></label>
+  <label class="row" title="權杖要有 chat:read 和 chat:edit 權限；只存在這台電腦，不會給 OBS 或其他網頁">回覆用的權杖 (可選) <input type="password" class="cfg-in" id="chat-token" placeholder="oauth:…" maxlength="200" autocomplete="off"></label>
+  <label class="row" title="權杖是哪個帳號的 (留空 = 頻道本人)">機器人帳號 (可選) <input type="text" class="cfg-in" id="chat-bot" placeholder="留空 = 用你的帳號" maxlength="40"></label>
+  <p class="hint" id="chat-status" style="margin:4px 0 0"></p>
+  <h3>桌布模式</h3>
+  <p class="hint">把舞台的歌詞和動態背景放到桌面上 (在桌面圖示後面)，效果跟著舞台的設定。視窗把桌面蓋滿時會自動暫停，不吃效能。</p>
+  <label class="row">歌詞桌布 <span class="switch"><input type="checkbox" id="wp-on"><span></span></span></label>
+  <label class="row">顯示在 <select class="mon-select" data-mon="wallpaper"></select></label>
   <h3>Folia 桌面版 (進階)</h3>
   <p class="hint">如果你另外安裝了 <a href="#" id="folia-link" style="color:#b9a6ff">Folia</a>，也可以把歌和歌詞送進它的舞台模式 (要先在 Folia 設定裡開啟 Stage 模式)。一般不需要，Hummi 舞台已經內建 Folia 的效果。</p>
   <label class="row">送到 Folia 桌面版 <span class="switch"><input type="checkbox" id="folia-on"><span></span></span></label>
@@ -476,12 +590,23 @@ body.settings-only #settings{display:block!important;position:fixed;inset:42px 0
   <h3>隱私</h3>
   <label class="row" title="開著時只讀 Spotify、YouTube Music 桌面版和音樂播放器；瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi (開台時不會露出其他分頁的標題)">只偵測音樂 App <span class="switch"><input type="checkbox" id="music-only"><span></span></span></label>
   <p class="hint" style="margin:4px 0 0">開著時，瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi、膠囊、舞台和 OBS 上。用瀏覽器分頁聽 YouTube Music 的話要關掉，或改用 YouTube Music 桌面版。</p>
+  <h3>膠囊</h3>
+  <label class="row">螢幕頂端的膠囊 <span class="switch"><input type="checkbox" id="notch-on"><span></span></span></label>
+  <label class="row">顯示在 <select class="mon-select" data-mon="notch"></select></label>
+  <h3>視窗</h3>
+  <label class="row" title="工作列的 Hummi 圖示上顯示這首歌播到哪 (暫停時變黃色)">工作列顯示播放進度 <span class="switch"><input type="checkbox" id="tb-progress"><span></span></span></label>
+  <h3>自動暫停</h3>
+  <label class="row">鎖定電腦、睡眠時暫停 <span class="switch"><input type="checkbox" data-ap="lock"><span></span></span></label>
+  <label class="row" title="拔掉有線耳機、藍牙耳機斷線時暫停，免得音樂突然從喇叭放出來；手動切換裝置不會暫停">耳機拔掉、藍牙斷線時暫停 <span class="switch"><input type="checkbox" data-ap="unplug"><span></span></span></label>
+  <label class="row" title="解鎖、或同一副耳機接回來時，接著播 (只會接著播被 Hummi 暫停的)">回來時接著播 <span class="switch"><input type="checkbox" data-ap="resume"><span></span></span></label>
+  <h3>快捷鍵</h3>
+  <label class="row" title="Ctrl + Alt + P / , / . / ↑ / ↓ / W / S，在遊戲和其他程式裡也能用">全域快捷鍵 (遊戲中也能用) <span class="switch"><input type="checkbox" id="hotkeys-on"><span></span></span></label>
+  <p class="hint" id="hotkeys-hint" style="margin:4px 0 0">Ctrl + Alt + P 播放 / 暫停、 , . 切歌、 ↑ ↓ 音量。 <a href="#" id="keys-open" style="color:#b9a6ff">所有快捷鍵 (?)</a></p>
   <h3>啟動與更新</h3>
   <label class="row" id="autostart-row">開機時自動啟動 <span class="switch"><input type="checkbox" id="autostart"><span></span></span></label>
   <label class="row">自動檢查更新 <span class="switch"><input type="checkbox" id="auto-update"><span></span></span></label>
   <div class="row">更新與分享 <span style="display:flex;gap:6px"><button class="chip" id="upd-check">檢查更新</button><button class="chip" id="share-btn">分享 Hummi</button></span></div>
   <p class="hint" id="upd-check-msg" style="margin:4px 0 0"></p>
-  <p class="hint" style="margin:12px 0 0">全域快捷鍵：<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd> 解鎖拖曳 · <kbd>H</kbd> 隱藏 · <kbd>←</kbd><kbd>→</kbd> 調整歌詞快慢</p>
   <div id="ver"></div>
   </div>
 </aside>
@@ -514,6 +639,23 @@ body.settings-only #settings{display:block!important;position:fixed;inset:42px 0
     <div class="new-hero"><img src="/icon.png" alt=""><div class="v" id="new-v"></div><h2 id="new-title"></h2></div>
     <div class="new-list" id="new-list"></div>
     <div class="new-foot"><span class="msg" id="new-msg"></span><button class="chip" id="new-share">分享給朋友</button><button class="chip primary" id="new-ok">知道了</button></div>
+  </div>
+</div>
+<div class="modal" id="find-dialog" role="dialog" aria-label="用歌詞找歌">
+  <div class="dialog">
+    <header><h2>用歌詞找歌</h2><button class="x" id="find-close" aria-label="關閉">×</button></header>
+    <div class="body">
+      <form id="find-form"><input type="text" id="find-q" placeholder="記得的那一句歌詞，例如：颳風這天 我試過握著你手" autocomplete="off"><button class="btn" type="submit">找</button></form>
+      <div class="msg" id="find-msg">先找你聽過的歌，再找網易雲、QQ 音樂的歌詞。找到後可以直接在 Spotify / YouTube Music 打開。</div>
+      <div id="find-common"><span>大部分結果都是</span><b id="find-common-t"></b><button class="chip" id="find-common-go">只用歌名在 Spotify 搜尋</button></div>
+      <div id="find-list"></div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="keys-dialog" role="dialog" aria-label="快捷鍵">
+  <div class="dialog">
+    <header><h2>快捷鍵</h2><button class="x" id="keys-close" aria-label="關閉">×</button></header>
+    <div class="keys" id="keys-list"></div>
   </div>
 </div>
 <div id="conn">⚠ 與本機伺服器斷線，重新連線中…</div>
@@ -558,6 +700,7 @@ function connect(){
     if (m.type === 'open_devices'){ if (!settingsOnly) openDevices(); return; }
     if (m.type === 'devices'){ devState = m; renderDevices(); return; }
     if (m.type === 'update'){ onUpdate(m); return; }
+    if (m.type === 'share_status'){ $('#share-msg').textContent = `已設定！放入了 ${m.added} 首，資料夾裡現在共有 ${m.total} 首歌詞。`; return; }
     m.type === 'state' ? onState(m) : onLyrics(m);
   };
 }
@@ -572,6 +715,16 @@ function onState(m){
     applyFont(cfg.font);
     micaOK = !!m.mica && document.body.classList.contains('app');
     if ($('#music-only') && performance.now() - musicOnlyEdit > 1500) $('#music-only').checked = cfg.music_only !== false;
+    if (performance.now() - hotkeysEdit > 1500) $('#hotkeys-on').checked = cfg.hotkeys !== false;
+    if (performance.now() - apEdit > 1500) document.querySelectorAll('[data-ap]').forEach(i => i.checked = (cfg.auto_pause || {})[i.dataset.ap] !== false);
+    if (performance.now() - apEdit > 1500){ $('#tb-progress').checked = cfg.taskbar_progress !== false; $('#notch-on').checked = cfg.notch !== false;
+      $('#wp-on').checked = !!(cfg.wallpaper || {}).enabled; }
+    renderMonitors(m.monitors);
+    renderShare();
+    applyTheme(cfg.theme);
+    renderChat(m);
+    $('#hotkeys-hint').classList.toggle('warn', !!(m.hotkeys_failed && m.hotkeys_failed.length));
+    if (m.hotkeys_failed && m.hotkeys_failed.length) $('#hotkeys-hint').firstChild.textContent = `這幾組被別的程式佔走了：${m.hotkeys_failed.join('、')}。 `;
     if ($('#folia-on')){
       if (performance.now() - foliaEdit > 1500) $('#folia-on').checked = !!cfg.folia?.enabled;
       const fs = m.folia || {};
@@ -775,6 +928,7 @@ function syncSettings(force){
     const out = $('#o-' + k); if (out) out.textContent = k === 'bg_opacity' ? o[k] + '%' : o[k] + 'px';
   });
   panel.querySelectorAll('#presets [data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === o.preset));
+  panel.querySelectorAll('#ov-fs [data-fs]').forEach(b => b.classList.toggle('on', b.dataset.fs === (o.fullscreen || 'dim')));
   $('#unlock').classList.toggle('on', unlocked);
   $('#autostart').checked = autostart; $('#autostart').disabled = !canAutostart;
   $('#autostart-row').classList.toggle('disabled', !canAutostart);
@@ -856,11 +1010,42 @@ $('#bar').onclick = e => {
   send({type:'seek', t}); anchorPos = t; anchorAt = performance.now(); activeIdx = -2;
 };
 addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft') setOffset(offset - .25);
-  else if (e.key === 'ArrowRight') setOffset(offset + .25);
-  else if (e.key === ' '){ e.preventDefault(); send({type:'toggle'}); }
-  else if (e.key.toLowerCase() === 'h') $('#btn-focus').click();
-  else if (e.key.toLowerCase() === 'f') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  // 打字時 (搜尋框、設定裡的文字欄) 不要觸發快捷鍵
+  if (e.target.closest?.('input:not([type=checkbox]):not([type=range]),textarea,select,[contenteditable]')) return;
+  if (e.altKey || e.metaKey) return;
+  const k = e.key, low = k.length === 1 ? k.toLowerCase() : k, open = document.querySelector('.modal.open');
+  if (k === 'Escape'){
+    if (open?.id === 'new-dialog') $('#new-ok').click();  // 用 Esc 關也算看過，下次不再跳
+    else if (open) open.classList.remove('open');
+    else if (settingsOnly) window.pywebview?.api?.close();
+    else if (document.fullscreenElement) document.exitFullscreen();
+    else { window.pywebview?.api?.exit_fullscreen?.(); menu.classList.remove('open'); $('#lyr-menu').classList.remove('open'); if (!settingsOnly) panel.classList.remove('open'); }
+    return;
+  }
+  if (settingsOnly) return;
+  if (e.ctrlKey){
+    if (k === 'ArrowRight'){ e.preventDefault(); send({type:'next'}); }
+    else if (k === 'ArrowLeft'){ e.preventDefault(); send({type:'prev'}); }
+    else if (k === ','){ e.preventDefault(); $('#btn-settings').click(); }
+    else if (low === 'f'){ e.preventDefault(); $('#btn-lyrsearch').click(); }
+    else if (low === 'k'){ e.preventDefault(); openFind(); }
+    return;
+  }
+  if (open) return;  // 對話框開著時只收 Esc
+  if (k === 'ArrowLeft') setOffset(offset - .25);
+  else if (k === 'ArrowRight') setOffset(offset + .25);
+  else if (k === 'ArrowUp'){ e.preventDefault(); send({type:'volume', delta: .05}); }
+  else if (k === 'ArrowDown'){ e.preventDefault(); send({type:'volume', delta: -.05}); }
+  else if (k === ' '){ e.preventDefault(); send({type:'toggle'}); }
+  else if (k === '?') openKeys();
+  else if (low === 'h') $('#btn-focus').click();
+  else if (low === 'f'){ const a = window.pywebview?.api;
+    if (a?.fullscreen) a.fullscreen(); else document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
+  else if (low === 's') $('#btn-stage').click();
+  else if (low === 'd') $('#btn-devices').click();
+  else if (low === 'r') $('#btn-refetch').click();
+  else if (low === 'm') $('#tb-mini')?.click();
+  else if (low === 't') $('#tb-pin')?.click();
 });
 addEventListener('resize', () => activeIdx = -2);
 
@@ -891,13 +1076,19 @@ if (settingsOnly){  // 膠囊的「更多設定」：只顯示設定面板的小
   document.title = 'Hummi 設定';
   $('#set-expand').onclick = () => window.pywebview?.api?.expand();
   $('#set-close').onclick = () => window.pywebview?.api?.close();
+  $('#set-bar .drag').addEventListener('mousedown', e => { if (e.button === 0) window.pywebview?.api?.drag(); });
 }
 if (new URLSearchParams(location.search).has('app')){
   document.body.classList.add('app');
   const api = () => window.pywebview?.api;
   $('#tb-min').onclick = () => api()?.minimize();
   $('#tb-max').onclick = () => api()?.toggle_maximize();
-  $('#tb-drag').ondblclick = () => api()?.toggle_maximize();
+  // 拖曳標題列：交給 Windows 原生移動 (可貼齊螢幕邊緣)；連點兩下放大/還原
+  $('#tb-drag').addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    if (e.detail >= 2) { api()?.toggle_maximize(); return; }
+    api()?.drag();
+  });
   $('#tb-close').onclick = () => api()?.hide();
   $('#tb-pin').onclick = async () => { const on = await api()?.toggle_on_top(); $('#tb-pin').classList.toggle('on', !!on); };
   $('#tb-mini').onclick = () => api()?.notch ? api().notch() : send({type: 'notch', value: true});
@@ -1239,6 +1430,7 @@ $('#btn-lyrmenu').onclick = e => {
 lyrMenu.onclick = e => { if (!e.target.closest('.offset')) { lyrMenu.classList.remove('open'); $('#btn-lyrmenu').classList.remove('on'); } e.stopPropagation(); };
 addEventListener('click', () => { lyrMenu.classList.remove('open'); $('#btn-lyrmenu').classList.remove('on'); });
 $('#btn-lyrpaste').onclick = () => openLyrDialog('paste');
+$('#btn-find').onclick = () => openFind();
 // 播放鍵：播放中顯示暫停
 setInterval(() => { const g = playing ? '\uF8AE' : '\uF5B0'; if ($('#btn-play').textContent !== g) $('#btn-play').textContent = g; }, 300);
 // 設定分頁 (記住上次看的)
@@ -1250,6 +1442,164 @@ function setTab(name){
 document.querySelectorAll('#set-tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 try { const t = localStorage.getItem('setTab'); if (t) setTab(t); } catch {}
 let musicOnlyEdit = 0;
+
+
+// ───── 用歌詞找歌 ─────
+function openFind(){ $('#find-dialog').classList.add('open'); setTimeout(() => $('#find-q').focus(), 50); }
+$('#find-close').onclick = () => $('#find-dialog').classList.remove('open');
+$('#find-dialog').onclick = e => { if (e.target.id === 'find-dialog') $('#find-dialog').classList.remove('open'); };
+$('#find-dialog').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') $('#find-dialog').classList.remove('open'); });
+const openSong = (title, artist, where) => fetch('/lyrics/open', {method: 'POST', body: JSON.stringify({title, artist, where})});
+let findSeq = 0;
+$('#find-form').onsubmit = async e => {
+  e.preventDefault();
+  const q = $('#find-q').value.trim(), seq = ++findSeq;
+  if (q.length < 2) return;
+  $('#find-msg').textContent = '找找看…'; $('#find-list').innerHTML = ''; $('#find-common').classList.remove('show');
+  let res = [];
+  try { res = await (await fetch('/lyrics/find?q=' + encodeURIComponent(q))).json(); } catch {}
+  if (seq !== findSeq) return;
+  $('#find-msg').textContent = res.length ? `找到 ${res.length} 首有這句的歌` : '找不到…換一句、或只打其中幾個字試試看';
+  const box = $('#find-list');
+  res.forEach(r => {
+    const d = document.createElement('div'); d.className = 'fr';
+    d.innerHTML = '<div class="t"></div><div class="go"><button data-w="spotify">Spotify</button><button data-w="youtube">YT Music</button></div><div class="a"></div><div class="l"></div>';
+    d.querySelector('.t').textContent = r.title;
+    if (r.source === '聽過的歌' || r.source === '推測的原唱'){
+      const tg = document.createElement('span'); tg.className = 'tag ' + (r.source === '聽過的歌' ? 'heard' : 'guess'); tg.textContent = r.source; d.querySelector('.t').appendChild(tg);
+    }
+    d.querySelector('.a').textContent = r.artist + (r.album ? ' · ' + r.album : '');
+    d.querySelector('.l').textContent = r.line || '';
+    if (!r.line) d.querySelector('.l').remove();
+    d.querySelectorAll('[data-w]').forEach(b => b.onclick = () => openSong(r.title, r.artist, b.dataset.w));
+    box.appendChild(d);
+  });
+  // 結果幾乎都是同一首歌的翻唱：給一個「只用歌名搜」(Spotify 會把原唱排第一)
+  const base = res.map(r => r.title.replace(/\s*[(（\[【].*$/, '').trim());
+  const cnt = {}; base.forEach(t => cnt[t] = (cnt[t] || 0) + 1);
+  const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+  if (top && top[1] >= 3){ $('#find-common-t').textContent = '「' + top[0] + '」'; $('#find-common').classList.add('show'); $('#find-common-go').onclick = () => openSong(top[0], '', 'spotify'); }
+};
+// ───── 風格 ─────
+let themeEdit = 0;
+function applyTheme(t){
+  if (performance.now() - themeEdit < 1500) return;
+  t = t || 'night';
+  if (document.body.dataset.theme !== t){
+    // 換風格時先關掉所有過場動畫：幾百行歌詞一起慢慢變色會卡住，直接換掉比較乾淨
+    document.documentElement.classList.add('theme-switch');
+    document.body.dataset.theme = t;
+    void document.body.offsetHeight;
+    setTimeout(() => document.documentElement.classList.remove('theme-switch'), 60);
+    try { localStorage.setItem('theme', t); } catch {}
+  }
+  document.querySelectorAll('#themes [data-theme]').forEach(b => b.classList.toggle('on', b.dataset.theme === t));
+}
+try { document.body.dataset.theme = localStorage.getItem('theme') || 'night'; } catch {}  // 開啟時不會先閃一下預設風格
+document.querySelectorAll('#themes [data-theme]').forEach(b => b.onclick = () => {
+  themeEdit = 0; applyTheme(b.dataset.theme); themeEdit = performance.now();
+  send({type: 'theme', value: b.dataset.theme});
+});
+// ───── 共享歌詞 ─────
+let shareEdit = 0;
+function renderShare(){
+  const sh = (cfg && cfg.share) || {};
+  $('#share-folder').textContent = sh.folder || '還沒設定'; $('#share-folder').title = sh.folder || '';
+  $('#share-off').hidden = !sh.folder;
+  if (performance.now() - shareEdit > 1500 && document.activeElement !== $('#share-name')) $('#share-name').value = sh.name || '';
+}
+$('#share-pick').onclick = async () => {
+  const api = window.pywebview?.api;
+  let f = api?.pick_folder ? await api.pick_folder() : prompt('共享資料夾的完整路徑');
+  if (!f) return;
+  shareEdit = performance.now(); $('#share-msg').textContent = '正在放入你之前的歌詞…';
+  send({type: 'share', folder: f});
+};
+$('#share-off').onclick = () => { shareEdit = performance.now(); send({type: 'share', folder: ''}); $('#share-msg').textContent = '已停用共享 (資料夾裡的檔案不會刪掉)'; };
+$('#share-name').onchange = e => { shareEdit = performance.now(); send({type: 'share', name: e.target.value.trim()}); };
+$('#share-name').onkeydown = e => e.stopPropagation();
+$('#btn-publish').onclick = async () => {
+  if (!track) return;
+  if (!confirm(`把「${track.title}」的同步歌詞公開上傳到 LRCLIB？\n\n上傳後任何人都查得到，請先確認歌詞和時間都正確 (AI 聽寫的常有錯字)。`)) return;
+  setStatusMsg('正在上傳到 LRCLIB…');
+  try {
+    const r = await (await fetch('/lyrics/publish', {method: 'POST'})).json();
+    setStatusMsg(r.ok ? r.msg : r.error);
+  } catch { setStatusMsg('上傳失敗，請稍後再試'); }
+};
+function setStatusMsg(t){ const el = $('#lyr-src'); if (el){ el.dataset.old ??= el.textContent; el.textContent = t; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = el.dataset.old; delete el.dataset.old; }, 5000); } }
+// ───── 直播聊天室 ─────
+let chatEdit = 0;
+function renderChat(m){
+  const c = (cfg && cfg.chat) || {};
+  if (performance.now() - chatEdit > 2000){
+    [['#chat-channel', 'channel'], ['#chat-cmds', 'commands'], ['#chat-bot', 'bot']].forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = c[k] || ''; });
+    if (document.activeElement !== $('#chat-token')) $('#chat-token').placeholder = c.has_token ? '已設定 (重新輸入可以換掉)' : 'oauth:…';
+  }
+  $('#chat-status').textContent = !c.channel ? '' : (m.chat && m.chat !== 'off' ? '● ' + m.chat : '連線中…');
+}
+['#chat-channel', '#chat-cmds', '#chat-bot', '#chat-token'].forEach(id => {
+  $(id).onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); };
+  $(id).onchange = () => {
+    chatEdit = performance.now();
+    const msg = {type: 'chat', channel: $('#chat-channel').value, commands: $('#chat-cmds').value, bot: $('#chat-bot').value};
+    if ($('#chat-token').value.trim()){ msg.token = $('#chat-token').value.trim(); $('#chat-token').value = ''; }
+    send(msg);
+  };
+});
+// ───── 快捷鍵 ─────
+let hotkeysEdit = 0, apEdit = 0, monitors = [];
+$('#wp-on').onchange = e => { apEdit = performance.now(); send({type: 'wallpaper', enabled: e.target.checked}); };
+$('#tb-progress').onchange = e => { apEdit = performance.now(); send({type: 'taskbar_progress', value: e.target.checked}); };
+$('#notch-on').onchange = e => { apEdit = performance.now(); send({type: 'notch_set', value: e.target.checked}); };
+panel.querySelectorAll('#ov-fs [data-fs]').forEach(b => b.onclick = () => patch({fullscreen: b.dataset.fs}));
+document.querySelectorAll('.mon-select').forEach(sel => sel.onchange = () => {
+  apEdit = performance.now();
+  if (sel.dataset.mon === 'overlay') patch({monitor: sel.value});
+  else if (sel.dataset.mon === 'wallpaper') send({type: 'wallpaper', monitor: sel.value});
+  else send({type: 'notch_monitor', value: sel.value});
+});
+function renderMonitors(list){
+  monitors = list || [];
+  document.querySelectorAll('.mon-select').forEach(sel => {
+    const cur = sel.dataset.mon === 'overlay' ? (cfg.overlay.monitor || 'primary')
+      : sel.dataset.mon === 'wallpaper' ? ((cfg.wallpaper || {}).monitor || 'primary') : (cfg.notch_monitor || 'primary');
+    const opts = [['primary', '主螢幕'], ['active', '正在用的螢幕 (跟著前景視窗)'], ['mouse', '滑鼠所在的螢幕'],
+      ...(monitors.length > 1 ? monitors.map(m => [m.name, m.label]) : [])];
+    if (!opts.some(o => o[0] === cur)) opts.push([cur, '指定的螢幕 (目前沒接上)']);
+    const sig = JSON.stringify(opts) + cur;
+    if (sel.dataset.sig === sig || performance.now() - apEdit < 1500) return;
+    sel.dataset.sig = sig;
+    sel.innerHTML = '';
+    opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; sel.appendChild(o); });
+    sel.value = cur;
+  });
+}
+document.querySelectorAll('[data-ap]').forEach(i => i.onchange = () => { apEdit = performance.now(); send({type: 'auto_pause', key: i.dataset.ap, value: i.checked}); });
+const KEYS_APP = [
+  ['播放', [['空白鍵', '播放 / 暫停'], ['Ctrl + →', '下一首'], ['Ctrl + ←', '上一首'], ['↑ / ↓', '音樂音量']]],
+  ['歌詞', [['← / →', '歌詞提早 / 延後 0.25 秒'], ['R', '重新找歌詞'], ['Ctrl + F', '手動搜尋歌詞'], ['Ctrl + K', '用一句歌詞找歌']]],
+  ['畫面', [['H', '專注模式 (只看歌詞)'], ['F', '全螢幕'], ['S', '舞台'], ['D', '裝置電量'], ['M', '膠囊模式'], ['T', '視窗置頂'], ['Ctrl + ,', '設定'], ['?', '這個快捷鍵表'], ['Esc', '關閉選單 / 視窗']]],
+];
+const KEYS_GLOBAL = [['Ctrl + Alt + P', '播放 / 暫停'], ['Ctrl + Alt + . / ,', '下一首 / 上一首'], ['Ctrl + Alt + ↑ / ↓', '音樂音量'],
+  ['Ctrl + Alt + W', '主視窗 顯示 / 隱藏'], ['Ctrl + Alt + S', '打開舞台']];
+const KEYS_OVERLAY = [['Ctrl + Alt + H', '隱藏 / 顯示浮動歌詞'], ['Ctrl + Alt + L', '解鎖浮動歌詞 (可拖曳)'], ['Ctrl + Alt + ← / →', '歌詞提早 / 延後 0.25 秒']];
+function openKeys(){
+  const box = $('#keys-list'); box.innerHTML = '';
+  const add = (title, rows) => {
+    const h = document.createElement('h4'); h.textContent = title; box.appendChild(h);
+    rows.forEach(([k, what]) => { const d = document.createElement('div'); d.innerHTML = '<span></span><kbd></kbd>';
+      d.firstChild.textContent = what; d.lastChild.textContent = k; box.appendChild(d); });
+  };
+  KEYS_APP.forEach(([t, rows]) => add(t, rows));
+  add(cfg && cfg.hotkeys === false ? '全域 (已關閉，到 設定 → 一般 打開)' : '全域：在遊戲、其他程式裡也能用', KEYS_GLOBAL);
+  add('浮動歌詞 (全域)', KEYS_OVERLAY);
+  $('#keys-dialog').classList.add('open');
+}
+$('#keys-close').onclick = () => $('#keys-dialog').classList.remove('open');
+$('#keys-dialog').onclick = e => { if (e.target.id === 'keys-dialog') $('#keys-dialog').classList.remove('open'); };
+$('#keys-open').onclick = e => { e.stopPropagation(); openKeys(); };
+$('#hotkeys-on').onchange = e => { hotkeysEdit = performance.now(); send({type: 'hotkeys', value: e.target.checked}); };
 $('#music-only').onchange = e => { musicOnlyEdit = performance.now(); send({type: 'music_only', value: e.target.checked}); };
 </script>
 </body>

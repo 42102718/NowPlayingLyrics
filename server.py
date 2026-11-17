@@ -41,9 +41,9 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.5.2"
+VERSION = "1.7.0"
 APP_NAME = "Hummi 哼哼"
-UA = f"Hummi/{VERSION} (desktop lyrics app)"
+UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
 PLAYING = 4  # GlobalSystemMediaTransportControlsSessionPlaybackStatus.PLAYING
 
@@ -52,6 +52,10 @@ CONFIG_PATH = DATA / "config.json"
 DEFAULT_CONFIG = {
     "offset": 0.0,
     "notch": True,   # 螢幕頂端的小膠囊 (跟主視窗分開，一直都在)
+    "theme": "night",  # 主視窗風格：night 夜光 / dawn 晨霧 / mono 極簡 / neon 霓虹 / paper 紙本
+    "auto_pause": {"lock": True, "unplug": True, "resume": True},  # 鎖定 / 拔耳機時暫停，回來接著播
+    "taskbar_progress": True,  # 工作列圖示上顯示播放進度
+    "hotkeys": True,     # 全域快捷鍵 Ctrl+Alt+… (遊戲裡也能切歌、調音量)
     "music_only": True,  # 只偵測音樂 App：不讀瀏覽器、抖音、影片播放器 (開台時不會露出其他分頁的標題)
     "notch_opts": {
         "battery": True,    # 藍牙裝置 / 筆電電量
@@ -86,7 +90,13 @@ DEFAULT_CONFIG = {
         "show_next": True,
         "color": "album",          # white / album
         "auto_hide": True,         # 主視窗或舞台開著時自動隱藏 (避免同時好幾份歌詞)
+        "monitor": "primary",      # primary / active (跟著正在用的螢幕) / mouse / 螢幕裝置名稱
+        "fullscreen": "dim",       # 全螢幕遊戲時：normal 照常 / dim 變淡 / hide 隱藏
     },
+    "notch_monitor": "primary",    # 膠囊在哪個螢幕 (同上)
+    "wallpaper": {"enabled": False, "monitor": "primary"},
+    "share": {"folder": "", "name": ""},
+    "chat": {"channel": "", "token": "", "bot": "", "commands": "!song !歌名 !這什麼歌 !歌"},  # 直播聊天室點歌指令 (Twitch)  # 和朋友共享歌詞的雲端資料夾、顯示的名字  # 桌布模式：舞台放在桌面圖示後面
 }
 
 
@@ -96,7 +106,23 @@ def load_config():
         saved = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         cfg["offset"] = float(saved.get("offset", 0))
         cfg["notch"] = bool(saved.get("notch", True))
+        cfg["theme"] = saved.get("theme") if saved.get("theme") in ("night", "dawn", "mono", "neon", "paper") else "night"
         cfg["music_only"] = bool(saved.get("music_only", True))
+        cfg["hotkeys"] = bool(saved.get("hotkeys", True))
+        cfg["taskbar_progress"] = bool(saved.get("taskbar_progress", True))
+        cfg["notch_monitor"] = str(saved.get("notch_monitor", "primary") or "primary")
+        ch = saved.get("chat") or {}
+        cfg["chat"].update({k: str(ch.get(k) or "") for k in ("channel", "token", "bot") if k in ch})
+        if ch.get("commands"):
+            cfg["chat"]["commands"] = str(ch["commands"])[:200]
+        sh = saved.get("share") or {}
+        cfg["share"] = {"folder": str(sh.get("folder") or ""), "name": str(sh.get("name") or "")[:20]}
+        wp = saved.get("wallpaper") or {}
+        cfg["wallpaper"] = {"enabled": bool(wp.get("enabled", False)), "monitor": str(wp.get("monitor") or "primary")}
+        ap = saved.get("auto_pause") or {}
+        cfg["auto_pause"] = {k: bool(ap.get(k, True)) for k in ("lock", "unplug", "resume")}
+        if isinstance(saved.get("window"), dict):
+            cfg["window"] = saved["window"]
         cfg["notch_opts"].update({k: bool(v) for k, v in saved.get("notch_opts", {}).items() if k in cfg["notch_opts"]})
         cfg["font"] = str(saved.get("font", "") or "")
         cfg["background"].update({k: v for k, v in saved.get("background", {}).items() if k in cfg["background"]})
@@ -479,6 +505,10 @@ class Lyrics:
             saved = AI.get(k)
             if saved:  # 之前 AI 聽寫 / 對時過的結果
                 return traditionalize({**saved, "lines": [dict(l) for l in saved["lines"]]})
+        if not result["synced"] and SHARE is not None:
+            shared = await asyncio.to_thread(SHARE.get, title, artist, duration)
+            if shared and shared["synced"] and shared["lines"]:  # 朋友的 AI 聽過了：直接用，不用再聽一次
+                return traditionalize({**shared, "lines": [dict(l) for l in shared["lines"]]})
         return result
 
     def rank(self, cands, title, artist, duration, strict=True, need_artist=False):
@@ -770,7 +800,146 @@ class Media:
 # ───────────────────────── 伺服器 ─────────────────────────
 media = Media()
 lyrics = Lyrics(str(DATA / "lyrics_overrides.json"))
+
+# ───────────────── 用一句歌詞找歌 ─────────────────
+_cc_s = None
+_COVER_WORDS = ("live", "remix", "cover", "翻唱", "伴奏", "instrumental", "ver.", "version", "dj", "現場", "现场",
+                "karaoke", "8d", "slowed", "sped up", "加速", "降調", "女版", "男版", "鋼琴", "钢琴")
+
+
+def _fnorm(s):
+    """比對用：簡體、小寫、去掉標點空白。"""
+    global _cc_s
+    if _cc_s is None:
+        _cc_s = OpenCC("tw2s")
+    s = _cc_s.convert(str(s or "")).lower()
+    return re.sub(r"[\s\W_]+", "", s)
+
+
+def _best_line(text_lines, qn):
+    """歌詞裡最像這句的那一行 (給結果顯示「是這句嗎」)。"""
+    best, score = "", 0.0
+    qs = set(qn)
+    for ln in text_lines:
+        n = _fnorm(ln)
+        if not n:
+            continue
+        if qn and qn in n:
+            return ln.strip()
+        sc = len(qs & set(n)) / max(len(qs), 1)
+        if sc > score:
+            best, score = ln.strip(), sc
+    return best if score >= 0.5 else ""
+
+
+async def find_by_lyric(q):
+    qn = _fnorm(q)
+    if len(qn) < 2:
+        return []
+    out, seen = [], {}
+
+    def add(title, artist, line, source, album=""):
+        key = (_fnorm(re.sub(r"\s*[\(（\[【].*$", "", title)), _fnorm(artist.split("/")[0].split(",")[0]))
+        if not title:
+            return
+        low = title.lower()
+        item = {"title": title, "artist": artist, "album": album, "line": line, "source": source,
+                "cover": any(w in low for w in _COVER_WORDS) or bool(re.search(r"[(（\[【][^)）\]】]*版", title))}
+        if key in seen:  # 同一首：原版取代 Live / Remix 版
+            old = seen[key]
+            if old["cover"] and not item["cover"]:
+                old.update({k: v for k, v in item.items() if k != "source" or old["source"] != "聽過的歌"})
+            return None
+        seen[key] = item
+        out.append(item)
+        return item
+
+    # 1. 聽過的歌 (這次開著時抓過的、手動指定過的)
+    pools = list(lyrics.overrides.items()) + list(lyrics.cache.items())
+    for k, res in pools:
+        texts = [l.get("text", "") for l in (res or {}).get("lines", [])]
+        if any(qn in _fnorm(t) for t in texts):
+            title, _, artist = k.partition("\u0000")
+            add(title, artist, _best_line(texts, qn), "聽過的歌")
+
+    # 2. 網路 (網易雲、QQ 音樂的歌詞搜尋)
+    qs = _cc_s.convert(q)
+    http = await lyrics.session()
+
+    async def netease():
+        async with http.get("https://music.163.com/api/search/get", headers=NETEASE_HEADERS,
+                            params={"s": qs, "type": 1006, "limit": 12}) as r:
+            d = json.loads(await r.text())
+        res = []
+        for s_ in ((d.get("result") or {}).get("songs") or []):
+            txt = ((s_.get("lyrics") or {}).get("txt") if isinstance(s_.get("lyrics"), dict) else "") or ""
+            res.append((s_.get("name") or "", " / ".join(a.get("name") or "" for a in s_.get("artists", [])),
+                        _best_line(txt.split("\n"), qn), (s_.get("album") or {}).get("name") or "", txt))
+        return res
+
+    async def qq():
+        body = {"comm": {"ct": 19, "cv": 1859, "uin": "0"},
+                "req": {"method": "DoSearchForQQMusicDesktop", "module": "music.search.SearchCgiService",
+                        "param": {"num_per_page": 10, "page_num": 1, "query": qs, "search_type": 7}}}
+        async with http.post("https://u.y.qq.com/cgi-bin/musicu.fcg", data=json.dumps(body)) as r:
+            d = json.loads(await r.text())
+        songs = (((d.get("req") or {}).get("data") or {}).get("body") or {}).get("song", {}).get("list") or []
+        out_ = []
+        for s_ in songs:
+            txt = (s_.get("lyric") or "").replace("\\n", "\n")
+            out_.append((s_.get("name") or "", " / ".join(a.get("name") or "" for a in s_.get("singer", [])),
+                         _best_line(txt.split("\n"), qn), (s_.get("album") or {}).get("name") or "", txt))
+        return out_
+
+    remote = []
+    for name, r in zip(("網易雲", "QQ 音樂"), await asyncio.gather(netease(), qq(), return_exceptions=True)):
+        if isinstance(r, Exception):
+            print("[find]", name, repr(r))
+            continue
+        remote += [(name, *x) for x in r]
+    # 翻唱的歌詞常會寫「原唱 / 作詞 / 作曲：某某」：被寫最多次的就是原唱
+    credits = " ".join(_fnorm(ln) for *_, txt in remote for ln in txt.split("\n")[:12]
+                       if re.search(r"原唱|作词|作曲|词|曲|lyric|compos", ln, re.I))
+    for name, title, artist, line, album, txt in remote:
+        if line or qn in _fnorm(title):  # 歌詞 (或歌名) 裡真的有這句才算
+            it = add(title, artist, line, name, album)
+            if it is not None:
+                a0 = _fnorm(re.split(r"[/,、&]", artist)[0])
+                it["credit"] = credits.count(a0) if len(a0) >= 2 else 0
+    # 結果都是翻唱 (原唱不在這兩個平台，例如周杰倫)：從翻唱標的「原唱 / 演唱 / 曲」推測原唱是誰
+    names = {}
+    for *_, txt in remote:
+        for m_ in re.finditer(r"(?:原唱|演唱|作曲|曲)\s*[:：]\s*([^\s/／,，、&()（）]{2,16})", txt[:400]):
+            names[m_.group(1)] = names.get(m_.group(1), 0) + 1
+    if names and out:
+        who, n = max(names.items(), key=lambda kv: kv[1])
+        artists = {_fnorm(re.split(r"[/,、&]", x["artist"])[0]) for x in out}
+        if n >= 3 and _fnorm(who) not in artists:
+            base = re.sub(r"\s*[(（\[【].*$", "", out[0]["title"]).strip()
+            titles = [re.sub(r"\s*[(（\[【].*$", "", x["title"]).strip() for x in out]
+            base = max(set(titles), key=titles.count) or base
+            out.insert(0, {"title": base, "artist": who, "album": "", "line": out[0]["line"], "source": "推測的原唱",
+                           "cover": False, "credit": n})
+    # 聽過的歌 → 推測的原唱 → 不是翻唱 / Live / Remix → 原唱 (被標成作者最多次) → 來源原本的順序
+    out.sort(key=lambda x: (x["source"] != "聽過的歌", x["source"] != "推測的原唱", x["cover"], -x.get("credit", 0)))
+    for x in out:
+        x["title"], x["artist"], x["line"] = to_trad(x["title"]), to_trad(x["artist"]), to_trad(x["line"])
+    return out[:12]
+
+
+def open_in_player(title, artist, where):
+    """在 Spotify / YouTube Music 打開搜尋結果。"""
+    import urllib.parse
+    q = f"{title} {artist}".strip()
+    if where == "youtube":
+        webbrowser.open("https://music.youtube.com/search?q=" + urllib.parse.quote(q))
+    else:
+        try:
+            os.startfile("spotify:search:" + urllib.parse.quote(q))
+        except OSError:  # 沒裝 Spotify：開網頁版
+            webbrowser.open("https://open.spotify.com/search/" + urllib.parse.quote(q))
 AI = None    # ai_lyrics.AIEngine，在 poll_loop 開始時建立
+SHARE = None  # share.Share：和朋友共享歌詞
 LOOP = None
 clients: set[web.WebSocketResponse] = set()
 stage_clients: set[web.WebSocketResponse] = set()  # 舞台頁面 (要即時音量)
@@ -834,6 +1003,12 @@ def on_ai_update(track_id, key, result, live):
 async def _ai_push(track_id, key, result, live):
     if not live:
         lyrics.cache.pop(key, None)
+        if SHARE is not None and result.get("synced") and result.get("lines"):
+            title, _, artist = key.partition("\u0000")
+            t0 = state["track"] or {}
+            dur = t0.get("duration") if (t0.get("title"), t0.get("artist")) == (title, artist) else 0
+            asyncio.ensure_future(asyncio.to_thread(SHARE.put, title, artist, dur, result,
+                                                    "aligned" if result.get("ai") == "aligned" else "transcribed"))
     t = state["track"]
     if not t or t["track_id"] != track_id:
         return
@@ -920,6 +1095,7 @@ async def poll_loop():
     global AI, LOOP
     await media.init()
     LOOP = asyncio.get_running_loop()
+    start_chat()
     try:
         import ai_lyrics
         AI = ai_lyrics.AIEngine(state, config, on_ai_update, _norm, DATA / "ai_lyrics.json")
@@ -954,9 +1130,11 @@ async def poll_loop():
                 state["track"] = None
                 last_id = None
             await broadcast({"type": "state", "track": state["track"], "sessions": state["sessions"],
-                             "pinned": media.pinned, "config": config, "unlocked": runtime["unlocked"],
+                             "pinned": media.pinned, "config": public_config(), "unlocked": runtime["unlocked"],
+                             "chat": CHAT.status if CHAT else "off",
                              "autostart": get_autostart(), "can_autostart": FROZEN, "version": VERSION,
                              "mica": MICA_OK,
+                             "hotkeys_failed": hotkeys_failed(), "monitors": monitor_list(),
                              "folia": runtime["folia"].status if runtime.get("folia") else None,
                              "ai": AI.status if AI is not None else None})
         except Exception as e:
@@ -1049,6 +1227,56 @@ async def ws_handler(request):
                 elif act == "auto":
                     config["auto_update"] = bool(d.get("value"))
                     save_config()
+            elif d.get("type") == "auto_pause" and d.get("key") in ("lock", "unplug", "resume"):
+                config["auto_pause"][d["key"]] = bool(d.get("value"))
+                save_config()
+            elif d.get("type") == "theme" and d.get("value") in ("night", "dawn", "mono", "neon", "paper"):
+                config["theme"] = d["value"]
+                save_config()
+                for w in (window, settings_window):
+                    if w is not None:
+                        threading.Thread(target=apply_window_style, args=(w,), daemon=True).start()
+            elif d.get("type") == "chat":
+                for k in ("channel", "bot", "commands"):
+                    if k in d:
+                        config["chat"][k] = str(d.get(k) or "").strip()[:200]
+                if d.get("token") is not None and d.get("token") != "":
+                    config["chat"]["token"] = str(d["token"]).strip()[:200]
+                if d.get("clear_token"):
+                    config["chat"]["token"] = ""
+                save_config()
+                start_chat()
+            elif d.get("type") == "share":
+                if "name" in d:
+                    config["share"]["name"] = str(d.get("name") or "")[:20]
+                if "folder" in d:
+                    config["share"]["folder"] = str(d.get("folder") or "")
+                save_config()
+                if d.get("folder"):
+                    n = await asyncio.to_thread(share_everything)
+                    total = await asyncio.to_thread(SHARE.count) if SHARE else 0
+                    await ws.send_str(json.dumps({"type": "share_status", "added": n, "total": total}, ensure_ascii=False))
+            elif d.get("type") == "wallpaper":
+                if "monitor" in d:
+                    config["wallpaper"]["monitor"] = str(d.get("monitor") or "primary")
+                if "enabled" in d:
+                    config["wallpaper"]["enabled"] = bool(d.get("enabled"))
+                save_config()
+                threading.Thread(target=sync_wallpaper, daemon=True).start()
+            elif d.get("type") == "notch_set":  # 設定裡的膠囊開關 (不會把主視窗收起來)
+                set_notch(bool(d.get("value")))
+            elif d.get("type") == "notch_monitor":
+                config["notch_monitor"] = str(d.get("value") or "primary")
+                save_config()
+            elif d.get("type") == "taskbar_progress":
+                config["taskbar_progress"] = bool(d.get("value"))
+                save_config()
+            elif d.get("type") == "hotkeys":
+                config["hotkeys"] = bool(d.get("value"))
+                save_config()
+                start_hotkeys()
+            elif d.get("type") == "volume":  # 主視窗 ↑ / ↓
+                await asyncio.to_thread(music_volume, float(d.get("delta") or 0))
             elif d.get("type") == "music_only":
                 config["music_only"] = bool(d.get("value"))
                 save_config()
@@ -1356,8 +1584,11 @@ def start_tray():
         P("膠囊選項", pystray.Menu(*[
             P(label, notch_toggle(k), checked=(lambda k: lambda it: config["notch_opts"][k])(k))
             for k, label in [("peek", "換歌時彈出歌名"), ("spectrum", "真實頻譜和光暈"),
-                             ("battery", "裝置電量 (藍牙 / 筆電)"), ("gestures", "滾輪調音量、左右滑切歌")]
+                             ("battery", "裝置電量"), ("gestures", "滾輪調音量、左右滑切歌")]
         ])),
+        P("打開舞台", lambda i, it: open_stage()),
+        P("裝置電量", lambda i, it: open_devices()),
+        pystray.Menu.SEPARATOR,
         P("顯示浮動歌詞", toggle("enabled"), checked=lambda it: ov["enabled"]),
         P("解鎖位置 (可拖曳)", unlock, checked=lambda it: runtime["unlocked"]),
         P("位置", pystray.Menu(*[
@@ -1404,6 +1635,55 @@ except Exception:
     MICA_OK = False
 
 
+def install_chrome(form):
+    """主視窗的原生外框 (UI 執行緒)：四邊可拉、貼齊、工作列縮圖按鈕和進度。"""
+    try:
+        import winchrome
+        ch = winchrome.Chrome(form, on_thumb=media_cmd)
+        ch.install()
+        runtime["chrome"] = ch
+
+        def tb_state():
+            t = state.get("track")
+            if not t:
+                return None, 0, 0
+            return bool(t.get("playing")), float(t.get("position") or 0), float(t.get("duration") or 0)
+        ch.thumbs = winchrome.Thumbs(ch.hwnd, tb_state, lambda: config.get("taskbar_progress", True)).start()
+    except Exception as e:
+        print("[chrome]", repr(e), flush=True)
+
+
+def main_hwnd():
+    import ctypes
+    ch = runtime.get("chrome")
+    if ch is not None and ch.hwnd:
+        return ch.hwnd
+    u = ctypes.windll.user32
+    u.FindWindowW.restype = ctypes.c_void_p
+    return u.FindWindowW(None, APP_NAME)
+
+
+def placement_loop():
+    """記住主視窗的位置和大小 (有變才存)。"""
+    import winchrome
+    last = config.get("window")
+    while not quitting:
+        time.sleep(3)
+        try:
+            h = main_hwnd()
+            import ctypes
+            if not h or not ctypes.windll.user32.IsWindowVisible(h) or ctypes.windll.user32.IsIconic(h):
+                continue
+            if window is not None and getattr(window.native, "is_fullscreen", False):
+                continue
+            g = winchrome.get_placement(h)
+            if g and g != last:
+                config["window"] = last = g
+                save_config()
+        except Exception as e:
+            print("[placement]", repr(e))
+
+
 def apply_window_style(win=None):
     """主視窗 / 設定小視窗：Windows 11 圓角 + 深色邊框；背景選 Mica 時套用系統材質 (透出桌布色調)。"""
     win = win or window
@@ -1430,13 +1710,15 @@ def apply_window_style(win=None):
             def attr(a, v):
                 val = ctypes.c_int(v)
                 return dwm.DwmSetWindowAttribute(hwnd, a, ctypes.byref(val), 4)
-            attr(20, 1)   # 深色模式邊框
+            attr(20, 0 if config.get("theme") in ("dawn", "paper") else 1)   # 深色 / 淺色風格的視窗邊框
             attr(33, 2)   # 圓角
             m = -1 if mica else 0
             dwm.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(MARGINS(m, m, m, m)))
             attr(38, 2 if mica else 1)  # 系統背景：Mica / 無
             form.BackColor = Color.Black if mica else ColorTranslator.FromHtml("#0b0b12")
             form.webview.DefaultBackgroundColor = Color.Transparent if mica else ColorTranslator.FromHtml("#0b0b12")
+            if win is window and runtime.get("chrome") is None:
+                install_chrome(form)
         except Exception as e:
             print("[style]", repr(e), flush=True)
     try:
@@ -1457,6 +1739,10 @@ def media_cmd(cmd, arg=None):
             await s.try_skip_next_async()
         elif cmd == "prev":
             await s.try_skip_previous_async()
+        elif cmd == "pause":
+            await s.try_pause_async()
+        elif cmd == "play":
+            await s.try_play_async()
         elif cmd == "seek":
             await s.try_change_playback_position_async(int(float(arg) * 10_000_000))
     if LOOP is not None:
@@ -1511,6 +1797,10 @@ class StageApi:
         if stage_window is not None:
             stage_window.toggle_fullscreen()
 
+    def exit_fullscreen(self):
+        if stage_window is not None and getattr(stage_window.native, "is_fullscreen", False):
+            stage_window.toggle_fullscreen()
+
     def back(self):
         """回主視窗：舞台收起來，主視窗叫出來。"""
         if stage_window is not None:
@@ -1547,7 +1837,101 @@ def open_stage():
         print("[stage]", repr(e), flush=True)
 
 
+wallpaper_window = None
+_wp_lock = threading.Lock()
+
+
+def sync_wallpaper():
+    """桌布模式開 / 關 (設定改了、程式啟動時)。"""
+    global wallpaper_window
+    if window is None:
+        return
+    with _wp_lock:
+        on = config["wallpaper"]["enabled"]
+        if on and wallpaper_window is None:
+            import webview
+            wallpaper_window = webview.create_window(
+                "Hummi 桌布", f"http://127.0.0.1:{PORT}/stage?obs=1&wallpaper=1&v={VERSION}",
+                width=800, height=600, frameless=True, focus=False, background_color="#05050a")
+            wallpaper_window.events.shown += lambda: threading.Thread(target=wallpaper_loop, args=(wallpaper_window,),
+                                                                      daemon=True).start()
+        elif not on and wallpaper_window is not None:
+            w, wallpaper_window = wallpaper_window, None
+            try:
+                w.destroy()
+            except Exception as e:
+                print("[wallpaper]", repr(e))
+            refresh_desktop()
+
+
+def refresh_desktop():
+    """拿掉桌布模式後，請 Windows 重畫原本的桌布 (不然會留著最後一格畫面)。"""
+    import ctypes
+    buf = ctypes.create_unicode_buffer(520)
+    ctypes.windll.user32.SystemParametersInfoW(0x73, 520, buf, 0)  # SPI_GETDESKWALLPAPER
+    ctypes.windll.user32.SystemParametersInfoW(0x14, 0, buf, 0)    # SPI_SETDESKWALLPAPER (同一張，不存檔)
+
+
+def wallpaper_loop(w):
+    """放到桌面圖示後面；之後每秒看一下：換螢幕、檔案總管重開了就重新放；桌面被蓋滿就暫停。"""
+    import ctypes
+    import screens
+    import wallpaper
+    from System import Action
+    form = w.native
+    hwnd = ctypes.c_void_p(form.Handle.ToInt64()).value
+    picker = screens.Picker([hwnd])
+    placed, progman, paused = None, None, False
+    while wallpaper_window is w and not quitting:
+        try:
+            mon = picker.pick(config["wallpaper"]["monitor"])
+            pm = ctypes.windll.user32.FindWindowW("Progman", None)
+            if mon["rect"] != placed or pm != progman:
+                form.Invoke(Action(lambda: wallpaper.attach(hwnd, mon["rect"])))
+                placed, progman, paused = mon["rect"], pm, False
+            cov = wallpaper.desktop_covered(mon["rect"], own=(hwnd,))
+            if cov != paused:  # 桌面看不到：停止繪製 (WebView2 不可見就不跑動畫)
+                paused = cov
+                form.BeginInvoke(Action(lambda v=not cov: setattr(form.webview, "Visible", v)))
+        except Exception as e:
+            print("[wallpaper]", repr(e), flush=True)
+        time.sleep(1)
+
+
 settings_window = None
+
+
+def enable_drag_regions(win):
+    """讓網頁裡 CSS `app-region: drag` 的地方變成真的標題列 (WebView2 原生)：拖得動、可以拖到螢幕邊緣貼齊。"""
+    try:
+        from System import Action
+        form = win.native
+
+        def go():
+            try:
+                st = form.webview.CoreWebView2.Settings
+                if not st.IsNonClientRegionSupportEnabled:
+                    st.IsNonClientRegionSupportEnabled = True
+                    form.webview.CoreWebView2.Reload()  # 這個設定要下一次載入頁面才生效 (只會發生一次)
+            except Exception as e:
+                print("[drag]", repr(e), flush=True)
+        form.BeginInvoke(Action(go))
+    except Exception as e:
+        print("[drag]", repr(e))
+
+
+def native_drag(title):
+    """拖曳無邊框視窗：交給 Windows 原生的移動 (SC_DRAGMOVE)，順便支援拖到螢幕邊緣貼齊。
+    pywebview 內建的拖曳是 JS 一直回報滑鼠位置再 SetWindowPos，在 WebView2 上常常拖不動。
+    用 PostMessage 非同步送，不會跨執行緒卡住 UI。"""
+    import ctypes, ctypes.wintypes as wt
+    u = ctypes.windll.user32
+    u.FindWindowW.restype = wt.HWND
+    u.PostMessageW.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
+    hwnd = u.FindWindowW(None, title)
+    if hwnd:
+        u.ReleaseCapture()
+        u.PostMessageW(hwnd, 0x0112, 0xF012, 0)  # WM_SYSCOMMAND, SC_MOVE | HTCAPTION
 
 
 class SettingsApi:
@@ -1556,6 +1940,9 @@ class SettingsApi:
     def close(self):
         if settings_window is not None:
             settings_window.hide()
+
+    def drag(self):
+        native_drag("Hummi 設定")
 
     def expand(self):
         """打開完整的主視窗 (設定面板也打開)，小視窗收起來。"""
@@ -1593,6 +1980,7 @@ def open_settings():
                 return False
             settings_window.events.closing += on_closing
             settings_window.events.shown += lambda: apply_window_style(settings_window)
+            settings_window.events.loaded += lambda: enable_drag_regions(settings_window)
         else:
             settings_window.show()
             settings_window.restore()
@@ -1657,9 +2045,154 @@ def start_notch():
     threading.Thread(target=notch.run, args=(state, config, runtime), daemon=True).start()
 
 
+def music_volume(delta):
+    """只調播放器自己的音量 (快捷鍵 / 主視窗 ↑↓)，膠囊會跳出音量條。"""
+    t = state.get("track")
+    if not t:
+        return None
+    import audio_ctl
+    app = t.get("app", "")
+    cur = audio_ctl.get_volume(app)
+    if cur is None:
+        return None
+    lv = audio_ctl.set_volume(app, round(min(1.0, max(0.0, cur + delta)), 2))
+    n = runtime.get("notch_obj")
+    if n is not None and lv is not None:
+        n.volume = (app, lv, n.last_frame)
+        n.push("volume", 1.4, level=lv, app=t.get("source") or "")
+    return lv
+
+
+def toggle_main_window():
+    if window is None:
+        return
+    import ctypes
+    u = ctypes.windll.user32
+    u.FindWindowW.restype = ctypes.c_void_p
+    h = u.FindWindowW(None, APP_NAME)
+    if h and u.IsWindowVisible(ctypes.c_void_p(h)) and not u.IsIconic(ctypes.c_void_p(h)):
+        window.hide()
+    else:
+        show_window()
+
+
+def start_hotkeys():
+    """全域快捷鍵 (Ctrl+Alt+…)：設定裡關掉就全部釋放，讓給別的程式。"""
+    hk = runtime.get("hotkeys")
+    if hk is not None:
+        hk.stop()
+        runtime["hotkeys"] = None
+    if not config.get("hotkeys", True):
+        return
+    try:
+        import hotkeys
+        runtime["hotkeys"] = hotkeys.Hotkeys({
+            "toggle": lambda: media_cmd("toggle"),
+            "next": lambda: media_cmd("next"),
+            "prev": lambda: media_cmd("prev"),
+            "vol_up": lambda: music_volume(0.05),
+            "vol_down": lambda: music_volume(-0.05),
+            "window": toggle_main_window,
+            "stage": open_stage,
+        }).start()
+    except Exception as e:
+        print("[hotkeys] disabled:", repr(e))
+
+
+_mon_cache = [0.0, []]
+
+
+def monitor_list():
+    """螢幕清單 (設定裡的「顯示在」)；每 5 秒才重新列一次。"""
+    if time.time() - _mon_cache[0] > 5:
+        try:
+            import screens
+            _mon_cache[1] = [{"name": m["name"], "label": screens.label(m, i)} for i, m in enumerate(screens.monitors())]
+        except Exception:
+            _mon_cache[1] = []
+        _mon_cache[0] = time.time()
+    return _mon_cache[1]
+
+
+CHAT = None
+
+
+def public_config():
+    """送給網頁的設定：權杖不送出去 (OBS 的網頁也連得到 /ws)。"""
+    c = dict(config)
+    c["chat"] = {**config["chat"], "token": "", "has_token": bool(config["chat"].get("token"))}
+    return c
+
+
+def start_chat():
+    global CHAT
+    try:
+        import chat
+
+        def now_playing():
+            t = state.get("track")
+            return (t["title"], t["artist"]) if t else None
+
+        def on_ask(user, title, artist):  # 舞台 / OBS 跳出「現在播放」卡片
+            asyncio.ensure_future(broadcast({"type": "chat_song", "user": user, "title": title, "artist": artist}))
+        if CHAT is None:
+            CHAT = chat.TwitchChat(lambda: config["chat"], now_playing, on_ask)
+        CHAT.restart(LOOP)
+    except Exception as e:
+        print("[chat] disabled:", repr(e))
+
+
+def init_share():
+    global SHARE
+    try:
+        import share
+        SHARE = share.Share(config, _norm, clean_title, clean_artist)
+    except Exception as e:
+        print("[share] disabled:", repr(e))
+
+
+def share_everything():
+    """剛設定好共享資料夾：把之前 AI 聽過的、手動指定的歌詞都放一份進去。回傳放了幾首。"""
+    if SHARE is None or SHARE.folder() is None:
+        return 0
+    n = 0
+    for k, res in list((AI.store if AI is not None else {}).items()):
+        title, _, artist = k.partition("\u0000")
+        if res.get("synced") and SHARE.put(title, artist, 0, res, "aligned" if res.get("ai") == "aligned" else "transcribed"):
+            n += 1
+    for k, res in list(lyrics.overrides.items()):
+        title, _, artist = k.partition("\u0000")
+        if res.get("synced") and SHARE.put(title, artist, 0, res, "manual"):
+            n += 1
+    return n
+
+
+def start_autopause():
+    try:
+        import autopause
+        runtime["autopause"] = autopause.AutoPause(
+            config, lambda: bool((state.get("track") or {}).get("playing")),
+            lambda: media_cmd("pause"), lambda: media_cmd("play")).start()
+    except Exception as e:
+        print("[autopause] disabled:", repr(e))
+
+
+def hotkeys_failed():
+    hk = runtime.get("hotkeys")
+    if hk is None or not hk.failed:
+        return []
+    import hotkeys
+    return [hotkeys.label(k) for k in hk.failed]
+
+
 def quit_app(icon=None):
     global quitting
     quitting = True
+    try:
+        if wallpaper_window is not None:
+            refresh_desktop()
+    except Exception:
+        pass
     try:
         if icon:
             icon.stop()
@@ -1683,12 +2216,43 @@ class WindowApi:
         window.hide()  # 縮到系統匣，浮動歌詞照常運作
 
     def toggle_maximize(self):
-        if getattr(window, "_maxed", False):
+        # 看視窗真正的狀態 (標題列連點兩下是 Windows 自己放大的，不會經過這裡)
+        import ctypes
+        u = ctypes.windll.user32
+        u.FindWindowW.restype = ctypes.c_void_p
+        hwnd = u.FindWindowW(None, APP_NAME)
+        if hwnd and u.IsZoomed(ctypes.c_void_p(hwnd)):
             window.restore()
-            window._maxed = False
         else:
             window.maximize()
-            window._maxed = True
+
+    def drag(self):
+        native_drag(APP_NAME)
+
+    def pick_folder(self):
+        """選擇共享資料夾 (Windows 的資料夾對話框)。"""
+        import webview
+        r = window.create_file_dialog(webview.FileDialog.FOLDER)
+        return r[0] if r else ""
+
+    def fullscreen(self):
+        """F：主視窗全螢幕 (網頁的全螢幕在 App 視窗裡沒有作用)。"""
+        window.toggle_fullscreen()
+        self._restyle()
+
+    def exit_fullscreen(self):
+        if getattr(window.native, "is_fullscreen", False):
+            window.toggle_fullscreen()
+            self._restyle()
+            return True
+        return False
+
+    def _restyle(self):
+        """離開全螢幕後 WinForms 會把外框樣式蓋掉，要加回來 (四邊可拉、貼齊)。"""
+        ch = runtime.get("chrome")
+        if ch is not None and not getattr(window.native, "is_fullscreen", False):
+            from System import Action
+            window.native.BeginInvoke(Action(ch.restyle))
 
     def toggle_on_top(self):
         self._on_top = on = not self._on_top
@@ -1761,6 +2325,9 @@ def make_app():
             result["lines"] = clean_lines(result["lines"], t["title"], t["artist"], *extra)
         result = traditionalize(result)
         lyrics.set_override(t["title"], t["artist"], result)
+        if SHARE is not None and result.get("synced"):
+            asyncio.ensure_future(asyncio.to_thread(SHARE.put, t["title"], t["artist"], t.get("duration") or 0,
+                                                    result, "manual"))
         if AI is not None:
             AI.set_job(None)
         state["lyrics"] = {"track_id": t["track_id"], **result, "override": True}
@@ -1792,6 +2359,36 @@ def make_app():
             asyncio.create_task(fetch_lyrics(t))
         return web.json_response({"ok": True})
 
+    async def lyr_find(request):
+        return web.json_response(await find_by_lyric(request.query.get("q", "").strip()[:120]))
+
+    async def lyr_open(request):
+        d = await request.json()
+        open_in_player(str(d.get("title") or ""), str(d.get("artist") or ""), str(d.get("where") or "spotify"))
+        return web.json_response({"ok": True})
+
+    async def lyr_publish(request):
+        """把目前這首歌的同步歌詞上傳到 LRCLIB (公開資料庫)。"""
+        t, cur = state["track"], state["lyrics"] or {}
+        if not t or not cur.get("synced") or not cur.get("lines") or cur.get("track_id") != t["track_id"]:
+            return web.json_response({"ok": False, "error": "這首歌現在沒有同步歌詞"})
+        import share
+        try:
+            ok, msg = await share.publish_lrclib(await lyrics.session(), UA, clean_title(t["title"]),
+                                                 clean_artist(t["artist"]), t.get("album") or "",
+                                                 t.get("duration") or 0, cur["lines"])
+        except Exception as e:
+            ok, msg = False, f"上傳失敗：{e!r}"[:160]
+        return web.json_response({"ok": ok, "error": "" if ok else msg, "msg": msg})
+
+    async def share_status(request):
+        total = await asyncio.to_thread(SHARE.count) if SHARE else 0
+        return web.json_response({"folder": config["share"]["folder"], "ok": bool(SHARE and SHARE.folder()), "total": total})
+
+    app.router.add_post("/lyrics/publish", lyr_publish)
+    app.router.add_get("/share/status", share_status)
+    app.router.add_get("/lyrics/find", lyr_find)
+    app.router.add_post("/lyrics/open", lyr_open)
     app.router.add_get("/lyrics/search", lyr_search)
     app.router.add_post("/lyrics/use", lyr_use)
     app.router.add_post("/lyrics/import", lyr_import)
@@ -1881,6 +2478,7 @@ def set_dpi_awareness():
 
 def main():
     global window
+    init_share()
     set_dpi_awareness()
     if "--ai-selftest" in sys.argv:  # 檢查 AI 元件：下載 (需要時)、載入模型、跑一次辨識，結果寫在 app.log
         import ai_lyrics
@@ -1928,6 +2526,8 @@ def main():
     threading.Thread(target=overlay.run, args=(state, config, runtime, save_config), daemon=True).start()
     start_notch()
     start_tray()
+    start_hotkeys()
+    start_autopause()
 
     window = webview.create_window(
         APP_NAME, f"http://127.0.0.1:{PORT}/?app=1&v={VERSION}",
@@ -1949,9 +2549,17 @@ def main():
         window.restore()
         window.resize(1180, 800)
         apply_window_style()
+        g = config.get("window")
+        if g:  # 上次的位置和大小 (含放大)
+            import winchrome
+            winchrome.set_placement(main_hwnd(), g, show=not background)
+        threading.Thread(target=placement_loop, daemon=True).start()
+        if config["wallpaper"]["enabled"]:
+            threading.Thread(target=sync_wallpaper, daemon=True).start()
         if background:
             window.hide()  # 先以正常大小建立好再藏起來，之後從系統匣叫出來才不會空白
     window.events.shown += on_shown
+    window.events.loaded += lambda: enable_drag_regions(window)
     webview.start(private_mode=False, storage_path=str(DATA / ".webview"))
     quit_app()
 

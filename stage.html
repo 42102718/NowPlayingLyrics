@@ -199,6 +199,12 @@ body.folia.no-folia-card #card{display:none}
 #card{position:fixed;left:3vmin;bottom:3vmin;display:flex;align-items:center;gap:1.6vmin;padding:1.2vmin 2.2vmin 1.2vmin 1.2vmin;border-radius:2.2vmin;
   background:rgba(10,10,20,.45);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);transform:translateY(160%);transition:transform .7s cubic-bezier(.2,.9,.2,1)}
 #card.show{transform:none}
+#ask{position:fixed;right:3vmin;top:3vmin;z-index:6;max-width:46vw;padding:1.4vmin 2.2vmin;border-radius:2vmin;background:rgba(14,14,22,.78);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(16px);color:#fff;font-family:var(--font);transform:translateY(-140%);opacity:0;transition:transform .5s cubic-bezier(.2,.9,.3,1.2),opacity .4s}
+#ask.show{transform:none;opacity:1}
+#ask .q{font-size:1.6vmin;color:rgba(255,255,255,.65)}
+#ask .s{font-size:2.6vmin;font-weight:800;margin-top:.4vmin;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ask .s::before{content:'🎵 '}
+#ask .a{font-size:1.8vmin;color:var(--accent,#cdbfff);margin-top:.2vmin}
 #card img{width:7vmin;height:7vmin;border-radius:1.2vmin;object-fit:cover}
 #card .t{font-weight:800;font-size:2.2vmin;max-width:40vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #card .a{font-weight:500;font-size:1.6vmin;opacity:.65;margin-top:.3vmin}
@@ -313,6 +319,8 @@ for (const k of Object.keys(opt)){
 if (opt.bg === 'none'){ opt.bg = 'fluid'; opt.transparent = true; }  // 舊設定：背景選「透明」改成獨立的開關
 const save = () => { if (!OBS) try { localStorage.setItem('hummi.stage', JSON.stringify(opt)); } catch {} };
 if (OBS) document.body.classList.add('obs');
+// 桌布模式：跟舞台用同一套設定，舞台那邊改了就跟著換
+if (params.has('wallpaper')){ opt.transparent = false; addEventListener('storage', e => { if (e.key === 'hummi.stage') location.reload(); }); }
 
 // ───── 資料 ─────
 let track = null, lyr = null, lines = [], cfgOffset = 0;
@@ -329,7 +337,16 @@ function connect(){
     if (m.type === 'state') onState(m);
     else if (m.type === 'lyrics') onLyrics(m);
     else if (m.type === 'viz') onViz(m);
+    else if (m.type === 'chat_song') showAsk(m);
   };
+}
+let askTimer = 0;
+function showAsk(m){  // 直播聊天室有人打 !song：右上角跳出現在播放
+  let el = document.getElementById('ask');
+  if (!el){ el = document.createElement('div'); el.id = 'ask'; el.innerHTML = '<div class="q"></div><div class="s"></div><div class="a"></div>'; document.body.appendChild(el); }
+  el.querySelector('.q').textContent = `${m.user} 問：這是什麼歌？`;
+  el.querySelector('.s').textContent = m.title; el.querySelector('.a').textContent = m.artist || '';
+  el.classList.add('show'); clearTimeout(askTimer); askTimer = setTimeout(() => el.classList.remove('show'), 8000);
 }
 function onState(m){
   if (m.config) cfgOffset = +m.config.offset || 0;
@@ -1030,7 +1047,7 @@ addEventListener('click', () => $('#panel').classList.remove('open'));
 const fullscreen = () => window.pywebview?.api?.fullscreen ? window.pywebview.api.fullscreen()
   : document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
 $('#b-full').onclick = fullscreen;
-addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F' || e.key === 'F11') && !e.target.closest?.('input,select')){ e.preventDefault(); fullscreen(); } if (e.key === 'Escape') $('#panel').classList.remove('open'); });
+addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F' || e.key === 'F11') && !e.target.closest?.('input,select')){ e.preventDefault(); fullscreen(); } if (e.key === 'Escape'){ $('#panel').classList.remove('open'); window.pywebview?.api?.exit_fullscreen?.(); } });
 $('#b-obs').onclick = async () => {
   if (isFolia(opt.mode)){  // Folia 效果：直接給 Folia 頁面的網址 (Hummi 要開著)
     const url = foliaUrl(opt.mode, true);
