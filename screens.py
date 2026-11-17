@@ -22,6 +22,8 @@ user32.GetForegroundWindow.restype = wt.HWND
 user32.GetWindowRect.argtypes = [wt.HWND, ctypes.POINTER(wt.RECT)]
 user32.GetClassNameW.argtypes = [wt.HWND, wt.LPWSTR, ctypes.c_int]
 user32.GetWindowThreadProcessId.argtypes = [wt.HWND, ctypes.POINTER(wt.DWORD)]
+user32.IsZoomed.argtypes = [wt.HWND]
+user32.GetWindowLongW.argtypes = [wt.HWND, ctypes.c_int]
 
 
 class MONITORINFOEXW(ctypes.Structure):
@@ -106,6 +108,15 @@ class Picker:
         return mon
 
 
+def exclusive_fullscreen():
+    """遊戲用「獨佔全螢幕」：這時 Windows 沒辦法把透明視窗疊在遊戲上 (硬疊會變成黑框)。"""
+    try:
+        q = ctypes.c_int()
+        return shell32.SHQueryUserNotificationState(ctypes.byref(q)) == 0 and q.value == 3
+    except Exception:
+        return False
+
+
 def fullscreen_app(mon_rect=None, own=()):
     """前景是全螢幕程式 (遊戲、影片全螢幕、簡報) 嗎？有給螢幕範圍時，只看那個螢幕。"""
     try:
@@ -123,6 +134,9 @@ def fullscreen_app(mon_rect=None, own=()):
         pass
     h, cls = _fg()
     if not h or h in {int(x) for x in own if x} or cls in _SHELL:
+        return False
+    # 放大的一般視窗 (瀏覽器、Discord…) 也會蓋滿螢幕，但不是全螢幕：有標題列 / 是「放大」狀態就不算
+    if (user32.GetWindowLongW(h, -16) & 0x00C00000) == 0x00C00000:
         return False
     r = wt.RECT()
     user32.GetWindowRect(h, ctypes.byref(r))

@@ -41,7 +41,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -52,6 +52,7 @@ CONFIG_PATH = DATA / "config.json"
 DEFAULT_CONFIG = {
     "offset": 0.0,
     "notch": True,   # 螢幕頂端的小膠囊 (跟主視窗分開，一直都在)
+    "ui_zoom": 100,    # 介面大小 % (字、按鈕一起放大，給看不清楚的人)
     "theme": "night",  # 主視窗風格：night 夜光 / dawn 晨霧 / mono 極簡 / neon 霓虹 / paper 紙本
     "auto_pause": {"lock": True, "unplug": True, "resume": True},  # 鎖定 / 拔耳機時暫停，回來接著播
     "taskbar_progress": True,  # 工作列圖示上顯示播放進度
@@ -106,6 +107,10 @@ def load_config():
         saved = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         cfg["offset"] = float(saved.get("offset", 0))
         cfg["notch"] = bool(saved.get("notch", True))
+        try:
+            cfg["ui_zoom"] = max(70, min(200, int(saved.get("ui_zoom", 100))))
+        except (TypeError, ValueError):
+            cfg["ui_zoom"] = 100
         cfg["theme"] = saved.get("theme") if saved.get("theme") in ("night", "dawn", "mono", "neon", "paper") else "night"
         cfg["music_only"] = bool(saved.get("music_only", True))
         cfg["hotkeys"] = bool(saved.get("hotkeys", True))
@@ -1236,6 +1241,12 @@ async def ws_handler(request):
                 for w in (window, settings_window):
                     if w is not None:
                         threading.Thread(target=apply_window_style, args=(w,), daemon=True).start()
+            elif d.get("type") == "ui_zoom":
+                config["ui_zoom"] = max(70, min(200, int(d.get("value") or 100)))
+                save_config()
+                for w in (window, settings_window):
+                    if w is not None:
+                        apply_zoom(w)
             elif d.get("type") == "chat":
                 for k in ("channel", "bot", "commands"):
                     if k in d:
@@ -1901,6 +1912,25 @@ def wallpaper_loop(w):
 settings_window = None
 
 
+def set_zoom_now(form):
+    """(UI 執行緒) 套用介面大小。"""
+    try:
+        z = config.get("ui_zoom", 100) / 100
+        if abs(form.webview.ZoomFactor - z) > 0.005:
+            form.webview.ZoomFactor = z
+    except Exception as e:
+        print("[zoom]", repr(e), flush=True)
+
+
+def apply_zoom(win):
+    try:
+        from System import Action
+        form = win.native
+        form.BeginInvoke(Action(lambda: set_zoom_now(form)))
+    except Exception as e:
+        print("[zoom]", repr(e))
+
+
 def enable_drag_regions(win):
     """讓網頁裡 CSS `app-region: drag` 的地方變成真的標題列 (WebView2 原生)：拖得動、可以拖到螢幕邊緣貼齊。"""
     try:
@@ -1915,6 +1945,19 @@ def enable_drag_regions(win):
                     form.webview.CoreWebView2.Reload()  # 這個設定要下一次載入頁面才生效 (只會發生一次)
             except Exception as e:
                 print("[drag]", repr(e), flush=True)
+            set_zoom_now(form)
+            if not getattr(form, "_hummi_zoom_hook", False):
+                # Ctrl + 滾輪 / Ctrl + + − 改的大小也記下來
+                def changed(sender, e):
+                    z = int(round(sender.ZoomFactor * 100))
+                    if abs(z - config.get("ui_zoom", 100)) >= 1 and 70 <= z <= 200:
+                        config["ui_zoom"] = z
+                        save_config()
+                        for w in (window, settings_window):  # 主視窗和設定小視窗一起
+                            if w is not None and w.native is not form:
+                                apply_zoom(w)
+                form.webview.ZoomFactorChanged += changed
+                form._hummi_zoom_hook = True
         form.BeginInvoke(Action(go))
     except Exception as e:
         print("[drag]", repr(e))

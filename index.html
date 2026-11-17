@@ -511,6 +511,9 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
     <button data-theme="neon"><span class="sw" style="background:linear-gradient(135deg,#06051a,#1a0b3a)"><b style="background:#ff2bd6"></b><i style="background:#22f0ff;box-shadow:0 0 6px #22f0ff"></i></span>霓虹</button>
     <button data-theme="paper"><span class="sw" style="background:#f1eadb"><b style="background:#2c2116"></b><i style="background:#b0532c"></i></span>紙本</button>
   </div>
+  <h3>介面大小</h3>
+  <div class="seg five" id="zooms"><button data-z="90">小</button><button data-z="100">標準</button><button data-z="115">大</button><button data-z="130">特大</button><button data-z="150">超大</button></div>
+  <p class="hint" style="margin:6px 0 0">字和按鈕一起放大。也可以按住 Ctrl 滾滑鼠滾輪，或 Ctrl + <kbd>+</kbd> / <kbd>−</kbd>，Ctrl + <kbd>0</kbd> 回到標準。</p>
   <h3>字體</h3>
   <button id="font-btn"><span class="fname" id="font-name">預設</span><span class="chev">▾</span></button>
   <div id="font-picker">
@@ -722,6 +725,8 @@ function onState(m){
     renderMonitors(m.monitors);
     renderShare();
     applyTheme(cfg.theme);
+    { const z = cfg.ui_zoom || 100, near = [90, 100, 115, 130, 150].reduce((a, b) => Math.abs(b - z) < Math.abs(a - z) ? b : a);
+      document.querySelectorAll('#zooms [data-z]').forEach(b => b.classList.toggle('on', +b.dataset.z === near)); }
     renderChat(m);
     $('#hotkeys-hint').classList.toggle('warn', !!(m.hotkeys_failed && m.hotkeys_failed.length));
     if (m.hotkeys_failed && m.hotkeys_failed.length) $('#hotkeys-hint').firstChild.textContent = `這幾組被別的程式佔走了：${m.hotkeys_failed.join('、')}。 `;
@@ -1500,6 +1505,7 @@ document.querySelectorAll('#themes [data-theme]').forEach(b => b.onclick = () =>
   themeEdit = 0; applyTheme(b.dataset.theme); themeEdit = performance.now();
   send({type: 'theme', value: b.dataset.theme});
 });
+document.querySelectorAll('#zooms [data-z]').forEach(b => b.onclick = () => send({type: 'ui_zoom', value: +b.dataset.z}));
 // ───── 共享歌詞 ─────
 let shareEdit = 0;
 function renderShare(){
@@ -1579,7 +1585,7 @@ document.querySelectorAll('[data-ap]').forEach(i => i.onchange = () => { apEdit 
 const KEYS_APP = [
   ['播放', [['空白鍵', '播放 / 暫停'], ['Ctrl + →', '下一首'], ['Ctrl + ←', '上一首'], ['↑ / ↓', '音樂音量']]],
   ['歌詞', [['← / →', '歌詞提早 / 延後 0.25 秒'], ['R', '重新找歌詞'], ['Ctrl + F', '手動搜尋歌詞'], ['Ctrl + K', '用一句歌詞找歌']]],
-  ['畫面', [['H', '專注模式 (只看歌詞)'], ['F', '全螢幕'], ['S', '舞台'], ['D', '裝置電量'], ['M', '膠囊模式'], ['T', '視窗置頂'], ['Ctrl + ,', '設定'], ['?', '這個快捷鍵表'], ['Esc', '關閉選單 / 視窗']]],
+  ['畫面', [['H', '專注模式 (只看歌詞)'], ['F', '全螢幕'], ['S', '舞台'], ['D', '裝置電量'], ['M', '膠囊模式'], ['T', '視窗置頂'], ['Ctrl + ,', '設定'], ['Ctrl + + / −', '介面放大 / 縮小'], ['?', '這個快捷鍵表'], ['Esc', '關閉選單 / 視窗']]],
 ];
 const KEYS_GLOBAL = [['Ctrl + Alt + P', '播放 / 暫停'], ['Ctrl + Alt + . / ,', '下一首 / 上一首'], ['Ctrl + Alt + ↑ / ↓', '音樂音量'],
   ['Ctrl + Alt + W', '主視窗 顯示 / 隱藏'], ['Ctrl + Alt + S', '打開舞台']];

@@ -215,7 +215,7 @@ class TextLayer:
 class Overlay:
     def __init__(self, state, config, runtime, save_config):
         self.picker, self.mon_rect = None, None
-        self.alpha, self.fs_at, self.fs_now = 255, 0.0, False
+        self.alpha, self.fs_at, self.fs_now, self.fs_excl = 255, 0.0, False, False
         self.state, self.config, self.runtime, self.save_config = state, config, runtime, save_config
         self.hwnd = None
         self.W = self.H = 0
@@ -488,9 +488,11 @@ class Overlay:
             self.fs_at = now
             import screens
             self.fs_now = screens.fullscreen_app(self.mon_rect, own=[self.hwnd])
+            self.fs_excl = self.fs_now and screens.exclusive_fullscreen()
         mode = self.config["overlay"].get("fullscreen", "dim")
         self.alpha = 120 if (self.fs_now and mode == "dim") else 255
-        return self.fs_now and mode == "hide"
+        # 獨佔全螢幕一定要藏起來：疊不上去，硬疊只會變成一個黑框
+        return self.fs_now and (mode == "hide" or self.fs_excl)
 
     def covered(self, now):
         """主視窗 (沒縮小) 或舞台開著時，它們已經在顯示歌詞了：浮動歌詞先藏起來，避免畫面上同時好幾份歌詞。"""

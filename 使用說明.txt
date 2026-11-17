@@ -1,4 +1,4 @@
-﻿Hummi 哼哼 v1.7.0  (1.4 以前叫 Now Playing Lyrics)
+﻿Hummi 哼哼 v1.7.1  (1.4 以前叫 Now Playing Lyrics)
 即時顯示 Spotify / YouTube Music 正在播放的歌詞，還有可以浮在遊戲上的浮動歌詞。
 
 ────────────────────────
