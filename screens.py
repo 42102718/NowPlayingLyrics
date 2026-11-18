@@ -147,3 +147,95 @@ def fullscreen_app(mon_rect=None, own=()):
     if mon_rect is not None and m["rect"] != tuple(mon_rect):
         return False
     return r.left <= l and r.top <= t and r.right >= rr and r.bottom >= b
+
+
+# ───────────────── 顯示設定變了嗎 (HDR 開關、解析度、螢幕插拔) ─────────────────
+class _LUID(ctypes.Structure):
+    _fields_ = [("LowPart", wt.DWORD), ("HighPart", wt.LONG)]
+
+
+class _PSRC(ctypes.Structure):
+    _fields_ = [("adapterId", _LUID), ("id", ctypes.c_uint32), ("modeInfoIdx", ctypes.c_uint32), ("statusFlags", ctypes.c_uint32)]
+
+
+class _PTGT(ctypes.Structure):
+    _fields_ = [("adapterId", _LUID), ("id", ctypes.c_uint32), ("modeInfoIdx", ctypes.c_uint32), ("outputTechnology", ctypes.c_uint32),
+                ("rotation", ctypes.c_uint32), ("scaling", ctypes.c_uint32), ("refreshRate", ctypes.c_uint32 * 2),
+                ("scanLineOrdering", ctypes.c_uint32), ("targetAvailable", wt.BOOL), ("statusFlags", ctypes.c_uint32)]
+
+
+class _PATH(ctypes.Structure):
+    _fields_ = [("sourceInfo", _PSRC), ("targetInfo", _PTGT), ("flags", ctypes.c_uint32)]
+
+
+class _MODE(ctypes.Structure):
+    _fields_ = [("infoType", ctypes.c_uint32), ("id", ctypes.c_uint32), ("adapterId", _LUID), ("data", ctypes.c_byte * 48)]
+
+
+class _HDR(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_uint32), ("size", ctypes.c_uint32), ("adapterId", _LUID), ("id", ctypes.c_uint32)]
+
+
+class _ADV(ctypes.Structure):
+    _fields_ = [("header", _HDR), ("value", ctypes.c_uint32), ("colorEncoding", ctypes.c_uint32), ("bitsPerColorChannel", ctypes.c_uint32)]
+
+
+_dll_user32 = ctypes.WinDLL("user32")  # 自己的一份，不動到其他模組共用的宣告
+
+
+class Healer:
+    """透明視窗自我修復：有些顯示卡 (特別是雙顯卡 + HDR) 在開別的程式時會把透明視窗畫壞，
+    透明的地方變成黑色、黑色變成灰色。定期看一下自己在畫面上的樣子，壞了就重建視窗。
+    背景剛好是全黑時會誤判：重建過還是一樣就先停 5 分鐘，不會一直重建。"""
+
+    def __init__(self, every=5.0):
+        self.every, self.at, self.bad, self.last_fix, self.pause_until = every, 0.0, 0, 0.0, 0.0
+
+    def due(self, now):
+        if now < self.pause_until or now - self.at < self.every:
+            return False
+        self.at = now
+        return True
+
+    def report(self, broken, now):
+        """回傳 True = 該重建了。"""
+        if not broken:
+            self.bad = 0
+            return False
+        self.bad += 1
+        if self.bad < 2:  # 連續兩次都壞才算 (避免剛好換畫面)
+            return False
+        self.bad = 0
+        if now - self.last_fix < 20:  # 重建完馬上又壞：多半是背景本來就黑，先別管
+            self.pause_until = now + 300
+            return False
+        self.last_fix = now
+        return True
+
+
+def grab_points(rect, points):
+    """抓畫面上幾個點的顏色 (rect = 視窗位置；points = 視窗內座標)。"""
+    from PIL import ImageGrab
+    l, t, r, b = rect
+    img = ImageGrab.grab(bbox=(l, t, r, b), all_screens=True)
+    return [img.getpixel((min(max(x, 0), img.width - 1), min(max(y, 0), img.height - 1)))[:3] for x, y in points]
+
+
+def display_signature():
+    """每個螢幕的位置大小 + HDR 開 / 關。遊戲開啟時常常會把螢幕切到 HDR：
+    之前建立的透明視窗 (浮動歌詞、膠囊) 在那之後會整個變成黑框，要重新建立視窗才會好。"""
+    sig = [m["rect"] for m in monitors()]
+    try:
+        u = _dll_user32
+        n_p, n_m = ctypes.c_uint32(), ctypes.c_uint32()
+        if u.GetDisplayConfigBufferSizes(2, ctypes.byref(n_p), ctypes.byref(n_m)) == 0:
+            paths, modes = (_PATH * n_p.value)(), (_MODE * n_m.value)()
+            if u.QueryDisplayConfig(2, ctypes.byref(n_p), paths, ctypes.byref(n_m), modes, None) == 0:
+                for p in paths[:n_p.value]:
+                    a = _ADV()
+                    a.header = _HDR(9, ctypes.sizeof(_ADV), p.targetInfo.adapterId, p.targetInfo.id)
+                    if u.DisplayConfigGetDeviceInfo(ctypes.byref(a)) == 0:
+                        sig.append((p.targetInfo.id, bool(a.value & 2), a.bitsPerColorChannel))
+    except Exception:
+        pass
+    return tuple(sig)

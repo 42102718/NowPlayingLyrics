@@ -41,7 +41,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.7.1"
+VERSION = "1.7.3"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -1161,6 +1161,8 @@ async def ws_handler(request):
             d = json.loads(msg.data)
             if d.get("type") == "hello":
                 print("[page]", d, flush=True)
+                if d.get("app"):  # 打開主視窗時：超過 10 分鐘沒檢查就再看一次有沒有新版
+                    asyncio.create_task(check_update(min_gap=600))
                 if d.get("stage"):  # 舞台頁面 (Hummi 舞台視窗 / OBS)：要即時音量
                     stage_clients.add(ws)
             elif d.get("type") == "pin":
@@ -1366,8 +1368,8 @@ def init_whatsnew():
             save_config()
 
 
-async def check_update(force=False):
-    if not force and (not config.get("auto_update", True) or time.time() - UPDATE["checked"] < 3600):
+async def check_update(force=False, min_gap=3600):
+    if not force and (not config.get("auto_update", True) or time.time() - UPDATE["checked"] < min_gap):
         return
     UPDATE["checked"] = time.time()
     try:
@@ -1401,7 +1403,7 @@ async def update_loop():
     await asyncio.sleep(20)
     while True:
         await check_update()
-        await asyncio.sleep(6 * 3600)
+        await asyncio.sleep(3600)  # 每小時看一次 (以前 6 小時，朋友發了新版要等太久)
 
 
 async def install_update():
@@ -2523,6 +2525,14 @@ def main():
     global window
     init_share()
     set_dpi_awareness()
+    try:
+        # 程式忙的時候 (電腦在跑遊戲、開別的程式)，膠囊 / 浮動歌詞的執行緒可能幾秒沒回應，
+        # Windows 就會蓋一個「沒有回應」的殘影視窗在上面：透明視窗的殘影是一整塊黑框，而且常常不會消失。
+        # 這兩個視窗不需要那個殘影，整個關掉。
+        import ctypes
+        ctypes.windll.user32.DisableProcessWindowsGhosting()
+    except Exception:
+        pass
     if "--ai-selftest" in sys.argv:  # 檢查 AI 元件：下載 (需要時)、載入模型、跑一次辨識，結果寫在 app.log
         import ai_lyrics
         import numpy as np

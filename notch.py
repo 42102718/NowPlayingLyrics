@@ -172,6 +172,8 @@ class Notch:
         self.last_frame = time.perf_counter()
         self.last_topmost = self.last_fs_check = 0.0
         self.picker, self.mon_rect = None, None
+        self.disp_sig, self.disp_at = None, 0.0
+        self.healer = None
         self.fullscreen = False
         # 時鐘
         self.anchor_pos, self.anchor_at, self.playing, self.track_id = 0.0, time.perf_counter(), False, None
@@ -209,7 +211,8 @@ class Notch:
     def create(self):
         self.setup_scale(user32.GetDpiForSystem() / 96 if hasattr(user32, "GetDpiForSystem") else 1.0)
         hinst = kernel32.GetModuleHandleW(None)
-        self._wndproc = WNDPROC(self.wndproc)
+        if not hasattr(self, "_wndproc"):  # 視窗類別只註冊一次 (重建視窗時沿用)
+            self._wndproc = WNDPROC(self.wndproc)
         wc = WNDCLASSEXW()
         wc.cbSize = ctypes.sizeof(WNDCLASSEXW)
         wc.lpfnWndProc = self._wndproc
@@ -227,6 +230,55 @@ class Notch:
         sw = user32.GetSystemMetrics(0)  # 主螢幕寬
         self.x, self.y = (sw - self.W) // 2, 0
         self.make_ears()
+
+    def recreate(self):
+        """顯示設定變了 (例如遊戲把螢幕切到 HDR)：重建膠囊視窗，不然透明的地方會變黑。"""
+        old = self.hwnd
+        if self.dib:
+            gdi32.DeleteObject(self.dib)
+        gdi32.DeleteDC(self.mem_dc)
+        user32.ReleaseDC(None, self.screen_dc)
+        self.create()
+        user32.DestroyWindow(old)
+        self.visible_win = False
+        self.mon_rect = None
+        self.last_fs_check = 0.0
+        self.static_sig = None
+        self.picker = None
+        print("[notch] 膠囊視窗已重建", flush=True)
+
+    def heal_check(self, now):
+        """收起來的膠囊上緣兩側一定是純黑；畫面上變灰 = 被顯示卡畫壞了，重建視窗。"""
+        if self.healer is None:
+            import screens
+            self.healer = screens.Healer()
+        if self.expanded or self.exk > 0.01 or self.activity or not self.visible_win or not self.dib_size[0]:
+            return
+        if not self.healer.due(now):
+            return
+        try:
+            import screens
+            w, h = self.dib_size
+            x0 = self.x + (self.W - w) // 2
+            e = self.pill_left
+            pts = [(e + self.px(4), 2), (e + self.px(10), 3), (w - e - self.px(5), 2), (w - e - self.px(11), 3)]
+            px = screens.grab_points((x0, self.y, x0 + w, self.y + h), pts)
+            broken = all(min(c) >= 60 for c in px)
+            if self.healer.report(broken, now):
+                print("[notch] 膠囊被畫成灰色了，重建視窗", flush=True)
+                self.recreate()
+        except Exception as e:
+            print("[notch] heal", repr(e), flush=True)
+
+    def check_display(self, now):
+        if now - self.disp_at < 2:
+            return
+        self.disp_at = now
+        import screens
+        sig = screens.display_signature()
+        if self.disp_sig is not None and sig != self.disp_sig:
+            self.recreate()
+        self.disp_sig = sig
 
     def wndproc(self, hwnd, msg, wp, lp):
         if msg == WM_MOUSEACTIVATE:
@@ -1018,6 +1070,7 @@ class Notch:
                 user32.DispatchMessageW(ctypes.byref(msg))
             delay = 0.25
             try:
+                self.check_display(t0)
                 self.check_fullscreen(t0)
                 want = bool(self.config.get("notch")) and not self.fullscreen
                 if not want:
@@ -1116,6 +1169,7 @@ class Notch:
         if moving or playing or sig != self.static_sig:
             self.static_sig = sig
             self.present(self.render(t, pos, now))
+        self.heal_check(now)
         if moving and (abs(self.vw) > 2 or abs(self.vh) > 2 or 0 < self.exk < 1):
             return 1 / 60
         if moving or (playing and (self.expanded or act)):

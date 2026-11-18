@@ -17,7 +17,7 @@ import time
 
 user32 = ctypes.windll.user32
 comctl32 = ctypes.windll.comctl32
-gdi32 = ctypes.windll.gdi32
+gdi32 = ctypes.WinDLL("gdi32")  # 自己的一份：下面會改函式宣告，不要影響浮動歌詞 / 膠囊用的共用宣告
 shell32 = ctypes.windll.shell32
 gdi32.DeleteObject.argtypes = [wt.HANDLE]
 

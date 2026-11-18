@@ -240,6 +240,21 @@ body.ui #gear,body.ui #home{opacity:1}
   background:rgba(0,0,0,.45);opacity:0;transition:opacity .4s;pointer-events:none}
 body.ui #hint.show{opacity:1}
 body.obs #gear,body.obs #home,body.obs #panel,body.obs #hint{display:none!important}
+/* 音樂控制列 (滑鼠一動才出現；OBS 不會出現) */
+#ctl{position:fixed;left:50%;bottom:22px;transform:translate(-50%,12px);z-index:20;display:flex;align-items:center;gap:6px;padding:8px 12px;
+  border-radius:999px;background:rgba(16,16,26,.72);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(20px) saturate(1.4);
+  box-shadow:0 16px 50px rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
+body.ui #ctl{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#ctl button{width:42px;height:42px;border-radius:50%;border:0;background:none;color:#fff;cursor:pointer;display:grid;place-items:center;
+  font:20px "Segoe Fluent Icons","Segoe MDL2 Assets";transition:background .15s,transform .15s}
+#ctl button:hover{background:rgba(255,255,255,.12)}
+#ctl #c-play{width:50px;height:50px;background:#fff;color:#111;font-size:22px}
+#ctl #c-play:hover{transform:scale(1.06);background:#fff}
+#ctl .bar{width:min(36vw,420px);display:flex;align-items:center;gap:10px;margin:0 6px;font:600 12px "Noto Sans TC",sans-serif;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
+#ctl .track{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.18);cursor:pointer;position:relative}
+#ctl .track i{position:absolute;inset:0 auto 0 0;border-radius:3px;background:#fff;width:0}
+#ctl .vol{display:flex;align-items:center;gap:2px}
+body.obs #ctl{display:none!important}
 @media (prefers-reduced-motion:reduce){.ln,.w{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -254,6 +269,13 @@ body.obs #gear,body.obs #home,body.obs #panel,body.obs #hint{display:none!import
 <div id="card"><img id="card-img" alt=""><div><div class="t" id="card-t"></div><div class="a" id="card-a"></div><div class="bar"><i id="card-bar"></i></div></div></div>
 <div id="hint">移動滑鼠顯示設定 · 按 F 全螢幕</div>
 <button id="home" title="回主視窗">⌂</button>
+<div id="ctl">
+  <button id="c-prev" title="上一首 (Ctrl + ←)">&#xF8AC;</button>
+  <button id="c-play" title="播放 / 暫停 (空白鍵)">&#xF5B0;</button>
+  <button id="c-next" title="下一首 (Ctrl + →)">&#xF8AD;</button>
+  <div class="bar"><span id="c-cur">0:00</span><div class="track" id="c-track"><i></i></div><span id="c-dur">0:00</span></div>
+  <div class="vol"><button id="c-vdown" title="音樂音量 − (↓)">&#xE993;</button><button id="c-vup" title="音樂音量 + (↑)">&#xE995;</button></div>
+</div>
 <button id="gear" title="舞台設定">⚙</button>
 <aside id="panel">
   <h2>舞台設定 <button id="p-close" aria-label="關閉">×</button></h2>
@@ -367,6 +389,39 @@ function onState(m){
   if (t.has_art && !artLoaded) loadArt(t);
 }
 let pendingLyr = null;
+// ───── 音樂控制列 ─────
+const sendWs = m => { try { ws.readyState === 1 && ws.send(JSON.stringify(m)); } catch {} };
+const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+$('#c-play').onclick = e => { e.stopPropagation(); sendWs({type: 'toggle'}); };
+$('#c-prev').onclick = e => { e.stopPropagation(); sendWs({type: 'prev'}); };
+$('#c-next').onclick = e => { e.stopPropagation(); sendWs({type: 'next'}); };
+$('#c-vup').onclick = e => { e.stopPropagation(); sendWs({type: 'volume', delta: .05}); };
+$('#c-vdown').onclick = e => { e.stopPropagation(); sendWs({type: 'volume', delta: -.05}); };
+$('#ctl').addEventListener('click', e => e.stopPropagation());
+$('#c-track').onclick = e => {
+  e.stopPropagation();
+  const dur = track && track.duration; if (!dur) return;
+  const r = e.currentTarget.getBoundingClientRect(), t = (e.clientX - r.left) / r.width * dur;
+  sendWs({type: 'seek', t}); anchorPos = t; anchorAt = performance.now();
+};
+function ctlTick(){
+  if (!OBS){
+    const dur = (track && track.duration) || 0, cur = Math.min(now(), dur || now());
+    $('#c-play').innerHTML = playing ? '&#xF8AE;' : '&#xF5B0;';
+    $('#c-cur').textContent = fmt(cur); $('#c-dur').textContent = fmt(dur);
+    $('#c-track i').style.width = dur ? (cur / dur * 100).toFixed(2) + '%' : '0';
+  }
+  setTimeout(ctlTick, 250);
+}
+ctlTick();
+addEventListener('keydown', e => {
+  if (OBS || e.target.closest?.('input,select,textarea')) return;
+  if (e.key === ' '){ e.preventDefault(); sendWs({type: 'toggle'}); }
+  else if (e.ctrlKey && e.key === 'ArrowRight'){ e.preventDefault(); sendWs({type: 'next'}); }
+  else if (e.ctrlKey && e.key === 'ArrowLeft'){ e.preventDefault(); sendWs({type: 'prev'}); }
+  else if (e.key === 'ArrowUp'){ e.preventDefault(); sendWs({type: 'volume', delta: .05}); }
+  else if (e.key === 'ArrowDown'){ e.preventDefault(); sendWs({type: 'volume', delta: -.05}); }
+});
 function onLyrics(m){
   if (m.loading) return;
   if (!track || m.track_id !== track.track_id){ pendingLyr = m; return; }

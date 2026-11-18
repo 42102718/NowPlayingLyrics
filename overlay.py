@@ -216,6 +216,8 @@ class Overlay:
     def __init__(self, state, config, runtime, save_config):
         self.picker, self.mon_rect = None, None
         self.alpha, self.fs_at, self.fs_now, self.fs_excl = 255, 0.0, False, False
+        self.disp_sig, self.disp_at = None, 0.0
+        self.healer, self.last_img = None, None
         self.state, self.config, self.runtime, self.save_config = state, config, runtime, save_config
         self.hwnd = None
         self.W = self.H = 0
@@ -242,7 +244,8 @@ class Overlay:
         # DPI 感知已在 server.main() 一開始設定好 (要在任何視窗建立前)
         self.scale = user32.GetDpiForSystem() / 96 if hasattr(user32, "GetDpiForSystem") else 1.0
         hinst = kernel32.GetModuleHandleW(None)
-        self._wndproc = WNDPROC(self.wndproc)
+        if not hasattr(self, "_wndproc"):  # 視窗類別只註冊一次 (重建視窗時沿用，舊的回呼不能被回收)
+            self._wndproc = WNDPROC(self.wndproc)
         wc = WNDCLASSEXW()
         wc.cbSize = ctypes.sizeof(WNDCLASSEXW)
         wc.lpfnWndProc = self._wndproc
@@ -258,6 +261,57 @@ class Overlay:
             user32.RegisterHotKey(self.hwnd, i + 1, mod | MOD_NOREPEAT, vk)
         self.screen_dc = user32.GetDC(None)
         self.mem_dc = gdi32.CreateCompatibleDC(self.screen_dc)
+
+    def recreate(self):
+        """顯示設定變了 (例如遊戲把螢幕切到 HDR)：整個視窗重建，不然透明的地方會變成黑框。"""
+        old = self.hwnd
+        for i in range(1, 5):
+            user32.UnregisterHotKey(old, i)
+        if self.dib:
+            gdi32.DeleteObject(self.dib)
+        gdi32.DeleteDC(self.mem_dc)
+        user32.ReleaseDC(None, self.screen_dc)
+        self.dib, self.W, self.H = None, 0, 0
+        self.create()
+        user32.DestroyWindow(old)
+        self.visible_win = False
+        self.set_clickthrough(not self.unlocked)
+        self.mon_rect = None
+        self.layout()
+        self.prev_block = None
+        print("[overlay] 浮動歌詞視窗已重建", flush=True)
+
+    def heal_check(self, now):
+        if self.healer is None:
+            import screens
+            self.healer = screens.Healer()
+        if self.last_img is None or not self.visible_win or not self.healer.due(now):
+            return
+        try:
+            import screens
+            a = self.last_img.getchannel("A")
+            w, h = a.size
+            pts = [(int(w * fx), int(h * fy)) for fx in (0.03, 0.2, 0.4, 0.6, 0.8, 0.97) for fy in (0.06, 0.5, 0.94)]
+            pts = [p for p in pts if a.getpixel(p) == 0][:12]  # 只看我們畫成全透明的點
+            if len(pts) < 4:
+                return
+            px = screens.grab_points((self.x, self.y, self.x + self.W, self.y + self.H), pts)
+            broken = all(max(c) <= 2 for c in px)
+            if self.healer.report(broken, now):
+                print("[overlay] 透明的地方變成黑框了，重建視窗", flush=True)
+                self.recreate()
+        except Exception as e:
+            print("[overlay] heal", repr(e), flush=True)
+
+    def check_display(self, now):
+        if now - self.disp_at < 2:
+            return
+        self.disp_at = now
+        import screens
+        sig = screens.display_signature()
+        if self.disp_sig is not None and sig != self.disp_sig:
+            self.recreate()
+        self.disp_sig = sig
 
     def wndproc(self, hwnd, msg, wp, lp):
         if msg == WM_NCHITTEST and self.unlocked:
@@ -519,6 +573,7 @@ class Overlay:
                 user32.TranslateMessage(ctypes.byref(msg))
                 user32.DispatchMessageW(ctypes.byref(msg))
             try:
+                self.check_display(t0)
                 self.sync_config()
                 if self.moved:
                     self.commit_drag()
@@ -529,7 +584,9 @@ class Overlay:
                 want = self.config["overlay"]["enabled"] and not self.hidden_by_hotkey and (t is not None or self.unlocked) \
                     and not (self.covered(t0) and not self.unlocked) and not (self.game_mode(t0) and not self.unlocked)
                 if want:
-                    self.present(self.render(t, pos))
+                    self.last_img = self.render(t, pos)
+                    self.present(self.last_img)
+                    self.heal_check(t0)
                     if t0 - self.last_topmost > 1.5:  # 有些遊戲會搶最上層，定期搶回來
                         user32.SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
                         self.last_topmost = t0
