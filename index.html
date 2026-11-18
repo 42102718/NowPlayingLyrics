@@ -546,9 +546,6 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
     </div>
   </div>
   <label class="row">顯示在 <select class="mon-select" data-mon="overlay"></select></label>
-  <div class="row col" title="遊戲、影片或簡報全螢幕的時候">全螢幕遊戲時
-    <div class="seg" id="ov-fs"><button data-fs="normal">照常顯示</button><button data-fs="dim">變淡</button><button data-fs="hide">先藏起來</button></div>
-  </div>
   <div class="row col"><div class="row" style="border:0;padding:0">文字大小 <output id="o-font_size"></output></div><input type="range" min="18" max="80" step="1" data-k="font_size"></div>
   <div class="row col"><div class="row" style="border:0;padding:0">寬度 <output id="o-width"></output></div><input type="range" min="400" max="1800" step="20" data-k="width"></div>
   <div class="row col"><div class="row" style="border:0;padding:0">背景深度 <output id="o-bg_opacity"></output></div><input type="range" min="0" max="90" step="5" data-k="bg_opacity"></div>
@@ -561,7 +558,6 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
   <h3>AI 歌詞</h3>
   <p class="hint">四個歌詞來源都沒有同步歌詞時，AI 會聽正在播放的聲音：沒有歌詞就邊聽邊寫，有歌詞沒時間就自動對時。聽完整首後會存起來，下次播放就完全同步。</p>
   <label class="row">啟用 AI 歌詞 <span class="switch"><input type="checkbox" data-aik="enabled"><span></span></span></label>
-  <label class="row" title="AI 只錄播放器的聲音，不會錄到遊戲；這個選項是為了不占用遊戲的顯示卡效能">玩全螢幕遊戲時暫停（省效能） <span class="switch"><input type="checkbox" data-aik="pause_fullscreen"><span></span></span></label>
   <div id="ai-status"></div>
   <h3>和朋友共享歌詞</h3>
   <p class="hint">你和朋友選同一個雲端硬碟的共用資料夾 (OneDrive、Google 雲端硬碟、Dropbox 都可以)。AI 聽完的歌詞、你手動選好的歌詞會自動放一份進去，朋友播同一首歌時直接用，AI 不用再聽一次。</p>
@@ -596,6 +592,28 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
   <h3>膠囊</h3>
   <label class="row">螢幕頂端的膠囊 <span class="switch"><input type="checkbox" id="notch-on"><span></span></span></label>
   <label class="row">顯示在 <select class="mon-select" data-mon="notch"></select></label>
+  <div class="row col" title="膠囊右邊要放什麼">膠囊右邊顯示
+    <div class="seg" id="notch-right" style="grid-template-columns:repeat(2,1fr)"><button data-cat="1">😺 哼哼貓 (會跟著音樂點頭)</button><button data-cat="0">▮▮▮ 音量條 (跟著音樂跳)</button></div>
+  </div>
+  <div class="row col" title="膠囊的樣子">形狀
+    <div class="seg" id="notch-shape" style="grid-template-columns:repeat(3,1fr)"><button data-shape="island">動態島</button><button data-shape="float">浮動膠囊</button><button data-shape="bar">極簡細條</button></div>
+  </div>
+  <div class="row col" title="膠囊的底色 (字一直都是白色)">顏色
+    <div class="seg" id="notch-color" style="grid-template-columns:repeat(3,1fr)"><button data-color="black">黑色</button><button data-color="album">專輯色</button><button data-color="theme">跟著風格</button></div>
+  </div>
+  <p class="hint" style="margin:4px 0 0">動態島貼在螢幕上緣；浮動膠囊離上緣一點點、有影子；極簡細條平常只是一條播放進度，滑鼠移上去才展開。</p>
+  <label class="row" title="網路斷超過 6 秒時膠囊會提醒，恢復時也會說一聲">網路斷線提醒 <span class="switch"><input type="checkbox" id="net-alert"><span></span></span></label>
+  <h3>遊戲模式</h3>
+  <p class="hint">玩全螢幕遊戲、看全螢幕影片時，Hummi 自動退到一邊，不擋畫面、不搶效能。</p>
+  <label class="row">遊戲模式 <span class="switch"><input type="checkbox" id="game-on"><span></span></span></label>
+  <div class="row col" data-game>浮動歌詞
+    <div class="seg" id="ov-fs"><button data-fs="normal">照常顯示</button><button data-fs="dim">變淡</button><button data-fs="hide">先藏起來</button></div>
+  </div>
+  <div class="row col" data-game title="無邊框視窗的遊戲才看得到；獨佔全螢幕的遊戲 Windows 不允許任何視窗疊上去">膠囊
+    <div class="seg" id="game-notch"><button data-gn="show">照常顯示</button><button data-gn="alerts">只彈重要提醒</button><button data-gn="hide">完全藏起來</button></div>
+  </div>
+  <label class="row" data-game title="AI 只錄播放器的聲音，不會錄到遊戲；這個選項是為了不占用遊戲的顯示卡效能">AI 歌詞先暫停（省效能） <span class="switch"><input type="checkbox" data-aik="pause_fullscreen"><span></span></span></label>
+  <p class="hint" style="margin:4px 0 0">重要提醒：計時器時間到、網路斷線、裝置快沒電。</p>
   <h3>視窗</h3>
   <label class="row" title="工作列的 Hummi 圖示上顯示這首歌播到哪 (暫停時變黃色)">工作列顯示播放進度 <span class="switch"><input type="checkbox" id="tb-progress"><span></span></span></label>
   <h3>自動暫停</h3>
@@ -721,6 +739,15 @@ function onState(m){
     if (performance.now() - hotkeysEdit > 1500) $('#hotkeys-on').checked = cfg.hotkeys !== false;
     if (performance.now() - apEdit > 1500) document.querySelectorAll('[data-ap]').forEach(i => i.checked = (cfg.auto_pause || {})[i.dataset.ap] !== false);
     if (performance.now() - apEdit > 1500){ $('#tb-progress').checked = cfg.taskbar_progress !== false; $('#notch-on').checked = cfg.notch !== false;
+      $('#net-alert').checked = cfg.net_alert !== false;
+      const ns = cfg.notch_style || {};
+      document.querySelectorAll('#notch-shape [data-shape]').forEach(b => b.classList.toggle('on', b.dataset.shape === (ns.shape || 'island')));
+      document.querySelectorAll('#notch-color [data-color]').forEach(b => b.classList.toggle('on', b.dataset.color === (ns.color || 'black')));
+      const catOn = (cfg.notch_opts || {}).cat !== false;
+      document.querySelectorAll('#notch-right [data-cat]').forEach(b => b.classList.toggle('on', (b.dataset.cat === '1') === catOn));
+      const gm = cfg.game || {}; $('#game-on').checked = gm.enabled !== false;
+      document.querySelectorAll('[data-game]').forEach(r => r.classList.toggle('disabled', gm.enabled === false));
+      document.querySelectorAll('#game-notch [data-gn]').forEach(b => b.classList.toggle('on', b.dataset.gn === (gm.notch || 'alerts')));
       $('#wp-on').checked = !!(cfg.wallpaper || {}).enabled; }
     renderMonitors(m.monitors);
     renderShare();
@@ -756,7 +783,8 @@ function onState(m){
   }
   playing = t.playing; duration = t.duration;
   if (changed) onTrackChange(t);
-  if (t.has_art && !$('#cover').dataset.loaded) loadArt(t);
+  if (t.has_art && $('#cover').dataset.loaded !== String(t.art_v || 1)) loadArt(t);  // 封面換了 (網頁播放器真正的封面晚到)
+  else if (!t.has_art && $('#cover').dataset.loaded) { $('#cover').dataset.loaded = ''; setArt(null); }
   $('#cover-wrap').classList.toggle('paused', !playing);
   const src = $('#source');
   src.classList.toggle('paused', !playing);
@@ -778,8 +806,8 @@ function onTrackChange(t){
 
 function loadArt(t){
   if (!t.has_art) return;
-  $('#cover').dataset.loaded = '1';
-  setArt(`/art?id=${encodeURIComponent(t.track_id)}`);
+  $('#cover').dataset.loaded = String(t.art_v || 1);
+  setArt(`/art?id=${encodeURIComponent(t.track_id)}&v=${t.art_v || 0}`);
 }
 
 function setArt(url){
@@ -1556,6 +1584,17 @@ function renderChat(m){
 // ───── 快捷鍵 ─────
 let hotkeysEdit = 0, apEdit = 0, monitors = [];
 $('#wp-on').onchange = e => { apEdit = performance.now(); send({type: 'wallpaper', enabled: e.target.checked}); };
+$('#net-alert').onchange = e => { apEdit = performance.now(); send({type: 'net_alert', value: e.target.checked}); };
+for (const [id, k] of [['notch-shape', 'shape'], ['notch-color', 'color']])
+  document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => { apEdit = performance.now();
+    send({type: 'notch_style', [k]: b.dataset[k]});
+    document.querySelectorAll(`#${id} button`).forEach(x => x.classList.toggle('on', x === b)); });
+document.querySelectorAll('#notch-right [data-cat]').forEach(b => b.onclick = () => { apEdit = performance.now();
+  send({type: 'notch_opt', key: 'cat', value: b.dataset.cat === '1'});
+  document.querySelectorAll('#notch-right [data-cat]').forEach(x => x.classList.toggle('on', x === b)); });
+$('#game-on').onchange = e => { apEdit = performance.now(); send({type: 'game', enabled: e.target.checked}); };
+document.querySelectorAll('#game-notch [data-gn]').forEach(b => b.onclick = () => { apEdit = performance.now(); send({type: 'game', notch: b.dataset.gn});
+  document.querySelectorAll('#game-notch [data-gn]').forEach(x => x.classList.toggle('on', x === b)); });
 $('#tb-progress').onchange = e => { apEdit = performance.now(); send({type: 'taskbar_progress', value: e.target.checked}); };
 $('#notch-on').onchange = e => { apEdit = performance.now(); send({type: 'notch_set', value: e.target.checked}); };
 panel.querySelectorAll('#ov-fs [data-fs]').forEach(b => b.onclick = () => patch({fullscreen: b.dataset.fs}));

@@ -37,6 +37,16 @@ WIN_W, WIN_H = 640, 236          # 視窗本身 (最大展開 + 邊緣)
 MIN_W, MAX_W, PILL_H = 196, 560, 36
 EXP_W, EXP_H, DEV_ROW = 460, 186, 36
 EAR = 10                         # 頂端兩側往外彎的小弧
+FLOAT_GAP = 6                    # 浮動膠囊離螢幕上緣多遠 (dp)
+BAR_W, BAR_H = 220, 6            # 極簡細條收起來的大小 (dp)
+# 跟著主題：(底色, 邊框)；字一律是白的，所以底色都要夠深
+THEME_FILL = {
+    "night": ((24, 16, 48), (150, 120, 255, 80)),
+    "dawn": ((46, 52, 70), (215, 222, 240, 130)),
+    "mono": ((0, 0, 0), (255, 255, 255, 70)),
+    "neon": ((10, 8, 34), (34, 240, 255, 170)),
+    "paper": ((60, 44, 30), (240, 226, 196, 140)),
+}
 FILL = (0, 0, 0, 255)
 
 GREEN, AMBER, RED = (48, 209, 88), (255, 176, 32), (255, 69, 58)
@@ -46,13 +56,17 @@ GLYPH = {"play": "", "pause": "", "prev": "", "next": "", "window": 
          "headphones": "", "controller": "", "mouse": "", "keyboard": "", "phone": "",
          "laptop": "", "speaker": "", "device": "", "pen": "", "bluetooth": "",
          "vol0": "", "vol1": "", "vol2": "", "vol3": "", "charging": "",
-         "settings": "", "back": "", "chevron": "", "download": "", "star": ""}
+         "settings": "", "back": "", "chevron": "", "download": "", "star": "",
+         "timer": "\uE916", "wifi": "\uE701", "wifi_off": "\uEB5E", "bell": "\uEA8F"}
 
 # 膠囊裡的設定頁：(key, 標籤)
-SETTINGS = [("peek", "換歌時彈出"), ("spectrum", "真實頻譜光暈"), ("battery", "裝置電量"), ("gestures", "滾輪 / 滑動手勢"),
+SETTINGS = [("cat", "哼哼貓 (關 = 音量條)"), ("peek", "換歌時彈出"), ("spectrum", "真實頻譜光暈"), ("battery", "裝置電量"), ("gestures", "滾輪 / 滑動手勢"),
             ("overlay", "浮動歌詞"), ("ai", "AI 歌詞"), ("folia", "送到 Folia 舞台"), ("autostart", "開機自動啟動")]
 
-DEFAULT_OPTS = {"battery": True, "peek": True, "spectrum": True, "gestures": True}
+DEFAULT_OPTS = {"battery": True, "peek": True, "spectrum": True, "gestures": True, "cat": True}
+TIMER_PRESETS = (1, 3, 5, 10, 15, 25, 30, 45, 60)  # 分鐘
+URGENT = ("timer", "net_off", "net_on", "low")      # 遊戲中也要彈出來的提醒
+ORANGE = (255, 159, 10)
 
 
 def clamp(x, a, b):
@@ -148,6 +162,84 @@ def rounded(img, radius):
     return img
 
 
+_cat_cache = {}
+
+
+def cat_sprite(size, mood):
+    """膠囊裡的哼哼貓 (果凍質感，戴耳機)。mood：happy 瞇眼笑 / sleep 睡覺 / open 睜眼。"""
+    size = max(8, int(size))
+    key = (size, mood)
+    if key in _cat_cache:
+        return _cat_cache[key]
+    N = size * 4  # 先畫大再縮小，邊緣才平滑
+    P = lambda x, y: (x * N, y * N)
+    img = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    # 耳機頭帶 (在頭後面)
+    d.arc((*P(0.10, 0.16), *P(0.90, 0.98)), start=198, end=342, fill=(92, 60, 190, 255), width=int(N * 0.075))
+    # 頭 + 耳朵 的形狀
+    shape = Image.new("L", (N, N), 0)
+    sd = ImageDraw.Draw(shape)
+    sd.ellipse((*P(0.11, 0.28), *P(0.89, 0.92)), fill=255)
+    for sx in (0, 1):
+        f = (lambda x: x) if sx == 0 else (lambda x: 1 - x)
+        sd.polygon([P(f(0.15), 0.50), P(f(0.21), 0.13), P(f(0.44), 0.33)], fill=255)
+    shape = shape.filter(ImageFilter.GaussianBlur(N * 0.012)).point(lambda v: 255 if v > 120 else 0)
+    # 果凍：紫 → 粉的漸層，中間亮一點
+    grad = Image.linear_gradient("L").rotate(-35, expand=False).resize((N, N))
+    c0, c1 = (176, 128, 255), (255, 128, 214)
+    body = Image.merge("RGB", [grad.point(lambda v, a=a, b=b: int(a + (b - a) * v / 255)) for a, b in zip(c0, c1)]).convert("RGBA")
+    glow = Image.new("L", (N, N), 0)
+    ImageDraw.Draw(glow).ellipse((*P(0.28, 0.40), *P(0.72, 0.84)), fill=90)
+    body.alpha_composite(Image.merge("RGBA", [Image.new("L", (N, N), 255)] * 3 + [glow.filter(ImageFilter.GaussianBlur(N * 0.08))]))
+    body.putalpha(shape.point(lambda v: v * 245 // 255))
+    img.alpha_composite(body)
+    # 耳朵內側 (另外一層再疊上去：直接畫半透明會把底下的貓挖空)
+    ears = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    ed = ImageDraw.Draw(ears)
+    for sx in (0, 1):
+        f = (lambda x: x) if sx == 0 else (lambda x: 1 - x)
+        ed.polygon([P(f(0.20), 0.44), P(f(0.225), 0.22), P(f(0.37), 0.35)], fill=(255, 182, 222, 200))
+    img.alpha_composite(ears.filter(ImageFilter.GaussianBlur(N * 0.006)))
+    # 邊緣亮一圈 (果凍的反光)
+    edge = ImageChops.subtract(shape, shape.filter(ImageFilter.MinFilter(max(3, (N // 40) | 1))))
+    img.alpha_composite(Image.merge("RGBA", [Image.new("L", (N, N), 255)] * 3 + [edge.point(lambda v: v * 140 // 255)]))
+    # 左上的高光
+    hl = Image.new("L", (N, N), 0)
+    ImageDraw.Draw(hl).ellipse((*P(0.22, 0.34), *P(0.46, 0.46)), fill=200)
+    img.alpha_composite(Image.merge("RGBA", [Image.new("L", (N, N), 255)] * 3 + [hl.filter(ImageFilter.GaussianBlur(N * 0.025))]))
+    # 耳罩
+    for sx in (0, 1):
+        x0 = 0.02 if sx == 0 else 0.80
+        d.rounded_rectangle((*P(x0, 0.50), *P(x0 + 0.18, 0.80)), radius=N * 0.07, fill=(120, 84, 230, 255))
+        d.rounded_rectangle((*P(x0 + 0.04, 0.55), *P(x0 + 0.14, 0.75)), radius=N * 0.04, fill=(255, 140, 205, 255))
+    # 眼睛
+    ink = (70, 30, 120, 255)
+    lw = max(2, int(N * 0.045))
+    for cx in (0.355, 0.645):
+        if mood == "happy":    # ∩ 瞇眼笑
+            d.arc((*P(cx - 0.075, 0.55), *P(cx + 0.075, 0.69)), start=200, end=340, fill=ink, width=lw)
+        elif mood == "sleep":  # ∪ 閉眼睡覺
+            d.arc((*P(cx - 0.07, 0.53), *P(cx + 0.07, 0.63)), start=20, end=160, fill=ink, width=lw)
+        else:                  # 睜眼
+            d.ellipse((*P(cx - 0.055, 0.55), *P(cx + 0.055, 0.68)), fill=ink)
+            d.ellipse((*P(cx - 0.03, 0.565), *P(cx + 0.0, 0.605)), fill=(255, 255, 255, 255))
+    # 嘴巴 ω + 腮紅
+    mw = max(2, int(N * 0.032))
+    d.arc((*P(0.445, 0.66), *P(0.505, 0.73)), start=10, end=170, fill=ink, width=mw)
+    d.arc((*P(0.495, 0.66), *P(0.555, 0.73)), start=10, end=170, fill=ink, width=mw)
+    blush = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(blush)
+    for cx in (0.25, 0.75):
+        bd.ellipse((*P(cx - 0.065, 0.675), *P(cx + 0.065, 0.745)), fill=(255, 110, 170, 150))
+    img.alpha_composite(blush.filter(ImageFilter.GaussianBlur(N * 0.012)))
+    out = img.resize((size, size), Image.LANCZOS)
+    if len(_cat_cache) > 40:
+        _cat_cache.clear()
+    _cat_cache[key] = out
+    return out
+
+
 def level_color(level, charging=False):
     if charging or level > 30:
         return GREEN
@@ -195,12 +287,51 @@ class Notch:
         self.dev_version = -1
         self.pending_low = []          # 全螢幕時先不提醒，遊戲關掉再說
         self.volume = None             # (app, level, 時間)
-        self.page = "main"             # 展開時的頁面：main / settings
+        self.page = "main"             # 展開時的頁面：main / settings / devices / timer
+        self.cat_blink_at = -10.0      # 哼哼貓眨眼 (換歌時)
+        self.timer_end, self.timer_total = None, 0  # 計時器 (perf_counter 時間, 秒數)
+        self.timer_custom = int((config.get("timer") or {}).get("custom", 20))  # 自訂的分鐘數 (會記住)
+        # 第二顆泡泡 (像 iPhone 同時有兩件事)：0 = 縮在膠囊裡，1 = 分開
+        self.bub_k, self.bub_v, self.bub_kind, self.bub_rect = 0.0, 0.0, None, None
+        self.pill_w = 0
+        self.pill_top = 0
+        self.fill_f, self.fillc, self.border = [0.0, 0.0, 0.0], (0, 0, 0), None
+        self.thin_k = 0.0              # 極簡細條：1 = 完全是細條
+        self.act_shown_at = 0.0
         self.opt_cache = {}            # 設定頁顯示用 (開機啟動要讀登錄檔，不要每幀讀)
         self.opt_cache_at = 0.0
 
     def opt(self, k):
         return (self.config.get("notch_opts") or {}).get(k, DEFAULT_OPTS[k])
+
+    def shape(self):
+        """island 動態島 (貼在上緣) / float 浮動膠囊 / bar 極簡細條"""
+        v = (self.config.get("notch_style") or {}).get("shape")
+        return v if v in ("island", "float", "bar") else "island"
+
+    def target_fill(self, t):
+        """膠囊的底色和邊框：black 黑色 / album 專輯色 / theme 跟著主題。"""
+        c = (self.config.get("notch_style") or {}).get("color")
+        if c == "album":
+            a = (t or {}).get("accent")
+            if a:
+                r, g, b = a
+                k = 74 / max(r, g, b, 1)  # 保留色相，壓暗到白字看得清楚
+                fill = tuple(int(v * k) for v in (r, g, b))
+                return fill, self.accent(t) + (70,)
+            return (0, 0, 0), None
+        if c == "theme":
+            return THEME_FILL.get(self.config.get("theme"), THEME_FILL["night"])
+        return (0, 0, 0), None
+
+    def step_fill(self, t, dt):
+        """換歌 / 換主題時底色慢慢變過去；回傳是不是還在變。"""
+        tgt, self.border = self.target_fill(t)
+        cur = self.fill_f
+        k = clamp(dt / 0.45, 0, 1)
+        self.fill_f = [c + (g - c) * k if abs(g - c) > 0.6 else g for c, g in zip(cur, tgt)]
+        self.fillc = tuple(int(round(c)) for c in self.fill_f)
+        return self.fill_f != list(tgt)
 
     # ───── 視窗 ─────
     def setup_scale(self, dpi_scale):
@@ -260,10 +391,17 @@ class Notch:
             import screens
             w, h = self.dib_size
             x0 = self.x + (self.W - w) // 2
-            e = self.pill_left
-            pts = [(e + self.px(4), 2), (e + self.px(10), 3), (w - e - self.px(5), 2), (w - e - self.px(11), 3)]
+            e, pr = self.pill_left, self.pill_left + self.pill_w
+            shape = self.shape()
+            if shape == "bar":
+                return
+            if shape == "float":
+                y = self.pill_top + self.px(4)
+                pts = [(e + self.px(18), y), (e + self.px(26), y), (pr - self.px(18), y), (pr - self.px(26), y)]
+            else:
+                pts = [(e + self.px(4), 2), (e + self.px(10), 3), (pr - self.px(5), 2), (pr - self.px(11), 3)]
             px = screens.grab_points((x0, self.y, x0 + w, self.y + h), pts)
-            broken = all(min(c) >= 60 for c in px)
+            broken = all(min(c) >= max(60, max(self.fillc) + 50) for c in px)
             if self.healer.report(broken, now):
                 print("[notch] 膠囊被畫成灰色了，重建視窗", flush=True)
                 self.recreate()
@@ -331,27 +469,33 @@ class Notch:
         """dp → 螢幕像素。"""
         return int(round(v * self.u))
 
-    def make_ears(self):
+    def make_ears(self, fill=(0, 0, 0), border=None):
         """膠囊頂端兩側往外彎的小弧，看起來像從螢幕邊緣長出來的。"""
         e = self.px(EAR)
         k = 4
         big = Image.new("L", (e * k, e * k), 255)
         ImageDraw.Draw(big).ellipse((0, 0, 2 * e * k, 2 * e * k), fill=0)  # 圓心在右下角 (e, e)
-        ear = Image.new("RGBA", (e, e), FILL)
+        ear = Image.new("RGBA", (e, e), tuple(fill) + (255,))
+        if border:  # 邊框沿著弧線接到膠囊兩側
+            bw = max(k, int(round(1.4 * self.u * k)))
+            ring = Image.new("RGBA", (e * k, e * k), (0, 0, 0, 0))
+            ImageDraw.Draw(ring).ellipse((-bw, -bw, 2 * e * k + bw, 2 * e * k + bw), outline=border, width=bw)
+            ear.alpha_composite(ring.resize((e, e), Image.LANCZOS))
         ear.putalpha(big.resize((e, e), Image.LANCZOS))
+        self.ear_key = (e, tuple(fill), border)
         self.ear_r = ear
         self.ear_l = ear.transpose(Image.FLIP_LEFT_RIGHT)
         self.e = e
 
     _mask_cache = {}
 
-    def pill_mask(self, w, h, r):
-        """w, h, r：畫布像素 (2 倍)。上緣是平的，下面兩角圓。"""
-        key = (w, h, r)
+    def pill_mask(self, w, h, r, round_top=False):
+        """w, h, r：畫布像素 (2 倍)。上緣是平的，下面兩角圓 (浮動膠囊四個角都圓)。"""
+        key = (w, h, r, round_top)
         m = self._mask_cache.get(key)
         if m is None:
             m = Image.new("L", (w, h), 0)
-            ImageDraw.Draw(m).rounded_rectangle((0, -r, w - 1, h - 1), radius=r, fill=255)
+            ImageDraw.Draw(m).rounded_rectangle((0, 0 if round_top else -r, w - 1, h - 1), radius=r, fill=255)
             if len(self._mask_cache) > 60:
                 self._mask_cache.clear()
             self._mask_cache[key] = m
@@ -374,7 +518,7 @@ class Notch:
             return None
 
     def cover(self, t, size, radius):
-        key = (t and t["track_id"], size, radius)
+        key = (t and t["track_id"], t and t.get("art_v", 0), t and t.get("has_art"), size, radius)
         if key in self.covers:
             return self.covers[key]
         im = self.art_image(t)
@@ -563,11 +707,15 @@ class Notch:
                 return self.px(320), self.px(PILL_H + 6)
             if k in ("update", "updated"):
                 return self.px(340), self.px(PILL_H + 6)
+            if k == "timer":
+                return self.px(320), self.px(PILL_H + 6)
+            if k in ("net_off", "net_on"):
+                return self.px(250), self.px(PILL_H + 6)
         if not t:
             return self.px(150), self.px(PILL_H)
         if not text:
             return self.px(MIN_W), self.px(PILL_H)
-        base = 14 + 24 + 12 + 12 + 19 + 16  # dp：左邊距 + 封面 + 間距 … 間距 + 音量條 + 右邊距
+        base = 14 + 24 + 12 + 12 + (24 if self.opt("cat") else 19) + 16  # dp：左邊距 + 封面 (或倒數) + 間距 … 間距 + 貓 / 音量條 + 右邊距
         font, body = fit(text, self.d(14), self.d(MAX_W - base), 600, min_size=self.d(12))
         return int(clamp(self.px(base) + font.getlength(body) / SS, self.px(MIN_W), self.px(MAX_W))), self.px(PILL_H)
 
@@ -587,7 +735,10 @@ class Notch:
             f2, s2 = fit(at.get("artist") or "", d(12), maxw, 400)
             dr.text((tx, h / 2 - d(2)), s1, font=f1, fill=(255, 255, 255, 250), anchor="ls")
             dr.text((tx, h / 2 + d(15)), s2, font=f2, fill=(255, 255, 255, 140), anchor="ls")
-            self.eq(dr, w - d(18) - eqw, (h - d(16)) // 2, d(16), self.accent(at) + (255,))
+            if self.opt("cat"):
+                self.draw_cat(layer, w - d(16) - d(28), h / 2, d(28), True, now)
+            else:
+                self.eq(dr, w - d(18) - eqw, (h - d(16)) // 2, d(16), self.accent(at) + (255,))
         elif k in ("device", "low", "charge", "full"):
             dv = act["dev"]
             col = RED if k == "low" else level_color(dv["level"], dv.get("charging"))
@@ -615,6 +766,28 @@ class Notch:
             bw = bf.getlength(btn) + d(20)
             dr.rounded_rectangle((w - d(12) - bw, h / 2 - d(12), w - d(12), h / 2 + d(12)), radius=d(12), fill=col + (255,))
             dr.text((w - d(12) - bw / 2, h / 2), btn, font=bf, fill=(20, 20, 30, 255), anchor="mm")
+        elif k == "timer":
+            r = d(13)
+            cx = d(14) + r
+            dr.ellipse((cx - r, h / 2 - r, cx + r, h / 2 + r), fill=ORANGE + (70,))
+            self.glyph(dr, "bell", cx, h / 2, 12, fill=ORANGE + (255,))
+            mins = max(1, round(act.get("total", 60) / 60))
+            dr.text((cx + r + d(12), h / 2 - d(1)), "時間到！", font=ui_font("時間到", d(14), 700), fill=(255, 255, 255, 250), anchor="ls")
+            sub = f"{mins} 分鐘計時"
+            dr.text((cx + r + d(12), h / 2 + d(13)), sub, font=ui_font(sub, d(11), 400), fill=(255, 255, 255, 140), anchor="ls")
+            btn = "知道了"
+            bf = ui_font(btn, d(12), 600)
+            bw = bf.getlength(btn) + d(20)
+            dr.rounded_rectangle((w - d(12) - bw, h / 2 - d(12), w - d(12), h / 2 + d(12)), radius=d(12), fill=ORANGE + (255,))
+            dr.text((w - d(12) - bw / 2, h / 2), btn, font=bf, fill=(20, 20, 30, 255), anchor="mm")
+        elif k in ("net_off", "net_on"):
+            col = RED if k == "net_off" else GREEN
+            r = d(13)
+            cx = d(14) + r
+            dr.ellipse((cx - r, h / 2 - r, cx + r, h / 2 + r), fill=col + (60,))
+            self.glyph(dr, "wifi_off" if k == "net_off" else "wifi", cx, h / 2, 12, fill=col + (255,))
+            txt = "網路斷線了" if k == "net_off" else "網路恢復了"
+            dr.text((cx + r + d(12), h / 2), txt, font=ui_font(txt, d(13), 600), fill=(255, 255, 255, 240), anchor="lm")
         elif k == "volume":
             lv = act["level"]
             g = "vol0" if lv <= 0.001 else "vol1" if lv < 0.34 else "vol2" if lv < 0.67 else "vol3"
@@ -646,19 +819,32 @@ class Notch:
         dr = ImageDraw.Draw(layer)
         act = self.activity
         if act:
-            ak = ease_out((now - act["start"]) / 0.35)
+            ak = ease_out((now - act["start"]) / 0.38)
             al = Image.new("RGBA", pill.size, (0, 0, 0, 0))
             self.draw_activity(al, act, t, now)
+            dy = int(d(10) * (1 - ak))  # 從下面滑上來
+            if dy:
+                moved = Image.new("RGBA", pill.size, (0, 0, 0, 0))
+                moved.alpha_composite(al, (0, dy))
+                al = moved
             self.blend(layer, al, ak)
         elif not t:
             f = ui_font("Hummi", d(13), 600)
-            dr.text((w / 2, h / 2), "Hummi", font=f, fill=(255, 255, 255, 110), anchor="mm")
+            if self.opt("cat"):  # 沒在播：貓在旁邊睡覺
+                dr.text((w / 2 + d(12), h / 2), "Hummi", font=f, fill=(255, 255, 255, 110), anchor="mm")
+                self.draw_cat(layer, w / 2 - d(48), h / 2, d(22), False, now)
+            else:
+                dr.text((w / 2, h / 2), "Hummi", font=f, fill=(255, 255, 255, 110), anchor="mm")
         else:
             cs = d(24)
             layer.alpha_composite(self.cover(t, cs, d(7)), (d(14), (h - cs) // 2))
             ac = self.accent(t) + (255,)
-            eqw = d(19)
-            self.eq(dr, w - d(16) - eqw, (h - d(14)) // 2, d(14), ac)
+            if self.opt("cat"):
+                eqw = d(24)
+                self.draw_cat(layer, w - d(16) - eqw, h / 2, eqw, t["playing"], now)
+            else:
+                eqw = d(19)
+                self.eq(dr, w - d(16) - eqw, (h - d(14)) // 2, d(14), ac)
             x0, x1 = d(14) + cs + d(12), w - d(16) - eqw - d(12)
             k = ease_out((now - self.switch_at) / 0.32)
             for txt, a, dy in ((self.prev_text, 1 - k, -d(9) * k), (text, k, d(9) * (1 - k))):
@@ -669,6 +855,122 @@ class Notch:
                 cx = x0 + max(0, (x1 - x0 - tw) / 2)
                 dr.text((cx, h / 2 + dy), txt, font=font, fill=(255, 255, 255, int(240 * a)), anchor="lm")
         self.blend(pill, layer, alpha)
+
+    def draw_cat(self, layer, x, cy, size, playing, now):
+        """哼哼貓：播放時跟著頻譜點頭、換歌時睜眼眨一下；暫停時睡覺，頭上飄 z。"""
+        d = self.d
+        if not playing:
+            mood = "sleep"
+        elif now - self.cat_blink_at < 0.32 or (now % 5.3) < 0.13:  # 換歌 / 偶爾眨一下眼
+            mood = "open"
+        else:
+            mood = "happy"
+        if playing:
+            energy = sum(self.bars) / len(self.bars)
+            dy = -d(2.6) * clamp((energy - 0.25) / 0.75, 0, 1) + d(0.5) * math.sin(now * 2 * math.pi * 1.6)
+        else:
+            dy = d(0.5) * math.sin(now * 2 * math.pi / 3.2)  # 睡覺的呼吸
+        spr = cat_sprite(size, mood)
+        layer.alpha_composite(spr, (int(x), int(cy - size / 2 + dy)))
+        if not playing:  # z z
+            dr = ImageDraw.Draw(layer)
+            for i in range(2):
+                ph = ((now / 2.4) + i * 0.5) % 1.0
+                zx = x + size * (0.78 + 0.25 * ph)
+                zy = cy - size * (0.45 + 0.55 * ph)
+                zs = int(d(7 + 3 * ph))
+                a = int(200 * math.sin(ph * math.pi))
+                dr.text((zx, zy), "z", font=ui_font("z", zs, 700), fill=(220, 200, 255, a), anchor="mm")
+
+    def timer_left(self, now):
+        return max(0.0, self.timer_end - time.perf_counter()) if self.timer_end else 0.0
+
+    def draw_timer_chip(self, dr, x, cy, now):
+        """收起來時左邊的倒數 (碼錶圖示 + 剩下的時間)，回傳寬度。"""
+        d = self.d
+        left = self.timer_left(now)
+        txt = f"{int(left // 60)}:{int(left % 60):02d}"
+        f = ui_font(txt, d(12), 600)
+        w = d(18) + f.getlength(txt) + d(10)
+        dr.rounded_rectangle((x, cy - d(11), x + w, cy + d(11)), radius=d(11), fill=ORANGE + (50,))
+        self.glyph(dr, "timer", x + d(11), cy, 10, fill=ORANGE + (255,))
+        dr.text((x + d(20), cy), txt, font=f, fill=ORANGE + (255,), anchor="lm")
+        return w
+
+    def draw_timer(self, layer, dr, w, h, hit, now):
+        """計時器頁：選時間；計時中顯示大大的倒數。"""
+        d = self.d
+        pad = d(20)
+        self.glyph(dr, "back", pad + d(6), d(26), 12, fill=(255, 255, 255, 200))
+        dr.text((pad + d(24), d(26)), "計時器", font=ui_font("計時器", d(15), 600), fill=(255, 255, 255, 245), anchor="lm")
+        hit["back"] = (0, 0, pad + d(80), d(48))
+        if self.timer_end:
+            left = self.timer_left(now)
+            cx, cy, r = w / 2, d(100), d(40)
+            frac = left / max(1, self.timer_total)
+            dr.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(255, 255, 255, 40), width=d(4))
+            if frac > 0:
+                dr.arc((cx - r, cy - r, cx + r, cy + r), start=-90, end=-90 + 360 * frac, fill=ORANGE + (255,), width=d(4))
+            txt = f"{int(left // 60)}:{int(left % 60):02d}"
+            dr.text((cx, cy), txt, font=ui_font(txt, d(22), 700), fill=(255, 255, 255, 250), anchor="mm")
+            for i, (name, label) in enumerate((("t_plus", "+1 分鐘"), ("t_cancel", "取消"))):
+                bw, bh = d(96), d(28)
+                bx = cx - bw - d(6) if i == 0 else cx + d(6)
+                by = h - d(44)
+                dr.rounded_rectangle((bx, by, bx + bw, by + bh), radius=d(14),
+                                     fill=(255, 255, 255, 30) if i == 0 else RED + (200,))
+                dr.text((bx + bw / 2, by + bh / 2), label, font=ui_font(label, d(12), 600), fill=(255, 255, 255, 245), anchor="mm")
+                hit[name] = (bx, by, bx + bw, by + bh)
+            return
+        gap = d(8)
+        cols = 3
+        cw = (w - 2 * pad - gap * (cols - 1)) / cols
+        ch, y0 = d(30), d(52)
+        for i, m in enumerate(TIMER_PRESETS):
+            x = pad + (i % cols) * (cw + gap)
+            y = y0 + (i // cols) * (ch + d(6))
+            dr.rounded_rectangle((x, y, x + cw, y + ch), radius=d(10), fill=(255, 255, 255, 18))
+            label = f"{m} 分鐘"
+            dr.text((x + cw / 2, y + ch / 2), label, font=ui_font(label, d(13), 600), fill=(255, 255, 255, 230), anchor="mm")
+            hit[f"t:{m}"] = (x, y, x + cw, y + ch)
+        # 自訂：[−] 20 分鐘 [+] [開始]；滑鼠在這頁滾滾輪也可以調
+        y = y0 + 3 * (ch + d(6)) + d(4)
+        dr.text((pad + d(4), y + ch / 2), "自訂", font=ui_font("自訂", d(12), 600), fill=(255, 255, 255, 150), anchor="lm")
+        bx = pad + d(44)
+        bs = ch
+        for name, glyph_txt, x in (("t_minus", "−", bx), ("t_more", "+", bx + bs + d(96))):
+            dr.rounded_rectangle((x, y, x + bs, y + ch), radius=ch / 2, fill=(255, 255, 255, 26))
+            dr.text((x + bs / 2, y + ch / 2 - d(1)), glyph_txt, font=ui_font("+", d(16), 600), fill=(255, 255, 255, 230), anchor="mm")
+            hit[name] = (x, y, x + bs, y + ch)
+        val = f"{self.timer_custom} 分鐘"
+        dr.text((bx + bs + d(48), y + ch / 2), val, font=ui_font(val, d(14), 700), fill=ORANGE + (255,), anchor="mm")
+        go = "開始"
+        gx1 = w - pad
+        gx0 = gx1 - d(76)
+        dr.rounded_rectangle((gx0, y, gx1, y + ch), radius=ch / 2, fill=ORANGE + (255,))
+        dr.text(((gx0 + gx1) / 2, y + ch / 2), go, font=ui_font(go, d(13), 700), fill=(20, 20, 30, 255), anchor="mm")
+        hit["t_go"] = (gx0, y, gx1, y + ch)
+
+    def start_timer(self, minutes):
+        self.timer_total = int(minutes * 60)
+        self.timer_end = time.perf_counter() + self.timer_total
+
+    def collect_events(self, now):
+        """不管膠囊有沒有顯示都要跑：計時到了、網路斷線 / 恢復。"""
+        if self.timer_end and time.perf_counter() >= self.timer_end:
+            total, self.timer_end = self.timer_total, None
+            self.last_frame = now
+            self.push("timer", 10.0, total=total)
+            self.static_sig = None
+            try:
+                import winsound
+                winsound.PlaySound("SystemNotification", winsound.SND_ALIAS | winsound.SND_ASYNC)
+            except Exception:
+                pass
+        ev = self.runtime.pop("net_event", None)
+        if ev:
+            self.last_frame = now
+            self.push("net_off" if ev == "off" else "net_on", 6.0 if ev == "off" else 3.0)
 
     def karaoke(self, layer, text, cx, cy, max_w, prog, color):
         font, line = fit(text, self.d(17), max_w, 600, min_size=self.d(13))
@@ -696,6 +998,8 @@ class Notch:
             layer.alpha_composite(hi)
 
     def exp_height(self):
+        if self.page == "timer" and not self.timer_end:
+            return EXP_H + 44  # 多一列「自訂」
         return EXP_H + (DEV_ROW if self.devices and self.opt("battery") else 0)
 
     def options(self):
@@ -807,9 +1111,11 @@ class Notch:
         dr = ImageDraw.Draw(layer)
         pad = d(20)
         hit = {}
-        if self.page in ("settings", "devices"):
+        if self.page in ("settings", "devices", "timer"):
             if self.page == "settings":
                 self.draw_settings(layer, dr, w, h, hit)
+            elif self.page == "timer":
+                self.draw_timer(layer, dr, w, h, hit, now)
             else:
                 self.draw_devices(layer, dr, w, h, hit, now)
             self.hit = hit
@@ -870,6 +1176,9 @@ class Notch:
         gx = pad + d(6)
         self.glyph(dr, "settings", gx, my, 14, fill=(255, 255, 255, 150))
         hit["settings"] = (gx - d(18), my - d(16), gx + d(18), my + d(16))
+        tx = gx + d(34)  # 計時器 (計時中是橘色)
+        self.glyph(dr, "timer", tx, my, 14, fill=(ORANGE + (230,)) if self.timer_end else (255, 255, 255, 150))
+        hit["timer"] = (tx - d(16), my - d(16), tx + d(16), my + d(16))
         # 裝置電量列
         if self.devices and self.opt("battery"):
             devs = list(self.devices)[:4]
@@ -913,32 +1222,161 @@ class Notch:
             layer.putalpha(layer.getchannel("A").point(lambda v: int(v * alpha)))
         dst.alpha_composite(layer, at)
 
+    def bubble_kind(self):
+        """第二顆泡泡要顯示什麼：計時中 > 有裝置在充電。展開時收回膠囊裡。"""
+        if self.timer_end:
+            return "timer"
+        if self.opt("battery") and any(dv.get("charging") for dv in self.devices):
+            return "charge"
+        return None
+
+    def step_bubble(self, dt):
+        kind = self.bubble_kind()
+        want = kind is not None and not self.expanded and self.exk < 0.05 and self.thin_k < 0.05 \
+            and not (self.activity and self.activity["kind"] in ("timer", "song", "volume"))
+        if kind:
+            self.bub_kind = kind
+        self.bub_k, self.bub_v = self.spring(self.bub_k, self.bub_v, 1.0 if want else 0.0, dt)
+        if not want and self.bub_k < 0.01 and abs(self.bub_v) < 0.05:
+            self.bub_k, self.bub_v = 0.0, 0.0
+            if not kind:
+                self.bub_kind = None
+        return abs(self.bub_v) > 0.02 or 0.01 < self.bub_k < 0.99
+
+    def draw_bubble(self, img, cx, cy, size, alpha, now):
+        """泡泡裡的東西：計時 = 橘色圈 + 剩下的時間；充電 = 綠色電量圈 + 裝置圖示。"""
+        if alpha <= 0.02 or size < 4:
+            return
+        k = SS
+        layer = Image.new("RGBA", (int(size * k), int(size * k)), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(layer)
+        c = size * k / 2
+        r = c - self.d(4)
+        if self.bub_kind == "timer" and self.timer_end:
+            left = self.timer_left(now)
+            frac = left / max(1, self.timer_total)
+            dr.ellipse((c - r, c - r, c + r, c + r), outline=ORANGE + (60,), width=self.d(2.6))
+            if frac > 0:
+                dr.arc((c - r, c - r, c + r, c + r), start=-90, end=-90 + 360 * frac, fill=ORANGE + (255,), width=self.d(2.6))
+            txt = f"{int(left // 60)}:{int(left % 60):02d}" if left < 600 else f"{int(left // 60)}m"
+            f, txt = fit(txt, self.d(9), r * 1.6, 700)
+            dr.text((c, c), txt, font=f, fill=ORANGE + (255,), anchor="mm")
+        elif self.bub_kind == "charge":
+            dv = next((dv for dv in self.devices if dv.get("charging")), None)
+            if dv:
+                self.ring(dr, c, c, r, dv["level"], GREEN, self.d(2.6), dv["kind"], 10, charging=True, now=now)
+        layer = layer.resize((int(size), int(size)), Image.LANCZOS)
+        if alpha < 0.999:
+            layer.putalpha(layer.getchannel("A").point(lambda v: int(v * alpha)))
+        img.alpha_composite(layer, (int(cx - size / 2), int(cy - size / 2)))
+
     def render(self, t, pos, now):
         """回傳只包含膠囊 (加兩側小弧) 的圖；寬度一定是偶數+兩側，置中才不會左右晃。"""
         w, h = max(4, int(round(self.cw))), max(4, int(round(self.ch)))
         w += (self.W - w) % 2
-        e = self.e
-        img = Image.new("RGBA", (w + 2 * e, h), (0, 0, 0, 0))
+        shape = self.shape()
+        fill, border = self.fillc, self.border
+        if shape == "island":
+            if getattr(self, "ear_key", None) != (self.px(EAR), fill, border):
+                self.make_ears(fill, border)
+            e = self.e
+        else:
+            e = 0  # 浮動膠囊、細條沒有兩側的小弧
+        top = self.px(FLOAT_GAP) if shape == "float" else 0
+        sp = self.px(12) if shape == "float" else 0  # 陰影的空間
+        # 有第二顆泡泡時，左右各多留一顆泡泡的空間 (膠囊才會維持在正中間)
+        bs, gap = self.px(PILL_H), self.px(8)
+        ext = (bs + gap) if self.bub_kind else 0
+        img = Image.new("RGBA", (w + 2 * e + 2 * ext + 2 * sp, top + h + sp), (0, 0, 0, 0))
         W2, H2 = w * SS, h * SS
         r = int(min(H2 / 2, self.d(18) + (self.d(30) - self.d(18)) * self.exk))
-        pill = Image.new("RGBA", (W2, H2), FILL)
+        pill = Image.new("RGBA", (W2, H2), fill + (255,))
         key, text, note, prog = self.lyric(t, pos)
         self.hit = {}
         self.exp_offset = 0
-        self.draw_collapsed(pill, t, text, now, clamp(1 - self.exk * 2.4, 0, 1))
+        thin = self.thin_k
+        self.draw_collapsed(pill, t, text, now, clamp(1 - self.exk * 2.4, 0, 1) * (1 - thin))
         self.draw_expanded(pill, t, pos, text, note, prog, now, clamp((self.exk - 0.4) / 0.6, 0, 1))
-        if t and t["playing"] and self.opt("spectrum"):
+        if thin > 0.01:
+            self.draw_bar(pill, t, pos, thin)
+        if t and t["playing"] and self.opt("spectrum") and thin < 0.5:
             self.rim(pill, self.accent(t), self.glow * 0.9, r)
-        pill.putalpha(self.pill_mask(W2, H2, r))
+        if border and thin < 0.99:
+            box = (0, 0 if shape == "float" else -r, W2 - 1, H2 - 1)
+            bd = ImageDraw.Draw(pill)
+            if self.config.get("theme") == "neon" and (self.config.get("notch_style") or {}).get("color") == "theme":
+                bd.rounded_rectangle(box, radius=r, outline=border[:3] + (int(38 * (1 - thin)),), width=self.d(3))  # 霓虹的光暈
+            bd.rounded_rectangle(box, radius=r, outline=border[:3] + (int(border[3] * (1 - thin)),), width=max(2, self.d(1.4)))
+        mask = self.pill_mask(W2, H2, r, round_top=shape == "float")
+        pill.putalpha(mask)
         pill = pill.resize((w, h), Image.LANCZOS)
-        img.alpha_composite(pill, (e, 0))
-        img.alpha_composite(self.ear_l, (0, 0))
-        img.alpha_composite(self.ear_r, (e + w, 0))
-        self.pill_left = e  # 膠囊在視窗裡的 x (點擊座標換算用)
+        x0 = ext + e + sp
+        if sp:  # 浮動膠囊下面淡淡的影子
+            skey = (img.size, w, h, r, x0)
+            if getattr(self, "_shadow_key", None) != skey:
+                sh = Image.new("L", img.size, 0)
+                sh.paste(mask.resize((w, h), Image.BILINEAR), (x0, top + self.px(3)))
+                sh = sh.filter(ImageFilter.GaussianBlur(self.px(5))).point(lambda v: v * 45 // 100)
+                shadow = Image.new("RGBA", img.size, (0, 0, 0, 255))
+                shadow.putalpha(sh)
+                self._shadow_key, self._shadow = skey, shadow
+            img.alpha_composite(self._shadow)
+        self.bub_rect = None
+        if self.bub_kind and self.bub_k > 0.005:
+            # 泡泡從膠囊右邊「啵」地分出來：還很近的時候用模糊 + 門檻讓兩個形狀黏在一起，像液體
+            kk = self.bub_k
+            size = bs * clamp(0.35 + 0.65 * kk, 0, 1.08)
+            cx = x0 + w - bs / 2 + (bs / 2 + gap + bs / 2) * kk
+            cy = top + min(h, self.px(PILL_H)) / 2
+            goo = Image.new("L", img.size, 0)
+            gd = ImageDraw.Draw(goo)
+            gd.rounded_rectangle((x0 + w - bs * 1.2, top, x0 + w - 1, top + self.px(PILL_H) - 1), radius=bs / 2, fill=255)
+            gd.ellipse((cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2), fill=255)
+            if kk < 0.98:
+                goo = goo.filter(ImageFilter.GaussianBlur(self.px(3.2))).point(lambda v: 0 if v < 96 else 255 if v > 150 else (v - 96) * 255 // 54)
+            black = Image.new("RGBA", img.size, fill + (255,))
+            black.putalpha(goo)
+            img.alpha_composite(black)
+            self.draw_bubble(img, cx, cy, size, clamp((kk - 0.35) / 0.5, 0, 1), now)
+            if kk > 0.6:
+                self.bub_rect = (cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2)
+        img.alpha_composite(pill, (x0, top))
+        if e:
+            img.alpha_composite(self.ear_l, (ext, 0))
+            img.alpha_composite(self.ear_r, (x0 + w, 0))
+        self.pill_left = x0  # 膠囊在視窗裡的 x, y (點擊座標換算用)
+        self.pill_top = top
+        self.pill_w = w
         return img
+
+    def draw_bar(self, pill, t, pos, alpha):
+        """極簡細條：一條播放進度，顏色是專輯的顏色。"""
+        w, h = pill.size
+        layer = Image.new("RGBA", pill.size, (0, 0, 0, 0))
+        dr = ImageDraw.Draw(layer)
+        if t and t.get("duration"):
+            frac = clamp(pos / max(1, t["duration"]), 0, 1)
+            a = 255 if t["playing"] else 140
+            dr.rectangle((0, 0, int(w * frac), h), fill=self.accent(t) + (a,))
+        self.blend(pill, layer, alpha)
 
     # ───── 互動 ─────
     def handle_click(self, x, y):
+        b = self.bub_rect
+        if b and b[0] <= x <= b[2] and b[1] <= y <= b[3]:
+            self.expanded = True
+            self.activity = None
+            self.hover_since = time.perf_counter()
+            self.leave_since = None  # 不然「滑鼠離開多久」還在算之前的，展開馬上又收起來
+            self.page = "timer" if self.bub_kind == "timer" else "devices"
+            if self.page == "devices" and self.runtime.get("devices") is not None:
+                self.runtime["devices"].refresh()
+            self.static_sig = None
+            return
+        if self.activity and self.activity["kind"] in ("timer", "net_off", "net_on") and self.exk < 0.3:
+            self.activity = None  # 點「知道了」
+            self.static_sig = None
+            return
         if self.activity and self.activity["kind"] in ("update", "updated") and self.exk < 0.3:
             self.activity = None  # 點「有新版本 / 已更新」：打開主視窗的更新畫面
             if self.runtime.get("open_update"):
@@ -950,7 +1388,7 @@ class Notch:
             self.hover_since = time.perf_counter()
             return
         px = (x - self.pill_left) * SS - self.exp_offset
-        py = y * SS
+        py = (y - self.pill_top) * SS
         cmd = self.runtime.get("media_cmd")
         for name, box in self.hit.items():
             if box[0] <= px <= box[2] and box[1] <= py <= box[3]:
@@ -965,6 +1403,21 @@ class Notch:
                 elif name == "settings":
                     self.page = "settings"
                     self.opt_cache_at = 0.0
+                elif name == "timer":
+                    self.page = "timer"
+                elif name.startswith("t:"):
+                    self.start_timer(int(name[2:]))
+                    self.page = "main"
+                elif name == "t_plus" and self.timer_end:
+                    self.timer_end += 60
+                    self.timer_total += 60
+                elif name == "t_cancel":
+                    self.timer_end = None
+                elif name in ("t_minus", "t_more"):
+                    self.set_custom(self.timer_custom + (-1 if name == "t_minus" else 1))
+                elif name == "t_go":
+                    self.start_timer(self.timer_custom)
+                    self.page = "main"
                 elif name == "back":
                     self.page = "main"
                 elif name == "more" and self.runtime.get("open_settings"):
@@ -984,8 +1437,20 @@ class Notch:
                 self.static_sig = None  # 重畫
                 return
 
+    def set_custom(self, minutes):
+        self.timer_custom = int(clamp(minutes, 1, 180))
+        self.config.setdefault("timer", {})["custom"] = self.timer_custom
+        self.static_sig = None
+        save = self.runtime.get("save_config")
+        if save:
+            save()
+
     def handle_wheel(self, t, now):
-        """滾輪：只調播放器自己的音量；觸控板左右滑：切歌。"""
+        """滾輪：只調播放器自己的音量 (計時器頁是調自訂分鐘)；觸控板左右滑：切歌。"""
+        if self.wheel and self.expanded and self.page == "timer" and not self.timer_end:
+            steps, self.wheel = self.wheel / 120, 0
+            self.set_custom(self.timer_custom + (1 if steps > 0 else -1) * max(1, round(abs(steps))))
+            return
         if self.wheel:
             steps, self.wheel = self.wheel / 120, 0
             if t and self.opt("gestures"):
@@ -1022,8 +1487,13 @@ class Notch:
         px, py = self.cursor()
         w, h = self.cw, self.ch
         m = self.px(10) if self.expanded else 0
+        mv = m
+        shape = self.shape()
+        if shape == "bar" and not self.expanded:
+            m, mv = self.px(10), self.px(14)
+        top = self.px(FLOAT_GAP) if shape == "float" else 0
         left = self.x + (self.W - w) / 2
-        inside = (left - m <= px <= left + w + m) and (self.y <= py <= self.y + h + m)
+        inside = (left - m <= px <= left + w + m) and (self.y <= py <= self.y + top + h + mv)
         if inside:
             self.leave_since = None
             if self.hover_since is None:
@@ -1072,10 +1542,21 @@ class Notch:
             try:
                 self.check_display(t0)
                 self.check_fullscreen(t0)
-                want = bool(self.config.get("notch")) and not self.fullscreen
+                self.collect_events(t0)
+                game = self.config.get("game") or {}
+                fs = self.fullscreen and game.get("enabled", True) and game.get("notch", "alerts") != "show"  # 選「照常顯示」= 遊戲中也一直在
+                urgent = bool(self.activity and self.activity["kind"] in URGENT)
+                if fs and urgent and game.get("notch", "alerts") == "alerts":
+                    import screens
+                    show_alert = not screens.exclusive_fullscreen()  # 獨佔全螢幕疊不上去
+                else:
+                    show_alert = False
+                want = bool(self.config.get("notch")) and (not fs or show_alert)
                 if not want:
                     self.expanded, self.exk, self.cw = False, 0.0, None
-                    self.click, self.activity = None, None
+                    self.click = None
+                    if not (fs and urgent):  # 重要提醒先留著，等可以顯示再說
+                        self.activity = None
                     self.wheel = self.hwheel = 0
                     svc = self.runtime.get("devices")
                     if svc is not None:  # 快沒電的等遊戲關掉再說，其他的就算了
@@ -1123,6 +1604,7 @@ class Notch:
         tid = t["track_id"] if t else None
         if tid and tid != self.last_track_seen:
             short = (t.get("source") == "瀏覽器" and 0 < (t.get("duration") or 0) < 60) or "#short" in (t.get("title") or "").lower()
+            self.cat_blink_at = now
             if self.last_track_seen is not None and self.opt("peek") and not self.expanded and not short:
                 self.push("song", 3.0, track=dict(t))
             self.last_track_seen = tid
@@ -1146,16 +1628,25 @@ class Notch:
                 key, text = ("covered",), ""
         if key != self.line_key:
             self.prev_text, self.line_text, self.line_key, self.switch_at = self.line_text, text, key, now
+        shape = self.shape()
         if self.expanded:
             tw, th = self.px(EXP_W), self.px(self.exp_height())
+        elif shape == "bar" and not self.activity:
+            tw, th = self.px(BAR_W), self.px(BAR_H)
         else:
             tw, th = self.collapsed_size(t, text)
         if self.cw is None:
             self.cw, self.ch = float(tw), float(th)
         self.cw, self.vw = self.spring(self.cw, self.vw, tw, dt)
         self.ch, self.vh = self.spring(self.ch, self.vh, th, dt)
-        self.ch = max(self.ch, self.px(PILL_H) * 0.9)
+        self.ch = max(self.ch, self.px(BAR_H if shape == "bar" else PILL_H) * 0.9)
+        if shape == "bar":
+            self.thin_k = clamp((self.px(PILL_H) - self.ch) / max(1, self.px(PILL_H) - self.px(BAR_H)), 0, 1)
+        else:
+            self.thin_k = 0.0
+        recolor = self.step_fill(t, dt)
         self.exk = clamp(self.exk + (dt / 0.24) * (1 if self.expanded else -1), 0, 1)
+        bubbling = self.step_bubble(dt)
         playing = bool(t and t["playing"])
         self.step_bars(now, playing)
         act = self.activity
@@ -1164,19 +1655,26 @@ class Notch:
             or max(abs(b - g) for b, g in zip(self.bars, self.bar_tgt)) > 0.01 \
             or (act is not None and (now - act["start"] < 0.4 or act["kind"] in ("low", "charge", "full") or (act.get("dev") or {}).get("charging"))) \
             or (self.expanded and any(dv.get("charging") or dv["level"] <= 15 for dv in self.devices))
+        moving = moving or recolor
         sig = (round(self.cw), round(self.ch), self.exk, key, tid, playing, int(pos) if self.expanded else 0,
-               id(act), len(self.devices), self.page, tuple(sorted(self.opt_cache.items())))
-        if moving or playing or sig != self.static_sig:
+               shape, self.fillc, self.border, self.config.get("theme"),
+               id(act), len(self.devices), self.page, tuple(sorted(self.opt_cache.items())),
+               int(self.timer_left(now)) if self.timer_end else -1, round(self.bub_k, 3), self.bub_kind)
+        sleepy_cat = self.opt("cat") and not playing and not self.expanded and not act  # 睡覺的 z 要動
+        moving = moving or bubbling or (self.bub_kind == "charge" and self.bub_k > 0.5)  # 充電圈會呼吸
+        if moving or playing or sleepy_cat or sig != self.static_sig:
             self.static_sig = sig
             self.present(self.render(t, pos, now))
         self.heal_check(now)
-        if moving and (abs(self.vw) > 2 or abs(self.vh) > 2 or 0 < self.exk < 1):
+        if moving and (abs(self.vw) > 2 or abs(self.vh) > 2 or 0 < self.exk < 1 or bubbling):
             return 1 / 60
         if moving or (playing and (self.expanded or act)):
             return 1 / 30
         if playing:
             viz = self.runtime.get("viz")
             return 1 / 24 if viz is not None and viz.fresh() else 1 / 15  # 真的頻譜跳得比較細，多畫幾張
+        if sleepy_cat:
+            return 1 / 12  # z 慢慢飄就好
         return 1 / 20  # 沒在動也要常常看滑鼠，移上去才會馬上展開
 
 

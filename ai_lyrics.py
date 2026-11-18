@@ -405,7 +405,8 @@ class AIEngine:
             try:
                 job = self.job
                 t, _ = self._pos()
-                paused_fs = self.cfg().get("pause_fullscreen", True) and fullscreen_app_running()
+                paused_fs = (self.cfg().get("pause_fullscreen", True) and (self.config.get("game") or {}).get("enabled", True)
+                             and fullscreen_app_running())
                 active = (job and t and t["track_id"] == job.track_id and t["playing"]
                           and self.cfg().get("enabled", True) and not paused_fs)
                 if not active:

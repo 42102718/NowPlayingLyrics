@@ -538,6 +538,9 @@ class Overlay:
 
     def game_mode(self, now):
         """全螢幕遊戲 / 影片在浮動歌詞那個螢幕上：照常 / 變淡 / 先藏起來。"""
+        if not (self.config.get("game") or {}).get("enabled", True):
+            self.alpha, self.fs_now, self.fs_excl = 255, False, False
+            return False
         if now - self.fs_at > 0.5:
             self.fs_at = now
             import screens

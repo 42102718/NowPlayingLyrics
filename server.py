@@ -20,6 +20,7 @@ if sys.stdout:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 else:  # 沒有主控台 (pythonw / .exe)：輸出寫到 app.log 方便除錯
     sys.stdout = sys.stderr = open(os.path.join(DATA_DIR, "app.log"), "w", encoding="utf-8", buffering=1)
+import hashlib
 import io
 import json
 import re
@@ -41,7 +42,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.7.3"
+VERSION = "1.8.0"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -63,6 +64,7 @@ DEFAULT_CONFIG = {
         "peek": True,       # 換歌時彈出封面和歌名
         "spectrum": True,   # 真實頻譜 + 邊緣光暈 (只錄播放器的聲音)
         "gestures": True,   # 滾輪調播放器音量、觸控板左右滑切歌
+        "cat": True,        # 膠囊裡的哼哼貓 (關掉就是原本的音量條)
     },
     "folia": {"enabled": False},  # 把歌和歌詞送到 Folia 舞台 (唱歌台用)
     "font": "",  # 字體家族 (英文名)；空白 = 預設 (Inter + 微軟正黑體)
@@ -95,6 +97,9 @@ DEFAULT_CONFIG = {
         "fullscreen": "dim",       # 全螢幕遊戲時：normal 照常 / dim 變淡 / hide 隱藏
     },
     "notch_monitor": "primary",    # 膠囊在哪個螢幕 (同上)
+    "game": {"enabled": True, "notch": "alerts"},  # 遊戲模式：全螢幕時；膠囊 alerts 只彈重要提醒 / hide 藏起來
+    "net_alert": True,             # 網路斷線 / 恢復時膠囊提醒
+    "notch_style": {"shape": "island", "color": "black"},  # 膠囊形狀 island/float/bar、顏色 black/album/theme
     "wallpaper": {"enabled": False, "monitor": "primary"},
     "share": {"folder": "", "name": ""},
     "chat": {"channel": "", "token": "", "bot": "", "commands": "!song !歌名 !這什麼歌 !歌"},  # 直播聊天室點歌指令 (Twitch)  # 和朋友共享歌詞的雲端資料夾、顯示的名字  # 桌布模式：舞台放在桌面圖示後面
@@ -116,6 +121,15 @@ def load_config():
         cfg["hotkeys"] = bool(saved.get("hotkeys", True))
         cfg["taskbar_progress"] = bool(saved.get("taskbar_progress", True))
         cfg["notch_monitor"] = str(saved.get("notch_monitor", "primary") or "primary")
+        gm = saved.get("game") or {}
+        cfg["game"] = {"enabled": bool(gm.get("enabled", True)),
+                       "notch": gm.get("notch") if gm.get("notch") in ("show", "alerts", "hide") else "alerts"}
+        cfg["net_alert"] = bool(saved.get("net_alert", True))
+        ns = saved.get("notch_style") if isinstance(saved.get("notch_style"), dict) else {}
+        cfg["notch_style"] = {"shape": ns.get("shape") if ns.get("shape") in ("island", "float", "bar") else "island",
+                              "color": ns.get("color") if ns.get("color") in ("black", "album", "theme") else "black"}
+        if isinstance(saved.get("timer"), dict):
+            cfg["timer"] = {"custom": int(saved["timer"].get("custom", 20))}
         ch = saved.get("chat") or {}
         cfg["chat"].update({k: str(ch.get(k) or "") for k in ("channel", "token", "bot") if k in ch})
         if ch.get("commands"):
@@ -517,8 +531,13 @@ class Lyrics:
         return result
 
     def rank(self, cands, title, artist, duration, strict=True, need_artist=False):
+        # 有任何來源找得到「同歌名 + 同歌手」：這首歌確實在，別的歌手的同名歌就一定是別首 (例如 OSKI 和 NCT U 都有〈OK!〉)
+        artist_found = bool(artist) and any(
+            title_matches(title, c.get("title")) and artist_matches(artist, c.get("artist")) for c in cands)
+
         def score(c):
             s = 0.0
+            diff = None
             if duration and c.get("duration"):
                 diff = abs(c["duration"] - duration)
                 if diff > 10:
@@ -530,6 +549,11 @@ class Lyrics:
             am = artist_matches(artist, c.get("artist"))
             if strict and artist and not am and (tm == 1 or need_artist):
                 return None  # 歌手是從影片標題拆出來的 (很可靠)，歌手不對就是別人的同名歌  # 歌名只是部分相同、歌手也不對
+            if strict and artist and not am:
+                if artist_found:
+                    return None  # 正確的歌手有這首 (可能只是那個版本沒歌詞)：不能拿別人的同名歌來頂
+                if diff is None or diff > 3:
+                    return None  # 歌手名字對不上 (可能是譯名不同)：長度要幾乎一樣才敢用
             s += 0 if tm == 2 else 1.5 if tm == 1 else 4
             s += 0 if am else 2 if artist else 0
             s += 0 if c.get("synced") is not False else 3
@@ -736,6 +760,12 @@ class Media:
         self.pinned: str | None = None  # 使用者手動選的 app id
         self.art: dict[str, bytes] = {}
         self.accent: dict[str, tuple] = {}
+        self.art_v: dict[str, int] = {}        # 封面換過幾次 (網頁靠這個知道要重新載入)
+        self.art_seen: dict[str, float] = {}   # 這首歌第一次讀封面的時間
+        self.art_at: dict[str, float] = {}     # 上次讀封面的時間
+        self.hash_tracks: dict[str, set] = {}  # 封面內容 → 用過它的歌 (很多首歌都同一張 = 是 App 圖示)
+        self.bad_hashes: set = set()           # 確定不是封面的圖 (Chrome 圖示之類)
+        self.online_tried: set = set()
         self.current = None  # 目前選中的 WinRT session
 
     async def init(self):
@@ -784,22 +814,125 @@ class Media:
         cur_app = cur.source_app_user_model_id if cur else None
         return max(sessions, key=lambda s: (s["playing"], source_priority(s["source"]), s["app"] == cur_app))
 
-    async def load_art(self, track_id, thumb):
-        if track_id in self.art or thumb is None:
+    def set_art(self, track_id, data):
+        if self.art.get(track_id) == data:
+            return
+        self.art[track_id] = data
+        self.accent[track_id] = accent_color(data)
+        self.art_v[track_id] = self.art_v.get(track_id, 0) + 1
+        if len(self.art) > 30:
+            old = next(iter(self.art))
+            for d in (self.art, self.accent, self.art_v):
+                d.pop(old, None)
+
+    async def load_art(self, cur):
+        """讀播放器給的封面。
+        瀏覽器 / 網頁 App (YouTube Music 的 Chrome App 等) 換歌的一瞬間常常先給 Chrome 的圖示，真正的封面晚一點才到：
+        前 20 秒每 2 秒重讀一次，換了就更新；同一張圖出現在好幾首歌 = 是 App 圖示，不當封面；
+        真的沒有封面就上網找 (iTunes)。"""
+        track_id, thumb = cur["track_id"], cur["_thumb"]
+        web = cur.get("source") in ("YouTube Music", "瀏覽器") or "chrome" in cur.get("app", "").lower() \
+            or "msedge" in cur.get("app", "").lower() or "_crx_" in cur.get("app", "").lower()
+        now = time.time()
+        first = self.art_seen.setdefault(track_id, now)
+        have = track_id in self.art
+        if have and not (web and now - first < 20 and now - self.art_at.get(track_id, 0) >= 2):
+            return
+        self.art_at[track_id] = now
+        data = None
+        if thumb is not None:
+            try:
+                stream = await thumb.open_read_async()
+                size = stream.size
+                reader = DataReader(stream.get_input_stream_at(0))
+                await reader.load_async(size)
+                buf = bytearray(size)
+                reader.read_bytes(buf)
+                data = bytes(buf)
+            except Exception as e:
+                print("[art]", e)
+        if data:
+            h = hashlib.md5(data).hexdigest()
+            users = self.hash_tracks.setdefault(h, set())
+            users.add(track_id)
+            if len(users) >= 3 and h not in self.bad_hashes:
+                self.bad_hashes.add(h)  # 三首不同的歌都是這張：App 圖示
+                print("[art] 這張圖是 App 圖示，不當封面", flush=True)
+                for tid, d in list(self.art.items()):
+                    if hashlib.md5(d).hexdigest() == h:
+                        for dd in (self.art, self.accent):
+                            dd.pop(tid, None)
+                        self.art_v[tid] = self.art_v.get(tid, 0) + 1
+            if h not in self.bad_hashes:
+                self.set_art(track_id, data)
+                return
+        # 沒有封面 / 只有 App 圖示：網頁播放器過幾秒還沒給真的封面，就上網找
+        if web and track_id not in self.art and track_id not in self.online_tried and now - first >= 4:
+            self.online_tried.add(track_id)
+            asyncio.create_task(self.online_art(track_id, cur.get("title") or "", cur.get("artist") or ""))
+
+    async def online_art(self, track_id, title, artist):
+        """上網找封面 (公開的搜尋，不用帳號)：先網易雲 (中文歌多)，再 iTunes (台灣 → 日本 → 美國)。
+        YouTube Music 的歌名常常是「歌手-歌名（英文名）」：拆開來多搜一次；
+        找到的歌名要在裡面、歌手也要對得上，歌手對得越多分數越高 (原唱的英文版不會贏過真正的這一首)。"""
+        q_all = _fnorm(f"{title} {artist}")
+        base = re.sub(r"[（(\[【].*?[）)\]】]", " ", title).strip()
+        parts = re.split(r"\s*[-–—]\s*", base, maxsplit=1)
+        queries = [f"{clean_title(title)} {clean_artist(artist)}".strip()]
+        if len(parts) == 2 and parts[0] and parts[1]:
+            queries.insert(0, f"{parts[0].replace('/', ' ')} {parts[1]}")  # 「加木/Demxntia-無意」→「加木 Demxntia 無意」
+
+        def score(name, singers):
+            n = _fnorm(name)
+            if not n or (len(n) < 2 and n != _fnorm(clean_title(title))):
+                return 0
+            if n not in q_all and not title_matches(clean_title(title), name):
+                return 0
+            hits = sum(1 for a in singers if _fnorm(a) and (_fnorm(a) in q_all or artist_matches(artist, a)))
+            if not hits:
+                return 0
+            exact = 1.5 if n in (_fnorm(clean_title(title)), _fnorm(parts[1]) if len(parts) == 2 else None) else 0
+            low, ql = name.lower(), title.lower()
+            alt = any(w in low and w not in ql for w in _COVER_WORDS)  # Live / 伴奏 / 翻唱版 排後面
+            return hits * 2 + exact - (1.5 if alt else 0) + min(len(n), 12) / 48
+
+        http = await lyrics.session()
+        best = (0, None, None)
+        for q in queries:
+            try:
+                async with http.get("https://music.163.com/api/cloudsearch/pc", headers=NETEASE_HEADERS,
+                                    params={"s": q, "type": 1, "limit": 8}) as r:
+                    d = json.loads(await r.text())
+                for it in ((d.get("result") or {}).get("songs") or []):
+                    pic = (it.get("al") or {}).get("picUrl")
+                    sc = score(it.get("name") or "", [a.get("name") or "" for a in it.get("ar") or []]) if pic else 0
+                    if sc > best[0]:
+                        best = (sc, pic.replace("http://", "https://") + "?param=600y600", (it.get("name"), "網易雲"))
+            except Exception as e:
+                print("[art] netease", repr(e))
+        if not best[1]:
+            for country in ("tw", "jp", "us"):
+                try:
+                    async with http.get("https://itunes.apple.com/search",
+                                        params={"term": queries[-1], "entity": "song", "limit": 8, "country": country}) as r:
+                        d = json.loads(await r.text())
+                    for it in d.get("results") or []:
+                        sc = score(it.get("trackName") or "", [it.get("artistName") or ""]) if it.get("artworkUrl100") else 0
+                        if sc > best[0]:
+                            best = (sc, it["artworkUrl100"].replace("100x100bb", "600x600bb"), (it.get("trackName"), "iTunes"))
+                except Exception as e:
+                    print("[art] itunes", repr(e))
+                if best[1]:
+                    break
+        if not best[1]:
             return
         try:
-            stream = await thumb.open_read_async()
-            size = stream.size
-            reader = DataReader(stream.get_input_stream_at(0))
-            await reader.load_async(size)
-            buf = bytearray(size)
-            reader.read_bytes(buf)
-            self.art[track_id] = bytes(buf)
-            self.accent[track_id] = accent_color(self.art[track_id])
-            if len(self.art) > 30:
-                self.art.pop(next(iter(self.art)))
+            async with http.get(best[1]) as r:
+                if r.status == 200 and track_id not in self.art:
+                    self.set_art(track_id, await r.read())
+                    print(f"[art] 從{best[2][1]}找到封面: {best[2][0]}", flush=True)
         except Exception as e:
-            print("[art]", e)
+            print("[art] download", repr(e))
 
 
 # ───────────────────────── 伺服器 ─────────────────────────
@@ -1117,9 +1250,10 @@ async def poll_loop():
             media.current = cur["_session"] if cur else None
             if cur:
                 cur["position"], cur["playing"] = clock.update(cur)
-                await media.load_art(cur["track_id"], cur["_thumb"])
+                await media.load_art(cur)
                 track = {k: v for k, v in cur.items() if not k.startswith("_")}
                 track["has_art"] = cur["track_id"] in media.art
+                track["art_v"] = media.art_v.get(cur["track_id"], 0)
                 track["accent"] = media.accent.get(cur["track_id"])
                 track["ts"] = time.time()
                 state["track"] = track
@@ -1276,6 +1410,24 @@ async def ws_handler(request):
                     config["wallpaper"]["enabled"] = bool(d.get("enabled"))
                 save_config()
                 threading.Thread(target=sync_wallpaper, daemon=True).start()
+            elif d.get("type") == "notch_opt" and d.get("key") in config["notch_opts"]:
+                set_option(d["key"], bool(d.get("value")))
+            elif d.get("type") == "game":
+                if "enabled" in d:
+                    config["game"]["enabled"] = bool(d["enabled"])
+                if d.get("notch") in ("show", "alerts", "hide"):
+                    config["game"]["notch"] = d["notch"]
+                save_config()
+            elif d.get("type") == "net_alert":
+                config["net_alert"] = bool(d.get("value"))
+                save_config()
+            elif d.get("type") == "notch_style":
+                ns = config.setdefault("notch_style", {"shape": "island", "color": "black"})
+                if d.get("shape") in ("island", "float", "bar"):
+                    ns["shape"] = d["shape"]
+                if d.get("color") in ("black", "album", "theme"):
+                    ns["color"] = d["color"]
+                save_config()
             elif d.get("type") == "notch_set":  # 設定裡的膠囊開關 (不會把主視窗收起來)
                 set_notch(bool(d.get("value")))
             elif d.get("type") == "notch_monitor":
@@ -1562,7 +1714,8 @@ def start_tray():
         print("[tray]", e)
         return
     try:
-        img = Image.open(ROOT / "icon.png").convert("RGBA").resize((64, 64), Image.LANCZOS)
+        p = ROOT / "icon_small.png"  # 小尺寸專用的簡化版 (精緻版縮到 64 px 會糊)
+        img = Image.open(p if p.exists() else ROOT / "icon.png").convert("RGBA").resize((64, 64), Image.LANCZOS)
     except Exception:
         img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
         ImageDraw.Draw(img).ellipse((2, 2, 62, 62), fill=(124, 92, 255))
@@ -1596,7 +1749,7 @@ def start_tray():
         P("膠囊模式 (螢幕頂端)", lambda i, it: set_notch(not config["notch"]), checked=lambda it: config["notch"]),
         P("膠囊選項", pystray.Menu(*[
             P(label, notch_toggle(k), checked=(lambda k: lambda it: config["notch_opts"][k])(k))
-            for k, label in [("peek", "換歌時彈出歌名"), ("spectrum", "真實頻譜和光暈"),
+            for k, label in [("cat", "顯示哼哼貓 (關掉 = 音量條)"), ("peek", "換歌時彈出歌名"), ("spectrum", "真實頻譜和光暈"),
                              ("battery", "裝置電量"), ("gestures", "滾輪調音量、左右滑切歌")]
         ])),
         P("打開舞台", lambda i, it: open_stage()),
@@ -2036,7 +2189,7 @@ def open_settings():
 
 runtime.update(media_cmd=media_cmd, art=lambda tid: media.art.get(tid), open_main=show_window,
                set_option=set_option, get_option=get_option, open_settings=open_settings,
-               can_autostart=FROZEN)
+               can_autostart=FROZEN, save_config=save_config)
 
 
 def devices_msg():
@@ -2210,6 +2363,38 @@ def share_everything():
         if res.get("synced") and SHARE.put(title, artist, 0, res, "manual"):
             n += 1
     return n
+
+
+def net_loop():
+    """網路斷線 / 恢復 → 膠囊提醒。用 Windows 自己的網路狀態 (不會另外連到外面)。
+    斷超過 6 秒才算 (避免換 Wi-Fi、閃斷一下就跳)；恢復時只有之前提醒過斷線才說。"""
+    try:
+        import comtypes
+        import comtypes.client
+        comtypes.CoInitialize()
+        nlm = comtypes.client.CreateObject("{DCB00C01-570F-4A9B-8D69-199FDBA5723B}", dynamic=True)
+    except Exception as e:
+        print("[net] disabled:", repr(e))
+        return
+    down_since, alerted = None, False
+    while not quitting:
+        try:
+            ok = bool(nlm.IsConnectedToInternet)
+        except Exception:
+            ok = True
+        now = time.time()
+        if not ok:
+            down_since = down_since or now
+            if not alerted and now - down_since >= 6 and config.get("net_alert", True):
+                runtime["net_event"] = "off"
+                alerted = True
+                print("[net] 網路斷線", flush=True)
+        else:
+            if alerted and config.get("net_alert", True):
+                runtime["net_event"] = "on"
+                print(f"[net] 網路恢復 (斷了 {now - down_since:.0f} 秒)", flush=True)
+            down_since, alerted = None, False
+        time.sleep(3)
 
 
 def start_autopause():
@@ -2581,6 +2766,7 @@ def main():
     start_tray()
     start_hotkeys()
     start_autopause()
+    threading.Thread(target=net_loop, daemon=True).start()
 
     window = webview.create_window(
         APP_NAME, f"http://127.0.0.1:{PORT}/?app=1&v={VERSION}",

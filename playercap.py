@@ -43,7 +43,7 @@ class PlayerCapHub:
     def song_info(self, t):
         cover = ""
         if t.get("has_art"):
-            cover = f"http://127.0.0.1:{self.port}/art?id=" + urllib.parse.quote(t["track_id"], safe="")
+            cover = f"http://127.0.0.1:{self.port}/art?id=" + urllib.parse.quote(t["track_id"], safe="") + f"&v={t.get('art_v', 0)}"
         return {"name": t.get("title") or "", "singer": t.get("artist") or "", "title": t.get("title") or "",
                 "cover": cover, "cover_base64": ""}
 

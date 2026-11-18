@@ -386,7 +386,7 @@ function onState(m){
     pendingLyr = null;
     rebuild();
   }
-  if (t.has_art && !artLoaded) loadArt(t);
+  if (t.has_art && (!artLoaded || artV !== (t.art_v || 0))) { artV = t.art_v || 0; loadArt(t); }
 }
 let pendingLyr = null;
 // ───── 音樂控制列 ─────
@@ -477,7 +477,7 @@ function normalize(raw){
 }
 
 // ───── 顏色 (封面取色) ─────
-let artLoaded = false, palette = ['#3a2a6a','#a04a7a','#1f4a7a','#2a6a5a'];
+let artV = -1, artLoaded = false, palette = ['#3a2a6a','#a04a7a','#1f4a7a','#2a6a5a'];
 function onTrack(t){
   artLoaded = false;
   $('#card-t').textContent = $('#intro-t').textContent = t.title || '';
