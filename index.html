@@ -484,9 +484,100 @@ body[data-theme="paper"] #bg::after{background:rgba(241,234,219,.55)}
 body[data-theme="paper"] #grain{opacity:.14;mix-blend-mode:multiply}
 body[data-theme="paper"] #cover{border-radius:6px;box-shadow:0 18px 40px -16px rgba(60,40,20,.45),0 0 0 6px #fffaf0,0 0 0 7px rgba(58,42,26,.12)}
 body[data-theme="paper"] .modal{background:rgba(120,100,70,.3)}
+/* 綠洲：深炭灰 + 亮綠 (串流 App 的感覺) */
+body[data-theme="oasis"]{--bg0:#121212;--panel:24,24,24;--dialog:#181818;--accent:#2bd46b;--accent2:#1fae55;--pill:#2bd46b;--pill-fg:#000;--glass:rgba(255,255,255,.06);--glass-b:rgba(255,255,255,.1)}
+body[data-theme="oasis"] .blob{opacity:.25}
+body[data-theme="oasis"] #bg .art.on{opacity:.35;filter:blur(var(--bg-blur,90px)) saturate(1.1) brightness(.55)}
+body[data-theme="oasis"] #cover{border-radius:6px}
+body[data-theme="oasis"] #fill{background:#2bd46b}
+body[data-theme="oasis"] .seg button.on{background:#2bd46b;color:#000;border-color:#2bd46b}
+/* 緋紅：深色毛玻璃 + 莓紅 */
+body[data-theme="crimson"]{--bg0:#1c1c1e;--panel:36,30,34;--dialog:#232024;--accent:#ff375f;--accent2:#e0234a;--pill:#ff375f;--pill-fg:#fff;--glass:rgba(255,255,255,.07);--glass-b:rgba(255,255,255,.12)}
+body[data-theme="crimson"] #bg .art.on{opacity:.9;filter:blur(var(--bg-blur,110px)) saturate(1.8) brightness(.62)}
+body[data-theme="crimson"] #cover{border-radius:14px;box-shadow:0 30px 70px -20px rgba(0,0,0,.7)}
+body[data-theme="crimson"] #fill{background:#ff375f}
+body[data-theme="crimson"] .seg button.on{background:#ff375f;color:#fff;border-color:#ff375f}
+/* 卡帶：復古卡帶機 */
+body[data-theme="cassette"]{--bg0:#1d1712;--panel:38,30,22;--dialog:#261d15;--ink:243,227,195;--fg:#f3e3c3;--hi:#fff4dc;--dim:rgba(243,227,195,.45);
+  --accent:#ff9f1c;--accent2:#e36414;--pill:#ff9f1c;--pill-fg:#1d1712;--glass:rgba(243,227,195,.06);--glass-b:rgba(243,227,195,.14)}
+body[data-theme="cassette"] .blob{display:none}
+body[data-theme="cassette"] #bg .art.on{opacity:.22;filter:blur(var(--bg-blur,90px)) sepia(.8) saturate(1.2) brightness(.7)}
+body[data-theme="cassette"] #bg::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 2px,transparent 2px 4px)}
+body[data-theme="cassette"] #grain{opacity:.16}
+body[data-theme="cassette"] #cover{border-radius:4px;box-shadow:0 0 0 6px #2a2018,0 0 0 7px rgba(255,159,28,.35),0 24px 50px -18px #000}
+body[data-theme="cassette"] #fill{background:repeating-linear-gradient(90deg,#ff9f1c 0 6px,#e36414 6px 8px)}
+body[data-theme="cassette"] .seg button.on{background:#ff9f1c;color:#1d1712;border-color:#ff9f1c}
+body[data-theme="cassette"] .times{font-family:Consolas,"Cascadia Mono",monospace}
+/* 蒸氣波：紫粉 + 青藍 */
+body[data-theme="vapor"]{--bg0:#1a0b2e;--panel:40,16,64;--dialog:#24103d;--accent:#ff71ce;--accent2:#01cdfe;--pill:#ff71ce;--pill-fg:#1a0b2e;--glass-b:rgba(255,113,206,.25)}
+body[data-theme="vapor"] #bg::before{content:"";position:absolute;left:-10%;right:-10%;bottom:0;height:45%;z-index:1;pointer-events:none;opacity:.35;
+  background:linear-gradient(transparent 0 0),repeating-linear-gradient(90deg,rgba(1,205,254,.5) 0 1px,transparent 1px 60px),
+  repeating-linear-gradient(0deg,rgba(255,113,206,.5) 0 1px,transparent 1px 34px);transform:perspective(300px) rotateX(55deg);transform-origin:bottom}
+body[data-theme="vapor"] #bg .art.on{opacity:.55;filter:blur(var(--bg-blur,90px)) saturate(2) hue-rotate(25deg) brightness(.6)}
+body[data-theme="vapor"] .line.active .txt{filter:drop-shadow(0 0 10px rgba(255,113,206,.55)) drop-shadow(0 0 22px rgba(1,205,254,.35))}
+body[data-theme="vapor"] #fill{background:linear-gradient(90deg,#ff71ce,#01cdfe)}
+body[data-theme="vapor"] #transport #btn-play{background:linear-gradient(135deg,#ff71ce,#01cdfe);color:#1a0b2e}
+body[data-theme="vapor"] .seg button.on{background:#ff71ce;color:#1a0b2e;border-color:#ff71ce}
+/* 深海 */
+body[data-theme="ocean"]{--bg0:#04111f;--panel:8,28,48;--dialog:#071a2d;--ink:225,242,255;--fg:#e1f2ff;--hi:#fff;--dim:rgba(225,242,255,.45);
+  --accent:#4cc9f0;--accent2:#4361ee;--pill:#4cc9f0;--pill-fg:#04111f;--glass-b:rgba(76,201,240,.2)}
+body[data-theme="ocean"] .blob{opacity:.4;filter:blur(120px) hue-rotate(190deg)}
+body[data-theme="ocean"] #bg .art.on{opacity:.45;filter:blur(var(--bg-blur,100px)) saturate(1.2) hue-rotate(160deg) brightness(.55)}
+body[data-theme="ocean"] #fill{background:linear-gradient(90deg,#4361ee,#4cc9f0)}
+body[data-theme="ocean"] .seg button.on{background:#4cc9f0;color:#04111f;border-color:#4cc9f0}
+/* 新風格的背景色調：不管封面什麼顏色，都看得出是哪個風格 */
+body[data-theme="oasis"] #bg::after{background:linear-gradient(180deg,rgba(40,40,40,.55),rgba(18,18,18,calc(.72 + var(--bg-dim,.35) * .25)))}
+body[data-theme="crimson"] #bg::after{background:radial-gradient(ellipse at 20% 20%,rgba(120,20,45,.45),rgba(28,28,30,.78) 70%)}
+body[data-theme="cassette"] #bg::after{background:radial-gradient(ellipse at 30% 40%,rgba(70,45,20,.6),rgba(29,23,18,.88) 75%)}
+body[data-theme="vapor"] #bg::after{background:linear-gradient(180deg,rgba(26,11,46,.82),rgba(90,22,100,.62) 62%,rgba(255,113,206,.45))}
+body[data-theme="ocean"] #bg::after{background:linear-gradient(180deg,rgba(10,42,74,.62),rgba(4,17,31,.86))}
+/* 櫻花 (淺色) */
+body[data-theme="sakura"]{--ink:90,42,63;--fg:#4a2234;--hi:#2e1220;--dim:rgba(90,42,63,.5);--glass:rgba(255,255,255,.6);--glass-b:rgba(90,42,63,.12);
+  --bg0:#fbf1f4;--panel:255,248,250;--dialog:#fff8fa;--pill:#e05a8a;--pill-fg:#fff;--accent:#e05a8a;--accent2:#e05a8a;--shade:255,245,248}
+body[data-theme="sakura"] .blob{mix-blend-mode:multiply;opacity:.22}
+body[data-theme="sakura"] #bg .art.on{opacity:.4;filter:blur(var(--bg-blur,90px)) saturate(1.2) brightness(1.2)}
+body[data-theme="sakura"] #bg::after{background:rgba(255,240,245,calc(.4 + var(--bg-dim,.35) * .5))}
+body[data-theme="sakura"] #grain{opacity:.03}
+body[data-theme="sakura"] .modal{background:rgba(240,215,225,.55)}
+body[data-theme="sakura"] #cover{border-radius:22px;box-shadow:0 26px 50px -20px rgba(150,60,100,.35)}
+/* 抹茶 (淺色) */
+body[data-theme="matcha"]{--ink:40,52,30;--fg:#2f3d24;--hi:#1d2715;--dim:rgba(40,52,30,.5);--glass:rgba(255,255,250,.6);--glass-b:rgba(40,52,30,.12);
+  --bg0:#eef2e6;--panel:248,250,242;--dialog:#f8faf2;--pill:#5a8f3c;--pill-fg:#fff;--accent:#5a8f3c;--accent2:#5a8f3c;--shade:240,244,232}
+body[data-theme="matcha"] .blob{display:none}
+body[data-theme="matcha"] #bg .art.on{opacity:.2;filter:blur(var(--bg-blur,90px)) saturate(.7) sepia(.2)}
+body[data-theme="matcha"] #bg::after{background:rgba(238,242,230,.55)}
+body[data-theme="matcha"] #grain{opacity:.1;mix-blend-mode:multiply}
+body[data-theme="matcha"] .modal{background:rgba(200,215,180,.4)}
+body[data-theme="matcha"] #cover{border-radius:10px;box-shadow:0 18px 40px -16px rgba(40,60,20,.4)}
 html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{transition:none!important}
+/* 歌詞呈現選擇 */
+#lyr-styles{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;margin:12px 0}
+#lyr-styles button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 12px;border-radius:12px;border:1px solid var(--glass-b);
+  background:var(--glass);color:var(--fg);cursor:pointer;text-align:left}
+#lyr-styles b{font:700 13px var(--font)}
+#lyr-styles span{font:500 11px/1.35 var(--font);color:var(--dim)}
+#lyr-styles button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+/* ───── 歌詞呈現方式 (body[data-ls]) ───── */
+body[data-ls="clear"] .line{filter:none!important;opacity:1!important}
+body[data-ls="clear"] .line.past{color:rgba(var(--ink),.45)}
+body[data-ls="center"] .line,body[data-ls="spot"] .line{text-align:center;transform-origin:center center}
+body[data-ls="center"] .interlude,body[data-ls="spot"] .interlude{justify-content:center}
+body[data-ls="spot"] .line{opacity:0!important;filter:blur(6px)!important}
+body[data-ls="spot"] .line.active{opacity:1!important;filter:none!important;transform:scale(1.22)}
+body[data-ls="spot"] .line.active + .line{opacity:.38!important;filter:none!important}
+body[data-ls="karaoke"] .line{filter:none!important;opacity:0!important}
+body[data-ls="karaoke"] .line.active,body[data-ls="karaoke"] .line.active + .line{opacity:1!important}
+body[data-ls="karaoke"] .line.active + .line{color:rgba(var(--ink),.55)}
+body[data-ls="karaoke"] .line:nth-child(odd){text-align:right;transform-origin:right center}
+body[data-ls="type"] .line.active .txt{-webkit-mask-image:linear-gradient(90deg,#000 calc(var(--p,0) * 108%),transparent calc(var(--p,0) * 108% + 6%));
+  mask-image:linear-gradient(90deg,#000 calc(var(--p,0) * 108%),transparent calc(var(--p,0) * 108% + 6%))}
+body[data-ls="type"] .line:not(.active):not(.past){opacity:.35!important}
+body[data-ls="pop"] .line.active{animation:lyrpop .55s cubic-bezier(.3,1.6,.5,1)}
+body[data-ls="pop"] .line.active .txt{filter:drop-shadow(0 0 14px color-mix(in srgb,var(--accent) 60%,transparent))}
+@keyframes lyrpop{0%{transform:scale(.88)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
 /* 風格選擇卡片 */
-#themes{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+#themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px}
 #themes button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:12px;border:1px solid var(--glass-b);background:var(--glass);
   color:var(--fg);font:600 12px var(--font);cursor:pointer}
 #themes button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
@@ -581,7 +672,27 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
       <button data-theme="mono"><span class="sw" style="background:#000;border:1px solid #222"><b style="background:#fff"></b><i style="background:#fff"></i></span>極簡</button>
       <button data-theme="neon"><span class="sw" style="background:linear-gradient(135deg,#06051a,#1a0b3a)"><b style="background:#ff2bd6"></b><i style="background:#22f0ff;box-shadow:0 0 6px #22f0ff"></i></span>霓虹</button>
       <button data-theme="paper"><span class="sw" style="background:#f1eadb"><b style="background:#2c2116"></b><i style="background:#b0532c"></i></span>紙本</button>
+      <button data-theme="oasis"><span class="sw" style="background:linear-gradient(160deg,#222,#121212)"><b style="background:#fff"></b><i style="background:#2bd46b"></i></span>綠洲</button>
+      <button data-theme="crimson"><span class="sw" style="background:linear-gradient(135deg,#3a1520,#1c1c1e)"><b style="background:#fff"></b><i style="background:#ff375f"></i></span>緋紅</button>
+      <button data-theme="cassette"><span class="sw" style="background:repeating-linear-gradient(0deg,#2a2018 0 3px,#231a13 3px 6px)"><b style="background:#f3e3c3"></b><i style="background:#ff9f1c"></i></span>卡帶</button>
+      <button data-theme="vapor"><span class="sw" style="background:linear-gradient(180deg,#2d0b4e,#7a1f6e 70%,#ff71ce)"><b style="background:#01cdfe"></b><i style="background:#ff71ce;box-shadow:0 0 6px #ff71ce"></i></span>蒸氣波</button>
+      <button data-theme="ocean"><span class="sw" style="background:linear-gradient(180deg,#0a2a4a,#04111f)"><b style="background:#bde7ff"></b><i style="background:#4cc9f0"></i></span>深海</button>
+      <button data-theme="sakura"><span class="sw" style="background:linear-gradient(135deg,#fde7ee,#fbf1f4)"><b style="background:#5a2a3f"></b><i style="background:#e05a8a"></i></span>櫻花</button>
+      <button data-theme="matcha"><span class="sw" style="background:linear-gradient(135deg,#e3ebd3,#f3f5ea)"><b style="background:#2f3d24"></b><i style="background:#5a8f3c"></i></span>抹茶</button>
     </div></div>
+  </section>
+  <section class="grp"><h3>歌詞呈現</h3>
+    <div class="card">
+      <div id="lyr-styles">
+        <button data-ls="flow"><b>流動</b><span>捲動，遠的句子模糊</span></button>
+        <button data-ls="clear"><b>清晰</b><span>不模糊，每句都看得清楚</span></button>
+        <button data-ls="center"><b>置中</b><span>歌詞排在正中間</span></button>
+        <button data-ls="spot"><b>聚光</b><span>只亮這一句，放大</span></button>
+        <button data-ls="karaoke"><b>卡拉 OK</b><span>兩行一左一右</span></button>
+        <button data-ls="type"><b>打字機</b><span>字一個個浮現</span></button>
+        <button data-ls="pop"><b>彈跳</b><span>換句時彈一下、發光</span></button>
+      </div>
+    </div>
   </section>
   <section class="grp"><h3>介面大小</h3>
     <div class="card">
@@ -921,6 +1032,7 @@ function onState(m){
     renderMonitors(m.monitors);
     renderShare();
     applyTheme(cfg.theme);
+    if (performance.now() - lsEdit > 1500) applyLyrStyle(cfg.lyr_style);
     { const z = cfg.ui_zoom || 100, near = [90, 100, 115, 130, 150].reduce((a, b) => Math.abs(b - z) < Math.abs(a - z) ? b : a);
       document.querySelectorAll('#zooms [data-z]').forEach(b => b.classList.toggle('on', +b.dataset.z === near)); }
     renderChat(m);
@@ -1751,6 +1863,16 @@ $('#find-form').onsubmit = async e => {
 };
 // ───── 風格 ─────
 let themeEdit = 0;
+function applyLyrStyle(v){
+  v = v || 'flow';
+  if (document.body.dataset.ls !== v){ document.body.dataset.ls = v; activeIdx = -2; try { localStorage.setItem('ls', v); } catch {} }
+  document.querySelectorAll('#lyr-styles [data-ls]').forEach(b => b.classList.toggle('on', b.dataset.ls === v));
+}
+try { document.body.dataset.ls = localStorage.getItem('ls') || 'flow'; } catch {}
+let lsEdit = 0;
+document.querySelectorAll('#lyr-styles [data-ls]').forEach(b => b.onclick = () => { lsEdit = performance.now();
+  applyLyrStyle(b.dataset.ls); send({type: 'lyr_style', value: b.dataset.ls}); });
+
 function applyTheme(t){
   if (performance.now() - themeEdit < 1500) return;
   t = t || 'night';

@@ -54,7 +54,9 @@ DEFAULT_CONFIG = {
     "offset": 0.0,
     "notch": True,   # 螢幕頂端的小膠囊 (跟主視窗分開，一直都在)
     "ui_zoom": 100,    # 介面大小 % (字、按鈕一起放大，給看不清楚的人)
-    "theme": "night",  # 主視窗風格：night 夜光 / dawn 晨霧 / mono 極簡 / neon 霓虹 / paper 紙本
+    "theme": "night",  # 主視窗風格：night 夜光 / dawn 晨霧 / mono 極簡 / neon 霓虹 / paper 紙本 / oasis 綠洲 / crimson 緋紅 /
+    #                    cassette 卡帶 / vapor 蒸氣波 / ocean 深海 / sakura 櫻花 / matcha 抹茶
+    "lyr_style": "flow",  # 主視窗歌詞呈現：flow 流動 / clear 清晰 / center 置中 / spot 聚光 / karaoke 卡拉OK / type 打字機 / pop 彈跳
     "auto_pause": {"lock": True, "unplug": True, "resume": True},  # 鎖定 / 拔耳機時暫停，回來接著播
     "taskbar_progress": True,  # 工作列圖示上顯示播放進度
     "hotkeys": True,     # 全域快捷鍵 Ctrl+Alt+… (遊戲裡也能切歌、調音量)
@@ -117,7 +119,7 @@ def load_config():
             cfg["ui_zoom"] = max(70, min(200, int(saved.get("ui_zoom", 100))))
         except (TypeError, ValueError):
             cfg["ui_zoom"] = 100
-        cfg["theme"] = saved.get("theme") if saved.get("theme") in ("night", "dawn", "mono", "neon", "paper") else "night"
+        cfg["theme"] = saved.get("theme") if saved.get("theme") in ('night', 'dawn', 'mono', 'neon', 'paper', 'oasis', 'crimson', 'cassette', 'vapor', 'ocean', 'sakura', 'matcha') else "night"
         cfg["music_only"] = bool(saved.get("music_only", True))
         cfg["hotkeys"] = bool(saved.get("hotkeys", True))
         cfg["taskbar_progress"] = bool(saved.get("taskbar_progress", True))
@@ -126,6 +128,7 @@ def load_config():
         cfg["game"] = {"enabled": bool(gm.get("enabled", True)),
                        "notch": gm.get("notch") if gm.get("notch") in ("show", "alerts", "hide") else "alerts"}
         cfg["net_alert"] = bool(saved.get("net_alert", True))
+        cfg["lyr_style"] = saved.get("lyr_style") if saved.get("lyr_style") in ('flow', 'clear', 'center', 'spot', 'karaoke', 'type', 'pop') else "flow"
         if isinstance(saved.get("stage_live"), dict):
             cfg["stage_live"] = saved["stage_live"]
         cfg["jp_reading"] = saved.get("jp_reading") if saved.get("jp_reading") in ("off", "furigana", "hiragana", "romaji") else "off"
@@ -1659,7 +1662,7 @@ async def ws_handler(request):
             elif d.get("type") == "auto_pause" and d.get("key") in ("lock", "unplug", "resume"):
                 config["auto_pause"][d["key"]] = bool(d.get("value"))
                 save_config()
-            elif d.get("type") == "theme" and d.get("value") in ("night", "dawn", "mono", "neon", "paper"):
+            elif d.get("type") == "theme" and d.get("value") in ('night', 'dawn', 'mono', 'neon', 'paper', 'oasis', 'crimson', 'cassette', 'vapor', 'ocean', 'sakura', 'matcha'):
                 config["theme"] = d["value"]
                 save_config()
                 for w in (window, settings_window):
@@ -1706,6 +1709,9 @@ async def ws_handler(request):
                 if d.get("notch") in ("show", "alerts", "hide"):
                     config["game"]["notch"] = d["notch"]
                 save_config()
+            elif d.get("type") == "lyr_style" and d.get("value") in ('flow', 'clear', 'center', 'spot', 'karaoke', 'type', 'pop'):
+                config["lyr_style"] = d["value"]
+                config_changed()
             elif d.get("type") == "net_alert":
                 config["net_alert"] = bool(d.get("value"))
                 save_config()
@@ -2173,7 +2179,7 @@ def apply_window_style(win=None):
             def attr(a, v):
                 val = ctypes.c_int(v)
                 return dwm.DwmSetWindowAttribute(hwnd, a, ctypes.byref(val), 4)
-            attr(20, 0 if config.get("theme") in ("dawn", "paper") else 1)   # 深色 / 淺色風格的視窗邊框
+            attr(20, 0 if config.get("theme") in ('dawn', 'paper', 'sakura', 'matcha') else 1)   # 深色 / 淺色風格的視窗邊框
             attr(33, 2)   # 圓角
             # Mica 要整個視窗都是「玻璃」才透得出來。不能用 -1 (整片)：那樣 Windows 會在右上角畫出它自己的
             # 最小化 / 放大 / 關閉按鈕，跟網頁的按鈕疊成虛影。改成只從下緣往上延伸一大段，一樣蓋滿整個視窗，但不會畫按鈕
