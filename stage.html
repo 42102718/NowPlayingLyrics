@@ -33,8 +33,9 @@ body.scene.transparent{background:#05050a}
 body.transparent #vignette{display:none}
 
 #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;perspective:1200px;overflow:hidden}
-.ln{position:absolute;left:5vw;right:5vw;top:50%;translate:0 -50%;text-align:center;font-weight:900;font-size:calc(7.6vmin * var(--size));line-height:1.22;
+.ln{position:absolute;left:5vw;right:5vw;top:50%;translate:0 -50%;text-align:center;font-weight:900;font-size:calc(7.6vmin * var(--size) * var(--k,1));line-height:1.22;
   letter-spacing:.01em;will-change:transform,opacity,filter}
+.ln.next{--k:var(--next,1)}  /* 下一句的大小 (設定 → 外觀 → 下一句大小) */
 .ln .tr{display:block;font-weight:700;font-size:.42em;margin-top:.45em;opacity:.75;letter-spacing:.02em}
 .w{display:inline-block;white-space:pre;will-change:transform}
 /* 共用：逐字填色 (--p = 這個字唱到幾成) */
@@ -96,7 +97,7 @@ body.transparent #vignette{display:none}
 .m-depth .ln.cur .tr{opacity:.75}
 
 /* 6. KTV：兩行交錯，粗描邊，逐字掃色 */
-.m-ktv .ln{font-size:calc(8vmin * var(--size));text-align:left;left:7vw;right:7vw;transition:opacity .4s}
+.m-ktv .ln{font-size:calc(8vmin * var(--size) * var(--k,1));text-align:left;left:7vw;right:7vw;transition:opacity .4s}
 .m-ktv .ln.slot0{top:36%}
 .m-ktv .ln.slot1{top:64%;text-align:right}
 .m-ktv .ln.prev,.m-ktv .ln.enter{opacity:0}
@@ -142,7 +143,7 @@ body.transparent #vignette{display:none}
 .m-stairs .ln.next,.m-stairs .ln .tr{display:none}
 
 /* 11. 迴環：字繞成一個圓圈慢慢轉，下一句在內圈 */
-.m-ring .ln{left:50%;right:auto;top:50%;translate:none;width:0;height:0;font-size:calc(4.6vmin * var(--size));
+.m-ring .ln{left:50%;right:auto;top:50%;translate:none;width:0;height:0;font-size:calc(4.6vmin * var(--size) * var(--k,1));
   transition:transform 1.1s cubic-bezier(.2,.8,.2,1),opacity 1s,filter 1s}
 .m-ring .ln .spin{position:absolute;left:0;top:0;animation:spin 50s linear infinite}
 .m-ring .ln .w{position:absolute;left:0;top:0;transform-origin:0 0;white-space:pre;
@@ -244,7 +245,7 @@ body.obs #gear,body.obs #home,body.obs #panel,body.obs #hint{display:none!import
 #ctl{position:fixed;left:50%;bottom:22px;transform:translate(-50%,12px);z-index:20;display:flex;align-items:center;gap:6px;padding:8px 12px;
   border-radius:999px;background:rgba(16,16,26,.72);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(20px) saturate(1.4);
   box-shadow:0 16px 50px rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
-body.ui #ctl{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+body.ui.ctl #ctl{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 #ctl button{width:42px;height:42px;border-radius:50%;border:0;background:none;color:#fff;cursor:pointer;display:grid;place-items:center;
   font:20px "Segoe Fluent Icons","Segoe MDL2 Assets";transition:background .15s,transform .15s}
 #ctl button:hover{background:rgba(255,255,255,.12)}
@@ -296,6 +297,7 @@ body.obs #ctl{display:none!important}
     <label class="row">用封面顏色 <input type="checkbox" id="o-album"></label>
     <label class="row" id="color-row">歌詞顏色 <input type="color" id="o-color" value="#ffffff"></label>
     <label class="row">顯示下一句 <input type="checkbox" id="o-next"></label>
+    <label class="row" id="nsize-row" title="Hummi 效果才有；Folia 效果的下一句由 Folia 決定">下一句大小 <input type="range" id="o-nsize" min="0.5" max="1.6" step="0.05"></label>
     <label class="row">換歌時顯示歌曲卡片 <input type="checkbox" id="o-card"></label>
     <label class="row">跟著節拍脈動 <input type="checkbox" id="o-beat"></label>
     <div class="src-note">字體大小兩種效果都有作用 (Folia 效果放開滑桿後會重新載入一下)；其他外觀設定只用在 Hummi 效果。</div>
@@ -331,7 +333,7 @@ const BGS = [['fluid','流動','專輯色流動'],['particles','粒子','光點�
 const FONTS = {sans:'"Noto Sans TC","Inter",system-ui,sans-serif', serif:'"Noto Serif TC","Noto Sans TC",serif', latin:'"Inter","Noto Sans TC",sans-serif'};
 const params = new URLSearchParams(location.search);
 const OBS = params.has('obs');
-let opt = {mode:'folia:classic', bg:'fluid', transparent:false, size:1, next:true, card:true, beat:true, album:true, color:'#ffffff', font:'sans'};
+let opt = {mode:'folia:classic', bg:'fluid', transparent:false, size:1, nsize:1, next:true, card:true, beat:true, album:true, color:'#ffffff', font:'sans'};
 try { Object.assign(opt, JSON.parse(localStorage.getItem('hummi.stage') || '{}')); } catch {}
 for (const k of Object.keys(opt)){
   if (!params.has(k)) continue;
@@ -1068,7 +1070,8 @@ function renderPanel(){
   $('#fmodes').querySelectorAll('button').forEach(b => b.onclick = () => pick(b));
   $('#modes').querySelectorAll('button').forEach(b => b.onclick = () => pick(b));
   $('#bgs').querySelectorAll('button').forEach(b => b.onclick = () => { opt.bg = b.dataset.b; save(); renderPanel(); applyBg(); });
-  $('#o-size').value = opt.size; $('#o-next').checked = opt.next; $('#o-card').checked = opt.card; $('#o-transparent').checked = opt.transparent;
+  $('#o-size').value = opt.size; $('#o-nsize').value = opt.nsize; $('#o-nsize').disabled = !opt.next || isFolia(opt.mode);
+  $('#nsize-row').style.opacity = isFolia(opt.mode) ? .45 : 1; $('#o-next').checked = opt.next; $('#o-card').checked = opt.card; $('#o-transparent').checked = opt.transparent;
   $('#o-beat').checked = opt.beat; $('#o-album').checked = opt.album; $('#o-color').value = opt.color; $('#o-font').value = opt.font;
   $('#color-row').hidden = opt.album;
 }
@@ -1081,6 +1084,7 @@ $('#p-close').onclick = () => $('#panel').classList.remove('open');
 function applyOpts(){
   const r = document.documentElement.style;
   r.setProperty('--size', opt.size);
+  r.setProperty('--next', opt.nsize);
   r.setProperty('--font', FONTS[opt.font] || FONTS.sans);
   document.body.classList.toggle('no-card', !opt.card);
   applyColors();
@@ -1090,7 +1094,8 @@ $('#o-size').onchange = () => { if (isFolia(opt.mode)) applyFolia(true); };  // 
 $('#o-font').onchange = e => { opt.font = e.target.value; applyOpts(); save(); };
 $('#o-album').onchange = e => { opt.album = e.target.checked; applyOpts(); save(); $('#color-row').hidden = opt.album; };
 $('#o-color').oninput = e => { opt.color = e.target.value; opt.album = false; $('#o-album').checked = false; applyOpts(); save(); };
-$('#o-next').onchange = e => { opt.next = e.target.checked; save(); rebuild(); };
+$('#o-next').onchange = e => { opt.next = e.target.checked; save(); rebuild(); $('#o-nsize').disabled = !opt.next || isFolia(opt.mode); };
+$('#o-nsize').oninput = e => { opt.nsize = +e.target.value; applyOpts(); save(); };
 $('#o-transparent').onchange = e => { opt.transparent = e.target.checked; save(); applyBg(); if (isFolia(opt.mode)) applyFolia(true); };
 $('#o-card').onchange = e => { opt.card = e.target.checked; applyOpts(); save(); };
 $('#o-beat').onchange = e => { opt.beat = e.target.checked; save(); };
@@ -1110,16 +1115,21 @@ $('#b-obs').onclick = async () => {
     catch { $('#msg').textContent = url; }
     return;
   }
-  const q = new URLSearchParams({obs: 1, mode: opt.mode, bg: opt.bg, size: opt.size, font: opt.font, transparent: +opt.transparent, next: +opt.next,
+  const q = new URLSearchParams({obs: 1, mode: opt.mode, bg: opt.bg, size: opt.size, nsize: opt.nsize, font: opt.font, transparent: +opt.transparent, next: +opt.next,
                                  card: +opt.card, beat: +opt.beat, album: +opt.album, color: opt.color});
   const url = `http://${location.host}/stage?${q}`;
   try { await navigator.clipboard.writeText(url); $('#msg').textContent = '已複製！在 OBS 新增「瀏覽器」來源，貼上網址，寬高設 1920×1080。'; }
   catch { $('#msg').textContent = url; }
 };
 let uiTimer;
-const poke = () => { document.body.classList.add('ui'); $('#hint').classList.add('show');
-  clearTimeout(uiTimer); uiTimer = setTimeout(() => { if (!$('#panel').classList.contains('open')){ document.body.classList.remove('ui'); $('#hint').classList.remove('show'); } }, 2500); };
+const poke = e => { document.body.classList.add('ui'); $('#hint').classList.add('show');
+  // 音樂控制列只在滑鼠移到畫面下方 (或正在用它) 時出現，不然會一直蓋住下面那句歌詞
+  const low = !e || e.clientY > innerHeight * 0.72 || e.target?.closest?.('#ctl');
+  document.body.classList.toggle('ctl', !!low);
+  clearTimeout(uiTimer); uiTimer = setTimeout(() => { if (!$('#panel').classList.contains('open')){ document.body.classList.remove('ui', 'ctl'); $('#hint').classList.remove('show'); } }, 2500); };
 addEventListener('mousemove', poke);
+document.documentElement.addEventListener('mouseleave', () => { clearTimeout(uiTimer); document.body.classList.remove('ctl');
+  if (!$('#panel').classList.contains('open')){ document.body.classList.remove('ui'); $('#hint').classList.remove('show'); } });
 
 addEventListener('resize', resize);
 resize(); applyBg(); applyOpts(); renderPanel(); rebuild(); poke();
