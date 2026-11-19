@@ -216,7 +216,44 @@ body.no-card #card{display:none}
 /* 設定面板 */
 #gear{position:fixed;right:20px;top:20px;width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(20,20,30,.6);
   backdrop-filter:blur(16px);color:#fff;font-size:20px;cursor:pointer;opacity:0;transition:opacity .3s;z-index:20}
-body.ui #gear,body.ui #home{opacity:1}
+body.ui #gear,body.ui #home,body.ui #find{opacity:1}
+#find{position:fixed;right:124px;top:20px;width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(20,20,30,.6);
+  backdrop-filter:blur(16px);color:#fff;font:18px "Segoe Fluent Icons","Segoe MDL2 Assets";cursor:pointer;opacity:0;transition:opacity .3s;z-index:20}
+/* 沒有歌詞時：滑鼠一動就出現「找歌詞」 */
+#nolyr{position:fixed;left:50%;top:22px;transform:translate(-50%,-8px);z-index:20;display:flex;align-items:center;gap:12px;padding:8px 8px 8px 18px;
+  border-radius:999px;background:rgba(16,16,26,.72);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(20px);color:rgba(255,255,255,.75);
+  font:600 13px "Noto Sans TC",sans-serif;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
+body.ui.nolyr #nolyr{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#nolyr button{height:32px;padding:0 14px;border-radius:999px;border:0;background:#fff;color:#111;font:700 13px "Noto Sans TC",sans-serif;cursor:pointer}
+/* 找歌詞視窗 */
+#fd{position:fixed;inset:0;z-index:40;display:none;place-items:center;background:rgba(0,0,0,.45);backdrop-filter:blur(6px)}
+#fd.open{display:grid}
+#fd .box{width:min(620px,calc(100vw - 32px));max-height:calc(100vh - 64px);display:flex;flex-direction:column;border-radius:20px;overflow:hidden;
+  background:rgba(18,18,28,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 80px rgba(0,0,0,.6);color:#fff;font-family:"Noto Sans TC",sans-serif}
+#fd header{display:flex;gap:4px;padding:10px 10px 0 12px;align-items:center}
+#fd header .tab{height:34px;padding:0 14px;border-radius:10px;border:0;background:none;color:rgba(255,255,255,.6);font:600 13px inherit;font-family:inherit;cursor:pointer}
+#fd header .tab.on{background:rgba(255,255,255,.12);color:#fff}
+#fd header .x{margin-left:auto;width:34px;height:34px;border:0;background:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer}
+#fd .body{padding:14px 18px 18px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0}
+#fd form{display:flex;gap:8px}
+#fd input,#fd textarea{flex:1;min-width:0;height:38px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);
+  color:#fff;font:500 14px inherit;font-family:inherit;outline:none}
+#fd textarea{height:220px;padding:10px 12px;resize:vertical;font:13px/1.5 Consolas,monospace}
+#fd .go{height:38px;padding:0 18px;border-radius:10px;border:0;background:#fff;color:#111;font:700 13px inherit;font-family:inherit;cursor:pointer}
+#fd .go.ghost{background:rgba(255,255,255,.1);color:#fff}
+#fd .msg{font-size:12px;color:rgba(255,255,255,.55)}
+#fd .msg.err{color:#ff9b9b}
+#fd .res{display:flex;flex-direction:column;gap:4px}
+#fd .res button{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;border:0;
+  background:rgba(255,255,255,.05);color:#fff;font-family:inherit;cursor:pointer}
+#fd .res button:hover{background:rgba(255,255,255,.12)}
+#fd .res button:disabled{opacity:.5}
+#fd .res .src{font-size:11px;font-weight:700;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.12);white-space:nowrap}
+#fd .res .t{display:block;font-weight:700;font-size:14px}
+#fd .res .a{display:block;font-size:12px;color:rgba(255,255,255,.55)}
+#fd .res .d{font-size:12px;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums}
+#fd .res .d.ok{color:#6ee7a0;font-weight:700}
+body.obs #find,body.obs #nolyr,body.obs #fd{display:none!important}
 #home{position:fixed;right:72px;top:20px;width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(20,20,30,.6);
   backdrop-filter:blur(16px);color:#fff;font-size:20px;cursor:pointer;opacity:0;transition:opacity .3s;z-index:20}
 #panel{position:fixed;right:20px;top:76px;width:340px;max-height:calc(100vh - 96px);overflow:auto;padding:18px;border-radius:20px;z-index:20;
@@ -270,6 +307,22 @@ body.obs #ctl{display:none!important}
 <div id="card"><img id="card-img" alt=""><div><div class="t" id="card-t"></div><div class="a" id="card-a"></div><div class="bar"><i id="card-bar"></i></div></div></div>
 <div id="hint">移動滑鼠顯示設定 · 按 F 全螢幕</div>
 <button id="home" title="回主視窗">⌂</button>
+<button id="find" title="找歌詞 (L)">&#xE721;</button>
+<div id="nolyr"><span id="nolyr-t">這首歌還沒有歌詞</span><button id="nolyr-go">🔍 找歌詞</button></div>
+<div id="fd" role="dialog" aria-label="找歌詞"><div class="box">
+  <header><button class="tab on" data-tab="search">🔍 搜尋</button><button class="tab" data-tab="paste">📋 貼上 / 匯入</button><button class="x" id="fd-x" aria-label="關閉">×</button></header>
+  <div class="body" data-pane="search">
+    <form id="fd-form"><input id="fd-title" placeholder="歌名"><input id="fd-artist" placeholder="歌手 (可留空)"><button class="go" type="submit">搜尋</button></form>
+    <div class="msg" id="fd-msg"></div>
+    <div class="res" id="fd-res"></div>
+  </div>
+  <div class="body" data-pane="paste" hidden>
+    <div class="msg">貼上歌詞。有時間標籤 [01:23.45] 的 LRC 會同步；沒有的話顯示成一般歌詞。</div>
+    <textarea id="fd-text" placeholder="[00:12.30]第一句歌詞&#10;[00:15.80]第二句歌詞"></textarea>
+    <div style="display:flex;gap:8px;align-items:center"><button class="go ghost" id="fd-file-btn">選擇 .lrc 檔…</button><input type="file" id="fd-file" accept=".lrc,.txt,text/plain" hidden>
+      <span class="msg" id="fd-pmsg"></span><button class="go" id="fd-apply" style="margin-left:auto">套用到這首歌</button></div>
+  </div>
+</div></div>
 <div id="ctl">
   <button id="c-prev" title="上一首 (Ctrl + ←)">&#xF8AC;</button>
   <button id="c-play" title="播放 / 暫停 (空白鍵)">&#xF5B0;</button>
@@ -1099,6 +1152,84 @@ $('#o-nsize').oninput = e => { opt.nsize = +e.target.value; applyOpts(); save();
 $('#o-transparent').onchange = e => { opt.transparent = e.target.checked; save(); applyBg(); if (isFolia(opt.mode)) applyFolia(true); };
 $('#o-card').onchange = e => { opt.card = e.target.checked; applyOpts(); save(); };
 $('#o-beat').onchange = e => { opt.beat = e.target.checked; save(); };
+// ───── 找歌詞 (跟主視窗同一套：/lyrics/search、/lyrics/use、/lyrics/import) ─────
+const fd = $('#fd');
+let fdSeq = 0;
+function fdTab(tab){
+  fd.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === tab));
+  fd.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== tab);
+}
+function openFind(){
+  if (!track || OBS) return;
+  const clean = s => (s || '').replace(/[\(\[【（「].*?[\)\]】）」]/g, ' ').replace(/\s+-\s+Topic$/i, '').replace(/\s+/g, ' ').trim();
+  $('#fd-title').value = clean(track.title) || track.title || '';
+  $('#fd-artist').value = clean(track.artist);
+  fd.classList.add('open'); fdTab('search'); fdSearch();
+  setTimeout(() => $('#fd-title').focus(), 50);
+}
+async function fdSearch(){
+  const title = $('#fd-title').value.trim(), artist = $('#fd-artist').value.trim();
+  if (!title) return;
+  const msg = $('#fd-msg'), box = $('#fd-res'), seq = ++fdSeq;
+  msg.className = 'msg'; msg.textContent = '搜尋中…'; box.innerHTML = '';
+  let list = [];
+  try { list = await (await fetch(`/lyrics/search?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`)).json(); }
+  catch { if (seq === fdSeq){ msg.className = 'msg err'; msg.textContent = '搜尋失敗，請檢查網路'; } return; }
+  if (seq !== fdSeq) return;
+  msg.textContent = list.length ? `找到 ${list.length} 個結果，點一個就套用。長度綠色的跟正在播的歌最接近。` : '沒有結果。試試只填歌名，或換成原文 / 英文歌名。';
+  const label = {lrclib: 'LRCLIB', netease: '網易雲', kugou: '酷狗', qq: 'QQ音樂', lyricsplus: 'Apple Music'};
+  const dur = track && track.duration;
+  for (const c of list){
+    const b = document.createElement('button');
+    b.innerHTML = '<span class="src"></span><span><span class="t"></span><span class="a"></span></span><span class="d"></span>';
+    b.querySelector('.src').textContent = label[c.source] || c.source;
+    b.querySelector('.t').textContent = c.title;
+    b.querySelector('.a').textContent = [c.artist, c.album].filter(Boolean).join(' · ') + (c.synced === false ? '　（未同步）' : '');
+    const d = b.querySelector('.d'); d.textContent = c.duration ? fmt(c.duration) : '?';
+    if (dur && c.duration && Math.abs(c.duration - dur) <= 3) d.classList.add('ok');
+    b.onclick = async () => {
+      box.querySelectorAll('button').forEach(x => x.disabled = true);
+      msg.className = 'msg'; msg.textContent = '套用中…';
+      try {
+        const r = await (await fetch('/lyrics/use', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)})).json();
+        if (r.ok) fd.classList.remove('open'); else { msg.className = 'msg err'; msg.textContent = r.error || '套用失敗'; }
+      } catch { msg.className = 'msg err'; msg.textContent = '套用失敗'; }
+      box.querySelectorAll('button').forEach(x => x.disabled = false);
+    };
+    box.appendChild(b);
+  }
+}
+$('#fd-form').onsubmit = e => { e.preventDefault(); fdSearch(); };
+$('#fd-x').onclick = () => fd.classList.remove('open');
+fd.onclick = e => { e.stopPropagation(); if (e.target === fd) fd.classList.remove('open'); };
+fd.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') fd.classList.remove('open'); });
+fd.querySelectorAll('.tab').forEach(t => t.onclick = () => fdTab(t.dataset.tab));
+$('#fd-file-btn').onclick = () => $('#fd-file').click();
+$('#fd-file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const buf = await f.arrayBuffer();
+  let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('\uFFFD')) text = new TextDecoder('big5').decode(buf);
+  if (text.includes('\uFFFD')) text = new TextDecoder('gbk').decode(buf);
+  $('#fd-text').value = text; $('#fd-pmsg').textContent = f.name;
+};
+$('#fd-apply').onclick = async () => {
+  const text = $('#fd-text').value;
+  if (!text.trim()){ $('#fd-pmsg').textContent = '請先貼上歌詞'; return; }
+  const r = await (await fetch('/lyrics/import', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})})).json();
+  if (r.ok){ fd.classList.remove('open'); $('#fd-text').value = ''; $('#fd-pmsg').textContent = ''; }
+  else $('#fd-pmsg').textContent = r.error || '套用失敗';
+};
+$('#find').onclick = e => { e.stopPropagation(); openFind(); };
+$('#nolyr-go').onclick = e => { e.stopPropagation(); openFind(); };
+$('#nolyr').addEventListener('click', e => e.stopPropagation());
+addEventListener('keydown', e => { if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.target.closest?.('input,select,textarea')) openFind(); });
+// 沒有同步歌詞 (而且 AI 也沒在寫) 時，滑鼠一動就提示可以找歌詞
+setInterval(() => {
+  const none = !!track && !!lyr && !lyr.loading && !lines.length && lyr.ai !== 'live';  // 沒歌詞或只有不同步的歌詞 (舞台顯示不了)
+  document.body.classList.toggle('nolyr', none);
+}, 500);
 $('#home').onclick = e => { e.stopPropagation(); window.pywebview?.api?.back ? window.pywebview.api.back() : (location.href = '/?app=1'); };
 $('#gear').onclick = e => { e.stopPropagation(); $('#panel').classList.toggle('open'); };
 $('#panel').onclick = e => e.stopPropagation();

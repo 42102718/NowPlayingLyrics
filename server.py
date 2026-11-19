@@ -249,7 +249,11 @@ SONG_WORD = re.compile(r"主題曲|主题曲|片頭曲|片头曲|片尾曲|插�
 INST_TAG = re.compile(
     r"[\(\[【（「]?\s*(?:(?:ktv|KTV)\s*)?(?:純伴奏|纯伴奏|伴奏版?|伴唱版?|導唱|导唱|卡拉\s*ok|カラオケ|オフボーカル|"
     r"karaoke(?:\s*ver(?:sion|\.)?)?|instrumental(?:\s*ver(?:sion|\.)?)?|\binst\.?(?=\W|$)|off\s*vocal|"
-    r"消音版?|去人聲版?|去人声版?|無人聲版?|无人声版?)\s*[\)\]】）」]?", re.I)
+    r"消音版?|去人聲版?|去人声版?|無人聲版?|无人声版?|"
+    # 器樂翻奏 (鋼琴版、吉他版、八音盒…)：一樣沒有人聲，用原曲歌詞
+    r"(?:鋼琴|钢琴|吉他|木吉他|八音盒|音樂盒|音乐盒|古箏|古筝|二胡|小提琴|大提琴|口琴|長笛|长笛|琵琶|笛子|電音|电音|純音樂|纯音乐|輕音樂|轻音乐)(?:演奏|獨奏|独奏)?版|"
+    r"(?:piano|guitar|acoustic guitar|music\s*box|violin|cello|lullaby)\s*(?:ver(?:sion|\.)?|cover|arrangement|instrumental)|"
+    r"(?<=[\(\[【（])\s*(?:piano|guitar|music\s*box|violin)\s*(?=[\)\]】）]))\s*[\)\]】）」]?", re.I)
 
 
 def strip_inst(title):
@@ -1160,6 +1164,12 @@ async def fetch_lyrics(track):
     inst = strip_inst(track["title"])
     res = await lyrics.find(inst or track["title"], track["artist"], track["album"], track["duration"],
                             need_artist=(kind == "video"))
+    if inst and not res.get("synced") and not res.get("override") and track["artist"]:
+        # 伴奏 / 鋼琴版的「歌手」常是演奏者 (例如 Jesse T 彈的〈紅色高跟鞋〉)，不是原唱：不帶歌手再用歌名找一次
+        # (長度仍要差不多，避免拿到別首同名歌)
+        alt = await lyrics.find(inst, "", track["album"], track["duration"])
+        if alt.get("synced"):
+            res = alt
     if inst:
         res = {**res, "inst": True}  # 伴奏版：顯示的是原曲的歌詞
     if kind == "video" and not res.get("synced") and not res.get("override"):
