@@ -220,6 +220,21 @@ body.no-card #card{display:none}
 #gear{position:fixed;right:20px;top:20px;width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(20,20,30,.6);
   backdrop-filter:blur(16px);color:#fff;font-size:20px;cursor:pointer;opacity:0;transition:opacity .3s;z-index:20}
 body.ui #gear,body.ui #home,body.ui #find{opacity:1}
+/* 在主視窗裡打開時：上面一條標題列 (拖曳、縮小、放大、關閉)，滑鼠一動才出現 */
+#tb{display:none;position:fixed;left:0;right:0;top:0;height:36px;z-index:30;align-items:center;background:linear-gradient(rgba(0,0,0,.45),transparent);
+  opacity:0;transition:opacity .3s;user-select:none}
+body.inwin #tb{display:flex}
+body.inwin.ui #tb{opacity:1}
+#tb .drag{flex:1;height:100%;display:flex;align-items:center;gap:8px;padding-left:14px;font:600 12px "Noto Sans TC",sans-serif;color:rgba(255,255,255,.7);
+  app-region:drag;-webkit-app-region:drag}
+#tb button{app-region:no-drag;-webkit-app-region:no-drag;width:44px;height:100%;border:0;background:none;color:rgba(255,255,255,.75);cursor:pointer;
+  display:grid;place-items:center}
+#tb button:hover{background:rgba(255,255,255,.12);color:#fff}
+#tb #tb-x:hover{background:#e81123}
+#tb svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.4}
+body.inwin #gear,body.inwin #home,body.inwin #find{top:48px}
+body.inwin #panel{top:104px}
+body.inwin #nolyr{top:48px}
 #find{position:fixed;right:124px;top:20px;width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(20,20,30,.6);
   backdrop-filter:blur(16px);color:#fff;font:18px "Segoe Fluent Icons","Segoe MDL2 Assets";cursor:pointer;opacity:0;transition:opacity .3s;z-index:20}
 /* 沒有歌詞時：滑鼠一動就出現「找歌詞」 */
@@ -309,6 +324,10 @@ body.obs #ctl{display:none!important}
 <div id="gap"><span>♪</span><span>♪</span><span>♪</span></div>
 <div id="card"><img id="card-img" alt=""><div><div class="t" id="card-t"></div><div class="a" id="card-a"></div><div class="bar"><i id="card-bar"></i></div></div></div>
 <div id="hint">移動滑鼠顯示設定 · 按 F 全螢幕</div>
+<header id="tb"><div class="drag">♪ Hummi 舞台</div>
+  <button id="tb-min" title="最小化"><svg viewBox="0 0 14 14"><path d="M2 7h10"/></svg></button>
+  <button id="tb-max" title="最大化"><svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg></button>
+  <button id="tb-x" title="關閉 (縮到系統匣)"><svg viewBox="0 0 14 14"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9"/></svg></button></header>
 <button id="home" title="回主視窗">⌂</button>
 <button id="find" title="找歌詞 (L)">&#xE721;</button>
 <div id="nolyr"><span id="nolyr-t">這首歌還沒有歌詞</span><button id="nolyr-go">🔍 找歌詞</button></div>
@@ -1255,7 +1274,18 @@ setInterval(() => {
   const none = !!track && !!lyr && !lyr.loading && !lines.length && lyr.ai !== 'live';  // 沒歌詞或只有不同步的歌詞 (舞台顯示不了)
   document.body.classList.toggle('nolyr', none);
 }, 500);
-$('#home').onclick = e => { e.stopPropagation(); window.pywebview?.api?.back ? window.pywebview.api.back() : (location.href = '/?app=1'); };
+// 在主視窗裡打開 (?app=1)：標題維持「Hummi 哼哼」，OBS 的視窗擷取、拖曳視窗都認得同一個視窗
+if (params.has('app') && !OBS){
+  document.body.classList.add('inwin');
+  document.title = 'Hummi 哼哼';
+  const api = () => window.pywebview?.api;
+  $('#tb-min').onclick = e => { e.stopPropagation(); api()?.minimize(); };
+  $('#tb-max').onclick = e => { e.stopPropagation(); api()?.toggle_maximize(); };
+  $('#tb-x').onclick = e => { e.stopPropagation(); api()?.hide(); };
+  $('#tb .drag').addEventListener('mousedown', e => { if (e.button !== 0) return; if (e.detail >= 2){ api()?.toggle_maximize(); return; } api()?.drag(); });
+  $('#tb').addEventListener('click', e => e.stopPropagation());
+}
+$('#home').onclick = e => { e.stopPropagation(); if (document.body.classList.contains('inwin') || !window.pywebview?.api?.back) location.href = '/?app=1'; else window.pywebview.api.back(); };
 $('#gear').onclick = e => { e.stopPropagation(); $('#panel').classList.toggle('open'); };
 $('#panel').onclick = e => e.stopPropagation();
 addEventListener('click', () => $('#panel').classList.remove('open'));

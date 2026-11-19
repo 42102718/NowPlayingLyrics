@@ -2262,30 +2262,14 @@ class StageApi:
 
 
 def open_stage():
-    """Hummi 舞台：全螢幕歌詞演出的視窗 (唱歌台；OBS 也可以直接用網址)。"""
-    global stage_window
+    """Hummi 舞台：在主視窗裡換到舞台頁面 (同一個視窗，OBS 的「視窗擷取」不用重新選)。
+    OBS 也可以用舞台裡「複製 OBS 網址」的瀏覽器來源。"""
     if window is None:  # 瀏覽器除錯模式
         webbrowser.open(f"http://127.0.0.1:{PORT}/stage")
         return
     try:
-        import webview
-        if stage_window is None:
-            stage_window = webview.create_window("Hummi 舞台", f"http://127.0.0.1:{PORT}/stage?v={VERSION}",
-                                                 width=1280, height=720, background_color="#05050a", js_api=StageApi())
-
-            def on_closing():
-                if quitting:
-                    return True
-                stage_window.hide()
-                show_window()  # 關掉舞台 = 回主視窗
-                return False
-            stage_window.events.closing += on_closing
-            stage_window.events.shown += lambda: apply_window_style(stage_window)
-        else:
-            stage_window.show()
-            stage_window.restore()
-        if window is not None:  # 舞台已經在演歌詞了：主視窗收起來 (膠囊還在，系統匣可以叫回來)
-            window.hide()
+        window.load_url(f"http://127.0.0.1:{PORT}/stage?app=1&v={VERSION}")
+        show_window()
     except Exception as e:
         print("[stage]", repr(e), flush=True)
 
