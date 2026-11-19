@@ -357,8 +357,9 @@ body.settings-only #set-bar{display:flex;position:fixed;top:0;left:0;right:0;hei
 #set-bar button{width:44px;height:100%;border:0;background:none;color:rgba(var(--ink),.7);cursor:pointer;font-size:13px}
 #set-bar button:hover{background:rgba(var(--ink),.1);color:var(--hi)}
 #set-bar #set-close:hover{background:#e81123}
-body.settings-only #settings{display:block!important;position:fixed;inset:42px 0 0 0;width:auto;max-height:none;border-radius:0;
-  border:0;background:transparent;box-shadow:none;backdrop-filter:none;animation:none;padding:6px 20px 20px}
+body.settings-only #settings{display:flex!important;position:fixed;inset:42px 0 0 0;width:auto;height:auto;max-height:none;border-radius:0;
+  border:0;background:transparent;box-shadow:none;backdrop-filter:none;animation:none;padding:0}
+body.settings-only #settings h2{display:none}
 
 /* ───── 整理過的控制列 ───── */
 #transport{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:-2px}
@@ -390,6 +391,56 @@ body.settings-only #settings{display:block!important;position:fixed;inset:42px 0
 #set-tabs{display:flex;gap:2px;padding:3px;margin:6px 0 4px;border-radius:12px;background:rgba(var(--ink),.06)}
 #set-tabs button{flex:1;height:32px;border:0;border-radius:9px;background:none;color:rgba(var(--ink),.6);font:600 12px var(--font);cursor:pointer;white-space:nowrap}
 #set-tabs button.on{background:rgba(var(--ink),.14);color:var(--hi)}
+/* ───── 設定：左邊分類、右邊卡片 ───── */
+#settings{padding:0;width:min(680px,calc(100vw - 32px));height:min(680px,calc(100vh - 32px));max-height:none;overflow:hidden;
+  flex-direction:column;container-type:inline-size}
+#settings.open{display:flex}
+#settings h2{padding:16px 20px 6px;margin:0}
+.set-body{flex:1;min-height:0;display:grid;grid-template-columns:172px 1fr}
+#set-tabs{display:flex;flex-direction:column;gap:2px;margin:0;padding:8px 10px 16px;border-radius:0;background:none;overflow:auto;
+  border-right:1px solid rgba(var(--ink),.07)}
+#set-tabs button{flex:none;position:relative;height:38px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:10px;
+  text-align:left;font:600 13px var(--font);color:rgba(var(--ink),.62);transition:background .15s,color .15s}
+#set-tabs button .fi{font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";font-size:15px;width:18px;text-align:center;font-weight:400}
+#set-tabs button:hover{background:rgba(var(--ink),.07);color:var(--fg)}
+#set-tabs button.on{background:rgba(var(--ink),.12);color:var(--hi)}
+#set-tabs button.on::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;background:var(--accent)}
+.set-search{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;margin:0 0 10px;border-radius:10px;
+  background:rgba(var(--ink),.07);color:var(--dim);border:1px solid transparent}
+.set-search:focus-within{border-color:var(--glass-b);background:rgba(var(--ink),.1)}
+.set-search .fi{font-family:"Segoe Fluent Icons","Segoe MDL2 Assets";font-size:13px}
+.set-search input{flex:1;min-width:0;border:0;background:none;color:var(--fg);font:500 13px var(--font);outline:none}
+.set-search input::-webkit-search-cancel-button{filter:invert(.6)}
+.set-main{overflow:auto;padding:6px 20px 24px;min-height:0}
+.set-empty{margin:40px 0;text-align:center;color:var(--dim);font:500 13px var(--font)}
+.grp{margin-top:20px}
+.pane > .grp:first-child{margin-top:8px}
+#settings .grp > h3{margin:0 0 8px 4px}
+#settings .desc{font:400 12px/1.55 var(--font);color:var(--dim);margin:-2px 4px 9px}
+.card{background:rgba(var(--ink),.045);border:1px solid rgba(var(--ink),.075);border-radius:14px;padding:2px 14px}
+.card > .row:first-child{border-top:0}
+.card > .seg:first-child,.card > #themes,.card > #font-btn{margin:12px 0}
+.card > .seg:first-child + .hint{margin-top:-4px}
+#settings .card .hint{margin:2px 0 10px}
+#settings .card .hint:empty{display:none}
+.seg.two{grid-template-columns:repeat(2,1fr)}
+#ver{margin:10px 4px 0}
+/* 搜尋時：所有分類一起列出，只留對得上的那幾組 */
+#settings.searching .pane{display:block;animation:none}
+#settings.searching .pane::before{content:attr(data-title);display:block;margin:18px 4px 4px;font:700 13px var(--font);color:var(--hi)}
+#settings.searching .pane.nohit,#settings.searching .grp.nohit{display:none}
+#settings.searching #set-tabs button.on{background:none;color:rgba(var(--ink),.62)}
+#settings.searching #set-tabs button.on::before{display:none}
+/* 窄的時候：分類變成上面兩排小按鈕 */
+@container (max-width:540px){
+  .set-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  #set-tabs{flex-direction:row;flex-wrap:wrap;gap:4px;padding:6px 16px 10px;border-right:0;border-bottom:1px solid rgba(var(--ink),.07)}
+  .set-search{flex:1 1 100%;margin:0 0 4px}
+  #set-tabs button{flex:1 1 auto;height:32px;padding:0 10px;gap:6px;font-size:12px;justify-content:center}
+  #set-tabs button .fi{font-size:13px;width:auto}
+  #set-tabs button.on::before{left:12px;right:12px;top:auto;bottom:2px;width:auto;height:2px}
+  .set-main{padding:4px 16px 20px}
+}
 #settings .pane{display:none}
 #settings .pane.on{display:block;animation:fade .2s ease-out}
 #settings .pane > h3:first-child{margin-top:12px}
@@ -502,139 +553,236 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
 </div>
 <aside id="settings" aria-label="設定">
   <h2>設定 <button id="settings-close" aria-label="關閉">×</button></h2>
-  <nav id="set-tabs"><button data-tab="look" class="on">外觀</button><button data-tab="overlay">浮動歌詞</button><button data-tab="ai">歌詞</button><button data-tab="stage">舞台</button><button data-tab="general">一般</button></nav>
+  <div class="set-body">
+  <nav id="set-tabs">
+    <label class="set-search"><span class="fi">&#xE721;</span><input type="search" id="set-search" placeholder="搜尋設定" autocomplete="off"></label>
+    <button data-tab="look" class="on"><span class="fi">&#xE790;</span><span>外觀</span></button>
+    <button data-tab="ai"><span class="fi">&#xE8D2;</span><span>歌詞</span></button>
+    <button data-tab="notch"><span class="fi">&#xE7F4;</span><span>膠囊</span></button>
+    <button data-tab="overlay"><span class="fi">&#xE8A7;</span><span>浮動歌詞</span></button>
+    <button data-tab="stage"><span class="fi">&#xE714;</span><span>舞台與直播</span></button>
+    <button data-tab="game"><span class="fi">&#xE7FC;</span><span>遊戲模式</span></button>
+    <button data-tab="general"><span class="fi">&#xE713;</span><span>一般</span></button>
+  </nav>
+  <div class="set-main">
+  <p class="set-empty" id="set-empty" hidden>找不到相關的設定</p>
+
+  <!-- ───── 外觀 ───── -->
   <div class="pane on" data-pane="look">
-  <h3>風格</h3>
-  <div id="themes">
-    <button data-theme="night"><span class="sw" style="background:linear-gradient(135deg,#2a1f5c,#0b0b12)"><b style="background:#fff"></b><i style="background:#fff"></i></span>夜光</button>
-    <button data-theme="dawn"><span class="sw" style="background:linear-gradient(135deg,#dfe4f3,#f7f2fa)"><b style="background:#17172a"></b><i style="background:#6a4cff"></i></span>晨霧</button>
-    <button data-theme="mono"><span class="sw" style="background:#000;border:1px solid #222"><b style="background:#fff"></b><i style="background:#fff"></i></span>極簡</button>
-    <button data-theme="neon"><span class="sw" style="background:linear-gradient(135deg,#06051a,#1a0b3a)"><b style="background:#ff2bd6"></b><i style="background:#22f0ff;box-shadow:0 0 6px #22f0ff"></i></span>霓虹</button>
-    <button data-theme="paper"><span class="sw" style="background:#f1eadb"><b style="background:#2c2116"></b><i style="background:#b0532c"></i></span>紙本</button>
-  </div>
-  <h3>介面大小</h3>
-  <div class="seg five" id="zooms"><button data-z="90">小</button><button data-z="100">標準</button><button data-z="115">大</button><button data-z="130">特大</button><button data-z="150">超大</button></div>
-  <p class="hint" style="margin:6px 0 0">字和按鈕一起放大。也可以按住 Ctrl 滾滑鼠滾輪，或 Ctrl + <kbd>+</kbd> / <kbd>−</kbd>，Ctrl + <kbd>0</kbd> 回到標準。</p>
-  <h3>字體</h3>
-  <button id="font-btn"><span class="fname" id="font-name">預設</span><span class="chev">▾</span></button>
-  <div id="font-picker">
-    <input id="font-search" type="search" placeholder="搜尋字體…" autocomplete="off">
-    <label class="font-filter"><span class="switch" style="transform:scale(.8);transform-origin:left"><input type="checkbox" id="font-zh" checked><span></span></span>只顯示支援中文的字體</label>
-    <div id="font-list"><div class="empty">正在讀取字體…</div></div>
-  </div>
-  <p class="hint" style="margin:8px 0 0">主視窗和浮動歌詞都會套用。字體沒有中文字時，中文會自動用微軟正黑體顯示。</p>
-  <h3>背景</h3>
-  <div class="seg five" id="bg-modes">
-    <button data-bg="mica" title="Windows 11 的系統材質，透出桌布的顏色">Mica</button><button data-bg="album">專輯封面</button><button data-bg="color">純色</button><button data-bg="gradient">漸層</button><button data-bg="image">圖片</button>
-  </div>
-  <div class="row" id="bg-colors-row">顏色 <span id="bg-colors"><input type="color" data-bgk="color1" title="顏色 1"><input type="color" data-bgk="color2" title="顏色 2"></span></div>
-  <div class="row" id="bg-image-row-wrap">圖片
-    <span id="bg-image-row"><span id="bg-thumb"></span><button class="chip" id="bg-pick">選擇圖片…</button></span>
-    <input type="file" id="bg-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
-  </div>
-  <div class="row col"><div class="row" style="border:0;padding:0">模糊 <output id="o-bg-blur"></output></div><input type="range" min="0" max="150" step="2" data-bgk="blur"></div>
-  <div class="row col"><div class="row" style="border:0;padding:0">變暗 <output id="o-bg-dim"></output></div><input type="range" min="0" max="90" step="5" data-bgk="dim"></div>
-  <label class="row">流動光暈 <span class="switch"><input type="checkbox" data-bgk="blobs"><span></span></span></label>
-  </div>
-  <div class="pane" data-pane="overlay">
-  <h3>浮動歌詞</h3>
-  <p class="hint">歌詞浮在所有視窗最上層，滑鼠點擊會穿透，玩遊戲或工作都不受影響。系統匣圖示也能調整。</p>
-  <label class="row">顯示浮動歌詞 <span class="switch"><input type="checkbox" data-k="enabled"><span></span></span></label>
-  <div class="row col">位置
-    <div class="seg" id="presets">
-      <button data-p="bottom-left">左下</button><button data-p="bottom-center">下方中間</button><button data-p="bottom-right">右下</button>
-      <button data-p="top-center">上方中間</button><button data-p="custom">自訂</button><button id="unlock">🔓 拖曳</button>
+  <section class="grp"><h3>風格</h3>
+    <div class="card"><div id="themes">
+      <button data-theme="night"><span class="sw" style="background:linear-gradient(135deg,#2a1f5c,#0b0b12)"><b style="background:#fff"></b><i style="background:#fff"></i></span>夜光</button>
+      <button data-theme="dawn"><span class="sw" style="background:linear-gradient(135deg,#dfe4f3,#f7f2fa)"><b style="background:#17172a"></b><i style="background:#6a4cff"></i></span>晨霧</button>
+      <button data-theme="mono"><span class="sw" style="background:#000;border:1px solid #222"><b style="background:#fff"></b><i style="background:#fff"></i></span>極簡</button>
+      <button data-theme="neon"><span class="sw" style="background:linear-gradient(135deg,#06051a,#1a0b3a)"><b style="background:#ff2bd6"></b><i style="background:#22f0ff;box-shadow:0 0 6px #22f0ff"></i></span>霓虹</button>
+      <button data-theme="paper"><span class="sw" style="background:#f1eadb"><b style="background:#2c2116"></b><i style="background:#b0532c"></i></span>紙本</button>
+    </div></div>
+  </section>
+  <section class="grp"><h3>介面大小</h3>
+    <div class="card">
+      <div class="seg five" id="zooms"><button data-z="90">小</button><button data-z="100">標準</button><button data-z="115">大</button><button data-z="130">特大</button><button data-z="150">超大</button></div>
+      <p class="hint">也可以 Ctrl + 滾輪，或 Ctrl + <kbd>+</kbd> / <kbd>−</kbd>，Ctrl + <kbd>0</kbd> 回到標準。</p>
     </div>
+  </section>
+  <section class="grp"><h3>字體</h3>
+    <div class="card">
+      <button id="font-btn"><span class="fname" id="font-name">預設</span><span class="chev">▾</span></button>
+      <div id="font-picker">
+        <input id="font-search" type="search" placeholder="搜尋字體…" autocomplete="off">
+        <label class="font-filter"><span class="switch" style="transform:scale(.8);transform-origin:left"><input type="checkbox" id="font-zh" checked><span></span></span>只顯示支援中文的字體</label>
+        <div id="font-list"><div class="empty">正在讀取字體…</div></div>
+      </div>
+      <p class="hint">主視窗和浮動歌詞都會套用；沒有中文字的字體，中文會用微軟正黑體。</p>
+    </div>
+  </section>
+  <section class="grp"><h3>主視窗背景</h3>
+    <div class="card">
+      <div class="seg five" id="bg-modes">
+        <button data-bg="mica" title="Windows 11 的系統材質，透出桌布的顏色">Mica</button><button data-bg="album">專輯封面</button><button data-bg="color">純色</button><button data-bg="gradient">漸層</button><button data-bg="image">圖片</button>
+      </div>
+      <div class="row" id="bg-colors-row">顏色 <span id="bg-colors"><input type="color" data-bgk="color1" title="顏色 1"><input type="color" data-bgk="color2" title="顏色 2"></span></div>
+      <div class="row" id="bg-image-row-wrap">圖片
+        <span id="bg-image-row"><span id="bg-thumb"></span><button class="chip" id="bg-pick">選擇圖片…</button></span>
+        <input type="file" id="bg-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+      </div>
+      <div class="row col"><div class="row" style="border:0;padding:0">模糊 <output id="o-bg-blur"></output></div><input type="range" min="0" max="150" step="2" data-bgk="blur"></div>
+      <div class="row col"><div class="row" style="border:0;padding:0">變暗 <output id="o-bg-dim"></output></div><input type="range" min="0" max="90" step="5" data-bgk="dim"></div>
+      <label class="row">流動光暈 <span class="switch"><input type="checkbox" data-bgk="blobs"><span></span></span></label>
+    </div>
+  </section>
   </div>
-  <label class="row">顯示在 <select class="mon-select" data-mon="overlay"></select></label>
-  <div class="row col"><div class="row" style="border:0;padding:0">文字大小 <output id="o-font_size"></output></div><input type="range" min="18" max="80" step="1" data-k="font_size"></div>
-  <div class="row col"><div class="row" style="border:0;padding:0">寬度 <output id="o-width"></output></div><input type="range" min="400" max="1800" step="20" data-k="width"></div>
-  <div class="row col"><div class="row" style="border:0;padding:0">背景深度 <output id="o-bg_opacity"></output></div><input type="range" min="0" max="90" step="5" data-k="bg_opacity"></div>
-  <label class="row">顯示下一句 <span class="switch"><input type="checkbox" data-k="show_next"><span></span></span></label>
-  <label class="row" title="主視窗或舞台本來就在顯示歌詞，浮動歌詞先藏起來，畫面才不會同時好幾份歌詞">主視窗或舞台開著時自動隱藏 <span class="switch"><input type="checkbox" data-k="auto_hide"><span></span></span></label>
-  <label class="row">用專輯配色 <span class="switch"><input type="checkbox" data-k="color" data-on="album" data-off="white"><span></span></span></label>
-  </div>
+
+  <!-- ───── 歌詞 ───── -->
   <div class="pane" data-pane="ai">
-  <h3>翻譯</h3>
-  <label class="row" title="外文歌在歌詞下面顯示中文翻譯 (主視窗、舞台、浮動歌詞、Folia 一起)">顯示歌詞翻譯 <span class="switch"><input type="checkbox" data-k="show_translation"><span></span></span></label>
-  <p class="hint" style="margin:4px 0 0">外文歌的每一句下面多一行中文翻譯 (有翻譯的歌才有)。主視窗、舞台、浮動歌詞一起套用。</p>
-  <h3>AI 歌詞</h3>
-  <p class="hint">四個歌詞來源都沒有同步歌詞時，AI 會聽正在播放的聲音：沒有歌詞就邊聽邊寫，有歌詞沒時間就自動對時。聽完整首後會存起來，下次播放就完全同步。</p>
-  <label class="row">啟用 AI 歌詞 <span class="switch"><input type="checkbox" data-aik="enabled"><span></span></span></label>
-  <div id="ai-status"></div>
-  <h3>和朋友共享歌詞</h3>
-  <p class="hint">你和朋友選同一個雲端硬碟的共用資料夾 (OneDrive、Google 雲端硬碟、Dropbox 都可以)。AI 聽完的歌詞、你手動選好的歌詞會自動放一份進去，朋友播同一首歌時直接用，AI 不用再聽一次。</p>
-  <div class="row">共享資料夾 <span style="display:flex;gap:6px;align-items:center;min-width:0"><span id="share-folder" class="dim-path">還沒設定</span><button class="chip" id="share-pick">選擇…</button><button class="chip" id="share-off" hidden>停用</button></span></div>
-  <label class="row">分享時顯示的名字 <input type="text" id="share-name" maxlength="20" placeholder="例如：小明 (可留空)"></label>
-  <p class="hint" id="share-msg" style="margin:4px 0 0"></p>
+  <section class="grp"><h3>翻譯</h3>
+    <div class="card">
+      <label class="row" title="外文歌在歌詞下面顯示中文翻譯 (主視窗、舞台、浮動歌詞、Folia 一起)">顯示歌詞翻譯 <span class="switch"><input type="checkbox" data-k="show_translation"><span></span></span></label>
+      <p class="hint">外文歌每一句下面多一行中文翻譯 (有翻譯的歌才有)，所有畫面一起套用。</p>
+    </div>
+  </section>
+  <section class="grp"><h3>AI 歌詞</h3>
+    <p class="desc">找不到同步歌詞時，AI 聽正在播放的聲音：沒歌詞就邊聽邊寫，有歌詞沒時間就自動對時；聽完會存起來，下次就完全同步。</p>
+    <div class="card">
+      <label class="row">啟用 AI 歌詞 <span class="switch"><input type="checkbox" data-aik="enabled"><span></span></span></label>
+      <div id="ai-status"></div>
+    </div>
+  </section>
+  <section class="grp"><h3>和朋友共享歌詞</h3>
+    <p class="desc">大家選同一個雲端共用資料夾 (OneDrive、Google 雲端硬碟、Dropbox)：AI 聽完的、你手動選好的歌詞會放一份進去，朋友播同一首直接用。</p>
+    <div class="card">
+      <div class="row">共享資料夾 <span style="display:flex;gap:6px;align-items:center;min-width:0"><span id="share-folder" class="dim-path">還沒設定</span><button class="chip" id="share-pick">選擇…</button><button class="chip" id="share-off" hidden>停用</button></span></div>
+      <label class="row">分享時顯示的名字 <input type="text" id="share-name" maxlength="20" placeholder="例如：小明 (可留空)"></label>
+      <p class="hint" id="share-msg"></p>
+    </div>
+  </section>
   </div>
+
+  <!-- ───── 膠囊 ───── -->
+  <div class="pane" data-pane="notch">
+  <section class="grp"><h3>膠囊</h3>
+    <p class="desc">螢幕頂端的小膠囊：平常顯示現在這句歌詞，滑鼠停上去展開成迷你播放器。</p>
+    <div class="card">
+      <label class="row">顯示膠囊 <span class="switch"><input type="checkbox" id="notch-on"><span></span></span></label>
+      <label class="row">顯示在 <select class="mon-select" data-mon="notch"></select></label>
+    </div>
+  </section>
+  <section class="grp"><h3>樣式</h3>
+    <div class="card">
+      <div class="row col" title="膠囊的樣子">形狀
+        <div class="seg" id="notch-shape"><button data-shape="island">動態島</button><button data-shape="float">浮動膠囊</button><button data-shape="bar">極簡細條</button></div>
+      </div>
+      <div class="row col" title="膠囊的底色 (字一直都是白色)">顏色
+        <div class="seg" id="notch-color"><button data-color="black">黑色</button><button data-color="album">專輯色</button><button data-color="theme">跟著風格</button></div>
+      </div>
+      <div class="row col" title="膠囊右邊要放什麼">右邊顯示
+        <div class="seg two" id="notch-right"><button data-cat="1">😺 哼哼貓</button><button data-cat="0">▮▮▮ 音量條</button></div>
+      </div>
+      <p class="hint">動態島貼在上緣；浮動膠囊離上緣一點點、有影子；極簡細條平常只是一條播放進度。</p>
+    </div>
+  </section>
+  <section class="grp"><h3>操作與提醒</h3>
+    <div class="card">
+      <div class="row col" title="滑鼠移到膠囊上時什麼時候展開">滑鼠移上去
+        <div class="seg" id="notch-hover"><button data-hover="smart">停一下才展開</button><button data-hover="fast">馬上展開</button><button data-hover="click">點一下才展開</button></div>
+      </div>
+      <p class="hint">「停一下才展開」：只是經過 (去點瀏覽器分頁、拖視窗) 不會跳出來。</p>
+      <label class="row" title="網路斷超過 6 秒時膠囊會提醒，恢復時也會說一聲">網路斷線提醒 <span class="switch"><input type="checkbox" id="net-alert"><span></span></span></label>
+    </div>
+  </section>
+  </div>
+
+  <!-- ───── 浮動歌詞 ───── -->
+  <div class="pane" data-pane="overlay">
+  <section class="grp"><h3>浮動歌詞</h3>
+    <p class="desc">歌詞浮在所有視窗最上層，滑鼠點擊會穿透，玩遊戲、工作都不受影響。</p>
+    <div class="card">
+      <label class="row">顯示浮動歌詞 <span class="switch"><input type="checkbox" data-k="enabled"><span></span></span></label>
+      <label class="row">顯示在 <select class="mon-select" data-mon="overlay"></select></label>
+      <div class="row col">位置
+        <div class="seg" id="presets">
+          <button data-p="bottom-left">左下</button><button data-p="bottom-center">下方中間</button><button data-p="bottom-right">右下</button>
+          <button data-p="top-center">上方中間</button><button data-p="custom">自訂</button><button id="unlock">🔓 拖曳</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="grp"><h3>文字</h3>
+    <div class="card">
+      <div class="row col"><div class="row" style="border:0;padding:0">文字大小 <output id="o-font_size"></output></div><input type="range" min="18" max="80" step="1" data-k="font_size"></div>
+      <div class="row col"><div class="row" style="border:0;padding:0">寬度 <output id="o-width"></output></div><input type="range" min="400" max="1800" step="20" data-k="width"></div>
+      <div class="row col"><div class="row" style="border:0;padding:0">背景深度 <output id="o-bg_opacity"></output></div><input type="range" min="0" max="90" step="5" data-k="bg_opacity"></div>
+      <label class="row">顯示下一句 <span class="switch"><input type="checkbox" data-k="show_next"><span></span></span></label>
+      <label class="row">用專輯配色 <span class="switch"><input type="checkbox" data-k="color" data-on="album" data-off="white"><span></span></span></label>
+      <label class="row" title="主視窗或舞台本來就在顯示歌詞，浮動歌詞先藏起來，畫面才不會同時好幾份歌詞">主視窗或舞台開著時自動隱藏 <span class="switch"><input type="checkbox" data-k="auto_hide"><span></span></span></label>
+    </div>
+  </section>
+  </div>
+
+  <!-- ───── 舞台與直播 ───── -->
   <div class="pane" data-pane="stage">
-  <h3>Hummi 舞台</h3>
-  <p class="hint">全螢幕的歌詞演出，有 Folia 的 17 種歌詞動畫，和 Hummi 自己的 13 種效果。舞台裡按「複製 OBS 網址」就能放進直播畫面。</p>
-  <div class="row">打開舞台 <button class="chip" id="open-stage">打開</button></div>
-  <h3>直播聊天室點歌指令</h3>
-  <p class="hint">觀眾在 Twitch 聊天室打 <b>!song</b>，舞台 / OBS 畫面右上角會跳出現在播的歌。再填聊天機器人的權杖，也會直接在聊天室回覆。</p>
-  <label class="row">Twitch 頻道 <input type="text" class="cfg-in" id="chat-channel" placeholder="你的頻道 ID" maxlength="40"></label>
-  <label class="row">指令 <input type="text" class="cfg-in" id="chat-cmds" placeholder="!song !歌名" maxlength="200"></label>
-  <label class="row" title="權杖要有 chat:read 和 chat:edit 權限；只存在這台電腦，不會給 OBS 或其他網頁">回覆用的權杖 (可選) <input type="password" class="cfg-in" id="chat-token" placeholder="oauth:…" maxlength="200" autocomplete="off"></label>
-  <label class="row" title="權杖是哪個帳號的 (留空 = 頻道本人)">機器人帳號 (可選) <input type="text" class="cfg-in" id="chat-bot" placeholder="留空 = 用你的帳號" maxlength="40"></label>
-  <p class="hint" id="chat-status" style="margin:4px 0 0"></p>
-  <h3>桌布模式</h3>
-  <p class="hint">把舞台的歌詞和動態背景放到桌面上 (在桌面圖示後面)，效果跟著舞台的設定。視窗把桌面蓋滿時會自動暫停，不吃效能。</p>
-  <label class="row">歌詞桌布 <span class="switch"><input type="checkbox" id="wp-on"><span></span></span></label>
-  <label class="row">顯示在 <select class="mon-select" data-mon="wallpaper"></select></label>
-  <h3>Folia 桌面版 (進階)</h3>
-  <p class="hint">如果你另外安裝了 <a href="#" id="folia-link" style="color:#b9a6ff">Folia</a>，也可以把歌和歌詞送進它的舞台模式 (要先在 Folia 設定裡開啟 Stage 模式)。一般不需要，Hummi 舞台已經內建 Folia 的效果。</p>
-  <label class="row">送到 Folia 桌面版 <span class="switch"><input type="checkbox" id="folia-on"><span></span></span></label>
-  <p class="hint" id="folia-status" style="margin:6px 0 0"></p>
+  <section class="grp"><h3>Hummi 舞台</h3>
+    <p class="desc">全螢幕的歌詞演出 (Folia 17 種 + Hummi 13 種效果)，舞台裡按「複製 OBS 網址」就能放進直播。</p>
+    <div class="card">
+      <div class="row">打開舞台 <button class="chip" id="open-stage">打開</button></div>
+    </div>
+  </section>
+  <section class="grp"><h3>聊天室點歌指令</h3>
+    <p class="desc">觀眾在 Twitch 聊天室打 <b>!song</b>，舞台 / OBS 畫面會跳出現在播的歌；填了權杖還會直接回覆。</p>
+    <div class="card">
+      <label class="row">Twitch 頻道 <input type="text" class="cfg-in" id="chat-channel" placeholder="你的頻道 ID" maxlength="40"></label>
+      <label class="row">指令 <input type="text" class="cfg-in" id="chat-cmds" placeholder="!song !歌名" maxlength="200"></label>
+      <label class="row" title="權杖要有 chat:read 和 chat:edit 權限；只存在這台電腦，不會給 OBS 或其他網頁">回覆用的權杖 (可選) <input type="password" class="cfg-in" id="chat-token" placeholder="oauth:…" maxlength="200" autocomplete="off"></label>
+      <label class="row" title="權杖是哪個帳號的 (留空 = 頻道本人)">機器人帳號 (可選) <input type="text" class="cfg-in" id="chat-bot" placeholder="留空 = 用你的帳號" maxlength="40"></label>
+      <p class="hint" id="chat-status"></p>
+    </div>
+  </section>
+  <section class="grp"><h3>歌詞桌布</h3>
+    <p class="desc">舞台的歌詞和動態背景放到桌面上 (在桌面圖示後面)；視窗蓋滿桌面時自動暫停，不吃效能。</p>
+    <div class="card">
+      <label class="row">歌詞桌布 <span class="switch"><input type="checkbox" id="wp-on"><span></span></span></label>
+      <label class="row">顯示在 <select class="mon-select" data-mon="wallpaper"></select></label>
+    </div>
+  </section>
+  <section class="grp"><h3>Folia 桌面版 (進階)</h3>
+    <p class="desc">另外裝了 <a href="#" id="folia-link" style="color:#b9a6ff">Folia</a> 才需要 (要先在 Folia 設定開啟 Stage 模式)；Hummi 舞台已經內建 Folia 的效果。</p>
+    <div class="card">
+      <label class="row">送到 Folia 桌面版 <span class="switch"><input type="checkbox" id="folia-on"><span></span></span></label>
+      <p class="hint" id="folia-status"></p>
+    </div>
+  </section>
   </div>
+
+  <!-- ───── 遊戲模式 ───── -->
+  <div class="pane" data-pane="game">
+  <section class="grp"><h3>遊戲模式</h3>
+    <p class="desc">玩全螢幕遊戲、看全螢幕影片時，Hummi 自動退到一邊，不擋畫面、不搶效能。</p>
+    <div class="card">
+      <label class="row">遊戲模式 <span class="switch"><input type="checkbox" id="game-on"><span></span></span></label>
+      <div class="row col" data-game>浮動歌詞
+        <div class="seg" id="ov-fs"><button data-fs="normal">照常顯示</button><button data-fs="dim">變淡</button><button data-fs="hide">先藏起來</button></div>
+      </div>
+      <div class="row col" data-game title="無邊框視窗的遊戲才看得到；獨佔全螢幕的遊戲 Windows 不允許任何視窗疊上去">膠囊
+        <div class="seg" id="game-notch"><button data-gn="show">照常顯示</button><button data-gn="alerts">只彈重要提醒</button><button data-gn="hide">完全藏起來</button></div>
+      </div>
+      <label class="row" data-game title="AI 只錄播放器的聲音，不會錄到遊戲；這個選項是為了不占用遊戲的顯示卡效能">AI 歌詞先暫停 (省效能) <span class="switch"><input type="checkbox" data-aik="pause_fullscreen"><span></span></span></label>
+      <p class="hint">重要提醒：計時器時間到、網路斷線、裝置快沒電。</p>
+    </div>
+  </section>
+  </div>
+
+  <!-- ───── 一般 ───── -->
   <div class="pane" data-pane="general">
-  <h3>隱私</h3>
-  <label class="row" title="開著時只讀 Spotify、YouTube Music 桌面版和音樂播放器；瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi (開台時不會露出其他分頁的標題)">只偵測音樂 App <span class="switch"><input type="checkbox" id="music-only"><span></span></span></label>
-  <p class="hint" style="margin:4px 0 0">開著時，瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi、膠囊、舞台和 OBS 上。用瀏覽器分頁聽 YouTube Music 的話要關掉，或改用 YouTube Music 桌面版。</p>
-  <h3>膠囊</h3>
-  <label class="row">螢幕頂端的膠囊 <span class="switch"><input type="checkbox" id="notch-on"><span></span></span></label>
-  <label class="row">顯示在 <select class="mon-select" data-mon="notch"></select></label>
-  <div class="row col" title="膠囊右邊要放什麼">膠囊右邊顯示
-    <div class="seg" id="notch-right" style="grid-template-columns:repeat(2,1fr)"><button data-cat="1">😺 哼哼貓 (會跟著音樂點頭)</button><button data-cat="0">▮▮▮ 音量條 (跟著音樂跳)</button></div>
+  <section class="grp"><h3>隱私</h3>
+    <div class="card">
+      <label class="row" title="開著時只讀 Spotify、YouTube Music 桌面版和音樂播放器；瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi (開台時不會露出其他分頁的標題)">只偵測音樂 App <span class="switch"><input type="checkbox" id="music-only"><span></span></span></label>
+      <p class="hint">開台時不會露出瀏覽器、影片的標題。用瀏覽器分頁聽 YouTube Music 要關掉，或改用桌面版。</p>
+    </div>
+  </section>
+  <section class="grp"><h3>自動暫停</h3>
+    <div class="card">
+      <label class="row">鎖定電腦、睡眠時暫停 <span class="switch"><input type="checkbox" data-ap="lock"><span></span></span></label>
+      <label class="row" title="拔掉有線耳機、藍牙耳機斷線時暫停，免得音樂突然從喇叭放出來；手動切換裝置不會暫停">耳機拔掉、藍牙斷線時暫停 <span class="switch"><input type="checkbox" data-ap="unplug"><span></span></span></label>
+      <label class="row" title="解鎖、或同一副耳機接回來時，接著播 (只會接著播被 Hummi 暫停的)">回來時接著播 <span class="switch"><input type="checkbox" data-ap="resume"><span></span></span></label>
+    </div>
+  </section>
+  <section class="grp"><h3>快捷鍵與工作列</h3>
+    <div class="card">
+      <label class="row" title="Ctrl + Alt + P / , / . / ↑ / ↓ / W / S，在遊戲和其他程式裡也能用">全域快捷鍵 (遊戲中也能用) <span class="switch"><input type="checkbox" id="hotkeys-on"><span></span></span></label>
+      <p class="hint" id="hotkeys-hint">Ctrl + Alt + P 播放 / 暫停、 , . 切歌、 ↑ ↓ 音量。 <a href="#" id="keys-open" style="color:#b9a6ff">所有快捷鍵 (?)</a></p>
+      <label class="row" title="工作列的 Hummi 圖示上顯示這首歌播到哪 (暫停時變黃色)">工作列顯示播放進度 <span class="switch"><input type="checkbox" id="tb-progress"><span></span></span></label>
+    </div>
+  </section>
+  <section class="grp"><h3>啟動與更新</h3>
+    <div class="card">
+      <label class="row" id="autostart-row">開機時自動啟動 <span class="switch"><input type="checkbox" id="autostart"><span></span></span></label>
+      <label class="row">自動檢查更新 <span class="switch"><input type="checkbox" id="auto-update"><span></span></span></label>
+      <div class="row">更新與分享 <span style="display:flex;gap:6px"><button class="chip" id="upd-check">檢查更新</button><button class="chip" id="share-btn">分享 Hummi</button></span></div>
+      <p class="hint" id="upd-check-msg"></p>
+    </div>
+    <div id="ver"></div>
+  </section>
   </div>
-  <div class="row col" title="膠囊的樣子">形狀
-    <div class="seg" id="notch-shape" style="grid-template-columns:repeat(3,1fr)"><button data-shape="island">動態島</button><button data-shape="float">浮動膠囊</button><button data-shape="bar">極簡細條</button></div>
   </div>
-  <div class="row col" title="膠囊的底色 (字一直都是白色)">顏色
-    <div class="seg" id="notch-color" style="grid-template-columns:repeat(3,1fr)"><button data-color="black">黑色</button><button data-color="album">專輯色</button><button data-color="theme">跟著風格</button></div>
-  </div>
-  <div class="row col" title="滑鼠移到膠囊上時什麼時候展開">滑鼠移上去
-    <div class="seg" id="notch-hover" style="grid-template-columns:repeat(3,1fr)"><button data-hover="smart">停一下才展開</button><button data-hover="fast">馬上展開</button><button data-hover="click">點一下才展開</button></div>
-  </div>
-  <p class="hint" style="margin:4px 0 0">「停一下才展開」：滑鼠只是經過 (去點瀏覽器分頁、拖視窗) 不會跳出來，停在膠囊上才展開。<br>動態島貼在螢幕上緣；浮動膠囊離上緣一點點、有影子；極簡細條平常只是一條播放進度，滑鼠移上去才展開。</p>
-  <label class="row" title="網路斷超過 6 秒時膠囊會提醒，恢復時也會說一聲">網路斷線提醒 <span class="switch"><input type="checkbox" id="net-alert"><span></span></span></label>
-  <h3>遊戲模式</h3>
-  <p class="hint">玩全螢幕遊戲、看全螢幕影片時，Hummi 自動退到一邊，不擋畫面、不搶效能。</p>
-  <label class="row">遊戲模式 <span class="switch"><input type="checkbox" id="game-on"><span></span></span></label>
-  <div class="row col" data-game>浮動歌詞
-    <div class="seg" id="ov-fs"><button data-fs="normal">照常顯示</button><button data-fs="dim">變淡</button><button data-fs="hide">先藏起來</button></div>
-  </div>
-  <div class="row col" data-game title="無邊框視窗的遊戲才看得到；獨佔全螢幕的遊戲 Windows 不允許任何視窗疊上去">膠囊
-    <div class="seg" id="game-notch"><button data-gn="show">照常顯示</button><button data-gn="alerts">只彈重要提醒</button><button data-gn="hide">完全藏起來</button></div>
-  </div>
-  <label class="row" data-game title="AI 只錄播放器的聲音，不會錄到遊戲；這個選項是為了不占用遊戲的顯示卡效能">AI 歌詞先暫停（省效能） <span class="switch"><input type="checkbox" data-aik="pause_fullscreen"><span></span></span></label>
-  <p class="hint" style="margin:4px 0 0">重要提醒：計時器時間到、網路斷線、裝置快沒電。</p>
-  <h3>視窗</h3>
-  <label class="row" title="工作列的 Hummi 圖示上顯示這首歌播到哪 (暫停時變黃色)">工作列顯示播放進度 <span class="switch"><input type="checkbox" id="tb-progress"><span></span></span></label>
-  <h3>自動暫停</h3>
-  <label class="row">鎖定電腦、睡眠時暫停 <span class="switch"><input type="checkbox" data-ap="lock"><span></span></span></label>
-  <label class="row" title="拔掉有線耳機、藍牙耳機斷線時暫停，免得音樂突然從喇叭放出來；手動切換裝置不會暫停">耳機拔掉、藍牙斷線時暫停 <span class="switch"><input type="checkbox" data-ap="unplug"><span></span></span></label>
-  <label class="row" title="解鎖、或同一副耳機接回來時，接著播 (只會接著播被 Hummi 暫停的)">回來時接著播 <span class="switch"><input type="checkbox" data-ap="resume"><span></span></span></label>
-  <h3>快捷鍵</h3>
-  <label class="row" title="Ctrl + Alt + P / , / . / ↑ / ↓ / W / S，在遊戲和其他程式裡也能用">全域快捷鍵 (遊戲中也能用) <span class="switch"><input type="checkbox" id="hotkeys-on"><span></span></span></label>
-  <p class="hint" id="hotkeys-hint" style="margin:4px 0 0">Ctrl + Alt + P 播放 / 暫停、 , . 切歌、 ↑ ↓ 音量。 <a href="#" id="keys-open" style="color:#b9a6ff">所有快捷鍵 (?)</a></p>
-  <h3>啟動與更新</h3>
-  <label class="row" id="autostart-row">開機時自動啟動 <span class="switch"><input type="checkbox" id="autostart"><span></span></span></label>
-  <label class="row">自動檢查更新 <span class="switch"><input type="checkbox" id="auto-update"><span></span></span></label>
-  <div class="row">更新與分享 <span style="display:flex;gap:6px"><button class="chip" id="upd-check">檢查更新</button><button class="chip" id="share-btn">分享 Hummi</button></span></div>
-  <p class="hint" id="upd-check-msg" style="margin:4px 0 0"></p>
-  <div id="ver"></div>
   </div>
 </aside>
 
@@ -1501,6 +1649,33 @@ function setTab(name){
   try { localStorage.setItem('setTab', name); } catch {}
 }
 document.querySelectorAll('#set-tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+// 搜尋設定：打字就把所有分類裡對得上的那幾組列出來
+document.querySelectorAll('#set-tabs button').forEach(b => {
+  const p = document.querySelector(`#settings .pane[data-pane="${b.dataset.tab}"]`);
+  if (p) p.dataset.title = b.querySelector('span:last-child').textContent.trim();
+  b.addEventListener('click', () => { if ($('#set-search').value){ $('#set-search').value = ''; filterSettings(''); } });
+});
+function filterSettings(raw){
+  const q = raw.trim().toLowerCase();
+  panel.classList.toggle('searching', !!q);
+  let any = false;
+  document.querySelectorAll('#settings .pane').forEach(p => {
+    const whole = q && (p.dataset.title || '').toLowerCase().includes(q);
+    let hit = false;
+    p.querySelectorAll('.grp').forEach(g => {
+      const txt = (g.textContent + ' ' + [...g.querySelectorAll('[title],[placeholder]')].map(e => (e.title || '') + ' ' + (e.placeholder || '')).join(' ')).toLowerCase();
+      const ok = !q || whole || txt.includes(q);
+      g.classList.toggle('nohit', !ok);
+      hit = hit || ok;
+    });
+    p.classList.toggle('nohit', !hit);
+    any = any || hit;
+  });
+  $('#set-empty').hidden = !q || any;
+  $('.set-main').scrollTop = 0;
+}
+$('#set-search').addEventListener('input', e => filterSettings(e.target.value));
+$('#set-search').addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.value){ e.stopPropagation(); e.target.value = ''; filterSettings(''); } });
 try { const t = localStorage.getItem('setTab'); if (t) setTab(t); } catch {}
 let musicOnlyEdit = 0;
 

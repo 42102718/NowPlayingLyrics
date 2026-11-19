@@ -2218,7 +2218,7 @@ def open_settings():
         import webview
         s = ctypes.windll.user32.GetDpiForSystem() / 96
         sw = ctypes.windll.user32.GetSystemMetrics(0)
-        w, h = 440, 720
+        w, h = 700, 720  # 寬一點：左邊分類、右邊設定
         x, y = int(sw / s / 2 - w / 2), 64
         if settings_window is None:
             settings_window = webview.create_window(
