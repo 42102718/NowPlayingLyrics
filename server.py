@@ -89,7 +89,7 @@ DEFAULT_CONFIG = {
         "font_size": 46,
         "width": 1200,
         "bg_opacity": 0,           # 0~100
-        "show_translation": True,
+        "show_translation": False,  # 歌詞翻譯 (主視窗、舞台、浮動歌詞、Folia 一起)；預設關
         "show_next": True,
         "color": "album",          # white / album
         "auto_hide": True,         # 主視窗或舞台開著時自動隱藏 (避免同時好幾份歌詞)
@@ -148,6 +148,9 @@ def load_config():
         cfg["background"].update({k: v for k, v in saved.get("background", {}).items() if k in cfg["background"]})
         cfg["ai"].update({k: v for k, v in saved.get("ai", {}).items() if k in cfg["ai"]})
         cfg["overlay"].update({k: v for k, v in saved.get("overlay", {}).items() if k in cfg["overlay"]})
+        if not saved.get("tr_off_v181"):  # 1.8.1 起翻譯預設關：舊設定裡的「開」是以前的預設值，一律先關掉，要的人再打開
+            cfg["overlay"]["show_translation"] = False
+        cfg["tr_off_v181"] = True
         dv = saved.get("devices") or {}
         cfg["devices"] = {"low": int(dv.get("low", 15)), "tray": bool(dv.get("tray", True)),
                           "hidden": [str(x) for x in dv.get("hidden", [])][:50]}
@@ -176,6 +179,17 @@ runtime = {"unlocked": False, "cfg_version": 0}
 def config_changed():
     runtime["cfg_version"] += 1
     save_config()
+
+
+def show_tr():
+    return bool(config["overlay"].get("show_translation"))
+
+
+def lyr_view(lyr):
+    """給主視窗、舞台的歌詞：翻譯關掉時不送翻譯 (原本的資料還留著，打開馬上就有)。"""
+    if not lyr or show_tr() or not any(l.get("tr") for l in lyr.get("lines") or []):
+        return lyr
+    return {**lyr, "lines": [{k: v for k, v in l.items() if k != "tr"} for l in lyr["lines"]]}
 
 
 # ───────────────────────── 繁體轉換 ─────────────────────────
@@ -1140,7 +1154,7 @@ async def fetch_lyrics(track):
         if state["track"] and state["track"]["track_id"] == track["track_id"]:
             state["lyrics"] = {"track_id": track["track_id"], "source": None, "synced": False, "lines": [],
                                "kind": "short"}
-            await broadcast({"type": "lyrics", **state["lyrics"]})
+            await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
         return
     # 一般影片：歌手 (頻道) 也要對得上才算，避免標題剛好跟某首歌同名
     inst = strip_inst(track["title"])
@@ -1152,7 +1166,7 @@ async def fetch_lyrics(track):
         res = {**res, "kind": "video"}
     if state["track"] and state["track"]["track_id"] == track["track_id"]:
         state["lyrics"] = {"track_id": track["track_id"], **res}
-        await broadcast({"type": "lyrics", **state["lyrics"]})
+        await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
         if AI is not None:
             if res.get("ai") and res.get("heard", 1.0) < 0.95:  # 上次沒聽完整：這次繼續聽，補齊後更新
                 AI.set_job(track, Lyrics.key(track["title"], track["artist"]),
@@ -1190,7 +1204,7 @@ async def _ai_push(track_id, key, result, live):
     if live and not result["lines"] and cur.get("lines"):
         return
     state["lyrics"] = {"track_id": track_id, **traditionalize({**result, "lines": [dict(l) for l in result["lines"]]})}
-    await broadcast({"type": "lyrics", **state["lyrics"]})
+    await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
 
 
 class PlaybackClock:
@@ -1320,7 +1334,7 @@ async def ws_handler(request):
     await ws.prepare(request)
     clients.add(ws)
     if state["lyrics"]:
-        await ws.send_str(json.dumps({"type": "lyrics", **state["lyrics"]}, ensure_ascii=False))
+        await ws.send_str(json.dumps({"type": "lyrics", **lyr_view(state["lyrics"])}, ensure_ascii=False))
     await ws.send_str(json.dumps(devices_msg(), ensure_ascii=False))
     if UPDATE.get("available") or UPDATE.get("whatsnew"):
         await ws.send_str(json.dumps(update_msg(), ensure_ascii=False))
@@ -1342,6 +1356,8 @@ async def ws_handler(request):
                 patch = {k: v for k, v in (d.get("patch") or {}).items() if k in config["overlay"]}
                 config["overlay"].update(patch)
                 config_changed()
+                if "show_translation" in patch and state["lyrics"]:
+                    await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
             elif d.get("type") == "background":
                 patch = {k: v for k, v in (d.get("patch") or {}).items() if k in config["background"] and k != "image"}
                 config["background"].update(patch)
@@ -1761,6 +1777,8 @@ def start_tray():
         def f(icon, item):
             ov[key] = not ov[key]
             config_changed()
+            if key == "show_translation" and LOOP is not None and state["lyrics"]:  # 主視窗、舞台馬上換
+                LOOP.call_soon_threadsafe(lambda: asyncio.ensure_future(broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})))
         return f
 
     def notch_toggle(key):
@@ -2597,7 +2615,7 @@ def make_app():
         if AI is not None:
             AI.set_job(None)
         state["lyrics"] = {"track_id": t["track_id"], **result, "override": True}
-        await broadcast({"type": "lyrics", **state["lyrics"]})
+        await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
         return web.json_response({"ok": True, "source": result["source"], "synced": result["synced"]})
 
     async def lyr_use(request):

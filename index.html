@@ -550,12 +550,14 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
   <div class="row col"><div class="row" style="border:0;padding:0">文字大小 <output id="o-font_size"></output></div><input type="range" min="18" max="80" step="1" data-k="font_size"></div>
   <div class="row col"><div class="row" style="border:0;padding:0">寬度 <output id="o-width"></output></div><input type="range" min="400" max="1800" step="20" data-k="width"></div>
   <div class="row col"><div class="row" style="border:0;padding:0">背景深度 <output id="o-bg_opacity"></output></div><input type="range" min="0" max="90" step="5" data-k="bg_opacity"></div>
-  <label class="row">顯示翻譯 <span class="switch"><input type="checkbox" data-k="show_translation"><span></span></span></label>
   <label class="row">顯示下一句 <span class="switch"><input type="checkbox" data-k="show_next"><span></span></span></label>
   <label class="row" title="主視窗或舞台本來就在顯示歌詞，浮動歌詞先藏起來，畫面才不會同時好幾份歌詞">主視窗或舞台開著時自動隱藏 <span class="switch"><input type="checkbox" data-k="auto_hide"><span></span></span></label>
   <label class="row">用專輯配色 <span class="switch"><input type="checkbox" data-k="color" data-on="album" data-off="white"><span></span></span></label>
   </div>
   <div class="pane" data-pane="ai">
+  <h3>翻譯</h3>
+  <label class="row" title="外文歌在歌詞下面顯示中文翻譯 (主視窗、舞台、浮動歌詞、Folia 一起)">顯示歌詞翻譯 <span class="switch"><input type="checkbox" data-k="show_translation"><span></span></span></label>
+  <p class="hint" style="margin:4px 0 0">外文歌的每一句下面多一行中文翻譯 (有翻譯的歌才有)。主視窗、舞台、浮動歌詞一起套用。</p>
   <h3>AI 歌詞</h3>
   <p class="hint">四個歌詞來源都沒有同步歌詞時，AI 會聽正在播放的聲音：沒有歌詞就邊聽邊寫，有歌詞沒時間就自動對時。聽完整首後會存起來，下次播放就完全同步。</p>
   <label class="row">啟用 AI 歌詞 <span class="switch"><input type="checkbox" data-aik="enabled"><span></span></span></label>

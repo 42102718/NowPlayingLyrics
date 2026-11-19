@@ -159,7 +159,7 @@ class FoliaBridge:
             lrc, tr, hint = to_lrc(lyr["lines"])
             if lrc.strip():
                 src = {"type": "local", "lrcContent": lrc, "formatHint": hint}
-                if tr:
+                if tr and (self.config.get("overlay") or {}).get("show_translation"):
                     src["tLrcContent"] = tr
                 body["lyricSource"] = src
         return body
@@ -170,7 +170,7 @@ class FoliaBridge:
             lines = lyr.get("lines") or []
             lk = (lyr.get("source"), lyr.get("synced"), len(lines), lines[0].get("text") if lines else "",
                   lyr.get("override"), bool(t.get("has_art")))
-        return (t["track_id"], lk, bool(t.get("has_art")))
+        return (t["track_id"], lk, bool(t.get("has_art")), bool((self.config.get("overlay") or {}).get("show_translation")))
 
     def push(self, t, lyr):
         body = self.payload(t, lyr)
