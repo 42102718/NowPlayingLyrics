@@ -416,7 +416,9 @@ for (const k of Object.keys(opt)){
   opt[k] = typeof opt[k] === 'boolean' ? v === '1' : typeof opt[k] === 'number' ? +v : v;
 }
 if (opt.bg === 'none'){ opt.bg = 'fluid'; opt.transparent = true; }  // 舊設定：背景選「透明」改成獨立的開關
-const save = () => { if (!OBS) try { localStorage.setItem('hummi.stage', JSON.stringify(opt)); } catch {} };
+const LIVE_SRC = !OBS && !params.has('wallpaper');  // 這個舞台的設定會同步給 OBS
+const pushLive = () => { if (LIVE_SRC) sendWs({type: 'stage_opt', opt}); };
+const save = () => { if (!OBS) try { localStorage.setItem('hummi.stage', JSON.stringify(opt)); } catch {} pushLive(); };
 if (OBS) document.body.classList.add('obs');
 // 桌布模式：跟舞台用同一套設定，舞台那邊改了就跟著換
 if (params.has('wallpaper')){ opt.transparent = false; addEventListener('storage', e => { if (e.key === 'hummi.stage') location.reload(); }); }
@@ -429,7 +431,7 @@ const now = () => anchorPos + (playing ? (performance.now() - anchorAt) / 1000 :
 let ws;
 function connect(){
   ws = new WebSocket(`ws://${location.host}/ws`);
-  ws.onopen = () => ws.send(JSON.stringify({type:'hello', stage:true}));
+  ws.onopen = () => { ws.send(JSON.stringify({type:'hello', stage:true})); pushLive(); };
   ws.onclose = () => setTimeout(connect, 1000);
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
@@ -437,6 +439,7 @@ function connect(){
     else if (m.type === 'lyrics') onLyrics(m);
     else if (m.type === 'viz') onViz(m);
     else if (m.type === 'chat_song') showAsk(m);
+    else if (m.type === 'stage_opt') applyLive(m.opt);
   };
 }
 let askTimer = 0;
@@ -467,6 +470,17 @@ function onState(m){
 }
 let pendingLyr = null;
 // ───── 音樂控制列 ─────
+// OBS 的舞台畫面：跟著舞台目前的設定即時換 (網址加 fixed=1 就固定用網址裡的設定)
+let liveKey = '';
+function applyLive(o){
+  if (!OBS || params.has('fixed') || !o) return;
+  const k = JSON.stringify(o);
+  if (k === liveKey) return;
+  liveKey = k;
+  Object.assign(opt, o);
+  applyOpts(); applyBg();
+  rebuild();  // 裡面會換 Folia 效果 (網址不同才重新載入)
+}
 const sendWs = m => { try { ws.readyState === 1 && ws.send(JSON.stringify(m)); } catch {} };
 const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 $('#c-play').onclick = e => { e.stopPropagation(); sendWs({type: 'toggle'}); };
@@ -1295,16 +1309,10 @@ const fullscreen = () => window.pywebview?.api?.fullscreen ? window.pywebview.ap
 $('#b-full').onclick = fullscreen;
 addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F' || e.key === 'F11') && !e.target.closest?.('input,select')){ e.preventDefault(); fullscreen(); } if (e.key === 'Escape'){ $('#panel').classList.remove('open'); window.pywebview?.api?.exit_fullscreen?.(); } });
 $('#b-obs').onclick = async () => {
-  if (isFolia(opt.mode)){  // Folia 效果：直接給 Folia 頁面的網址 (Hummi 要開著)
-    const url = foliaUrl(opt.mode, true);
-    try { await navigator.clipboard.writeText(url); $('#msg').textContent = '已複製 Folia 效果的網址！在 OBS 新增「瀏覽器」來源貼上，寬高設 1920×1080。'; }
-    catch { $('#msg').textContent = url; }
-    return;
-  }
   const q = new URLSearchParams({obs: 1, mode: opt.mode, bg: opt.bg, size: opt.size, nsize: opt.nsize, font: opt.font, transparent: +opt.transparent, next: +opt.next,
                                  card: +opt.card, beat: +opt.beat, album: +opt.album, color: opt.color});
   const url = `http://${location.host}/stage?${q}`;
-  try { await navigator.clipboard.writeText(url); $('#msg').textContent = '已複製！在 OBS 新增「瀏覽器」來源，貼上網址，寬高設 1920×1080。'; }
+  try { await navigator.clipboard.writeText(url); $('#msg').textContent = '已複製！在 OBS 新增「瀏覽器」來源，貼上網址，寬高設 1920×1080。之後在這裡換效果、背景，OBS 會自動跟著換，不用再複製。'; }
   catch { $('#msg').textContent = url; }
 };
 let uiTimer;

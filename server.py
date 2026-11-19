@@ -126,6 +126,8 @@ def load_config():
         cfg["game"] = {"enabled": bool(gm.get("enabled", True)),
                        "notch": gm.get("notch") if gm.get("notch") in ("show", "alerts", "hide") else "alerts"}
         cfg["net_alert"] = bool(saved.get("net_alert", True))
+        if isinstance(saved.get("stage_live"), dict):
+            cfg["stage_live"] = saved["stage_live"]
         cfg["jp_reading"] = saved.get("jp_reading") if saved.get("jp_reading") in ("off", "furigana", "hiragana", "romaji") else "off"
         ns = saved.get("notch_style") if isinstance(saved.get("notch_style"), dict) else {}
         cfg["notch_style"] = {"shape": ns.get("shape") if ns.get("shape") in ("island", "float", "bar") else "island",
@@ -1562,11 +1564,21 @@ async def ws_handler(request):
     if state["lyrics"]:
         await ws.send_str(json.dumps({"type": "lyrics", **lyr_view(state["lyrics"])}, ensure_ascii=False))
     await ws.send_str(json.dumps(devices_msg(), ensure_ascii=False))
+    if config.get("stage_live"):  # OBS 的舞台畫面一連上就換成舞台目前的效果
+        await ws.send_str(json.dumps({"type": "stage_opt", "opt": config["stage_live"]}, ensure_ascii=False))
     if UPDATE.get("available") or UPDATE.get("whatsnew"):
         await ws.send_str(json.dumps(update_msg(), ensure_ascii=False))
     async for msg in ws:
         try:
             d = json.loads(msg.data)
+            if d.get("type") == "stage_opt" and isinstance(d.get("opt"), dict):
+                # 舞台換了效果 / 背景 / 字體…：記下來並告訴 OBS 的舞台畫面，OBS 即時跟著換，不用重新複製網址
+                o = {k: v for k, v in d["opt"].items() if isinstance(k, str) and isinstance(v, (str, int, float, bool))}
+                if o != config.get("stage_live"):
+                    config["stage_live"] = o
+                    save_config()
+                    await broadcast({"type": "stage_opt", "opt": o})
+                continue
             if d.get("type") == "hello":
                 print("[page]", d, flush=True)
                 if d.get("app"):  # 打開主視窗時：超過 10 分鐘沒檢查就再看一次有沒有新版
