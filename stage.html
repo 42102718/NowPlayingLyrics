@@ -279,6 +279,12 @@ body.obs #find,body.obs #nolyr,body.obs #fd{display:none!important}
   display:none;font-family:"Noto Sans TC","Inter",sans-serif}
 #panel.open{display:block}
 #panel h2{font:800 17px "Noto Sans TC";margin-bottom:12px;display:flex;justify-content:space-between}
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px}
+.seg3.four{grid-template-columns:repeat(4,1fr)}
+.seg3 button{height:32px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);
+  font:600 12px "Noto Sans TC";cursor:pointer}
+.seg3 button.on{background:#8b6cff;border-color:#8b6cff;color:#fff}
+#panel .row.col{flex-direction:column;align-items:stretch}
 #panel h3{font:700 11px "Noto Sans TC";letter-spacing:.1em;color:rgba(255,255,255,.5);margin:14px 0 8px}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .grid button{height:56px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;
@@ -375,7 +381,19 @@ body.obs #ctl{display:none!important}
     <label class="row" id="nsize-row" title="Hummi 效果才有；Folia 效果的下一句由 Folia 決定">下一句大小 <input type="range" id="o-nsize" min="0.5" max="1.6" step="0.05"></label>
     <label class="row">換歌時顯示歌曲卡片 <input type="checkbox" id="o-card"></label>
     <label class="row">跟著節拍脈動 <input type="checkbox" id="o-beat"></label>
-    <div class="src-note">字體大小兩種效果都有作用 (Folia 效果放開滑桿後會重新載入一下)；其他外觀設定只用在 Hummi 效果。</div>
+    <div class="src-note">字體大小兩種效果都有作用 (Folia 效果放開滑桿後會重新載入一下)；上面其他設定只用在 Hummi 效果。</div>
+    <h3>Folia 效果的樣式</h3>
+    <div class="row col">背景型別
+      <div class="seg3" id="f-bg"><button data-v="common">通用</button><button data-v="monet">莫奈</button><button data-v="nomand">漫遊</button>
+        <button data-v="latent">隱現</button><button data-v="sora">空</button></div>
+    </div>
+    <div class="row col">字重
+      <div class="seg3 four" id="f-fw"><button data-v="auto">自動</button><button data-v="300">細</button><button data-v="400">一般</button><button data-v="700">粗</button></div>
+    </div>
+    <label class="row">停用暗角 <input type="checkbox" id="f-vig"></label>
+    <label class="row">隱藏通用的幾何背景 <input type="checkbox" id="f-geo"></label>
+    <label class="row">加上封面的顏色 <input type="checkbox" id="f-cover"></label>
+    <div class="src-note">Folia 效果改了會重新載入一下；OBS 也會跟著換。</div>
   </div>
   <div class="ppane" data-p="live">
     <label class="row">透明背景 (疊在直播畫面上) <input type="checkbox" id="o-transparent"></label>
@@ -398,9 +416,12 @@ const FOLIA_MODES = [['classic','流光'],['cadenza','心象'],['partita','雲�
   ['tilt','傾訴'],['claddagh','迴環'],['diorama','鏡台'],['pendolo','時計'],['sonnet','商籟'],['tempera','凝彩'],
   ['lumiere','繪光'],['nebbia','霧箋'],['hanabi','花火'],['machi','町景'],['still','靜止']];
 const isFolia = m => m.startsWith('folia:');
+// Folia 的設定：lfn 字體大小、lfw 字重 (300/400/700)、vbm 背景型別、dvv 停用暗角、dvgb 隱藏幾何背景、ccb 封面色彩
+const foliaCfg = () => ({lfn: opt.size, vbm: opt.fbg || 'latent', dvv: !!opt.fvig, dvgb: !!opt.fgeo, ccb: !!opt.fcover,
+                         ...(opt.fw && opt.fw !== 'auto' ? {lfw: +opt.fw} : {})});
 const foliaUrl = (mode, obs) => `http://${obs ? '127.0.0.1:' + location.port : location.host}/folia/?` + new URLSearchParams({
   obs: 1, obsSource: 'playercap', host: obs ? '127.0.0.1:' + location.port : location.host, nxpcPlayer: 'hummi',
-  visualizer: mode.slice(6), cfg: JSON.stringify({lyricsFontScale: opt.size}), ...(opt.transparent ? {transparent: 1} : {})});
+  visualizer: mode.slice(6), cfg: JSON.stringify(foliaCfg()), ...(opt.transparent ? {transparent: 1} : {})});
 const NOFILL = ['ktv', 'neon', 'bounce', 'rain', 'city', 'scatter', 'stairs', 'ring'];
 const REVEAL = ['fly', 'scatter', 'stairs'];  // 字要唱到 (前一點點) 才出現的效果
 const BGS = [['fluid','流動','專輯色流動'],['particles','粒子','光點飄浮'],['stars','星空','星光穿梭'],
@@ -408,7 +429,7 @@ const BGS = [['fluid','流動','專輯色流動'],['particles','粒子','光點�
 const FONTS = {sans:'"Noto Sans TC","Inter",system-ui,sans-serif', serif:'"Noto Serif TC","Noto Sans TC",serif', latin:'"Inter","Noto Sans TC",sans-serif'};
 const params = new URLSearchParams(location.search);
 const OBS = params.has('obs');
-let opt = {mode:'folia:classic', bg:'fluid', transparent:false, size:1, nsize:1, next:true, card:true, beat:true, album:true, color:'#ffffff', font:'sans'};
+let opt = {mode:'folia:classic', bg:'fluid', transparent:false, size:1, nsize:1, fbg:'latent', fw:'auto', fvig:false, fgeo:false, fcover:false, next:true, card:true, beat:true, album:true, color:'#ffffff', font:'sans'};
 try { Object.assign(opt, JSON.parse(localStorage.getItem('hummi.stage') || '{}')); } catch {}
 for (const k of Object.keys(opt)){
   if (!params.has(k)) continue;
@@ -1182,6 +1203,7 @@ function renderPanel(){
   $('#fmodes').querySelectorAll('button').forEach(b => b.onclick = () => pick(b));
   $('#modes').querySelectorAll('button').forEach(b => b.onclick = () => pick(b));
   $('#bgs').querySelectorAll('button').forEach(b => b.onclick = () => { opt.bg = b.dataset.b; save(); renderPanel(); applyBg(); });
+  renderFolia();
   $('#o-size').value = opt.size; $('#o-nsize').value = opt.nsize; $('#o-nsize').disabled = !opt.next || isFolia(opt.mode);
   $('#nsize-row').style.opacity = isFolia(opt.mode) ? .45 : 1; $('#o-next').checked = opt.next; $('#o-card').checked = opt.card; $('#o-transparent').checked = opt.transparent;
   $('#o-beat').checked = opt.beat; $('#o-album').checked = opt.album; $('#o-color').value = opt.color; $('#o-font').value = opt.font;
@@ -1207,6 +1229,17 @@ $('#o-font').onchange = e => { opt.font = e.target.value; applyOpts(); save(); }
 $('#o-album').onchange = e => { opt.album = e.target.checked; applyOpts(); save(); $('#color-row').hidden = opt.album; };
 $('#o-color').oninput = e => { opt.color = e.target.value; opt.album = false; $('#o-album').checked = false; applyOpts(); save(); };
 $('#o-next').onchange = e => { opt.next = e.target.checked; save(); rebuild(); $('#o-nsize').disabled = !opt.next || isFolia(opt.mode); };
+function renderFolia(){
+  document.querySelectorAll('#f-bg button').forEach(b => b.classList.toggle('on', b.dataset.v === (opt.fbg || 'latent')));
+  document.querySelectorAll('#f-fw button').forEach(b => b.classList.toggle('on', b.dataset.v === String(opt.fw || 'auto')));
+  $('#f-vig').checked = !!opt.fvig; $('#f-geo').checked = !!opt.fgeo; $('#f-cover').checked = !!opt.fcover;
+}
+const foliaChanged = () => { save(); renderFolia(); if (isFolia(opt.mode)) applyFolia(); };
+document.querySelectorAll('#f-bg button').forEach(b => b.onclick = () => { opt.fbg = b.dataset.v; foliaChanged(); });
+document.querySelectorAll('#f-fw button').forEach(b => b.onclick = () => { opt.fw = b.dataset.v; foliaChanged(); });
+$('#f-vig').onchange = e => { opt.fvig = e.target.checked; foliaChanged(); };
+$('#f-geo').onchange = e => { opt.fgeo = e.target.checked; foliaChanged(); };
+$('#f-cover').onchange = e => { opt.fcover = e.target.checked; foliaChanged(); };
 $('#o-nsize').oninput = e => { opt.nsize = +e.target.value; applyOpts(); save(); };
 $('#o-transparent').onchange = e => { opt.transparent = e.target.checked; save(); applyBg(); if (isFolia(opt.mode)) applyFolia(true); };
 $('#o-card').onchange = e => { opt.card = e.target.checked; applyOpts(); save(); };
