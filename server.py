@@ -1932,8 +1932,10 @@ def apply_window_style(win=None):
                 return dwm.DwmSetWindowAttribute(hwnd, a, ctypes.byref(val), 4)
             attr(20, 0 if config.get("theme") in ("dawn", "paper") else 1)   # 深色 / 淺色風格的視窗邊框
             attr(33, 2)   # 圓角
-            m = -1 if mica else 0
-            dwm.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(MARGINS(m, m, m, m)))
+            # Mica 要整個視窗都是「玻璃」才透得出來。不能用 -1 (整片)：那樣 Windows 會在右上角畫出它自己的
+            # 最小化 / 放大 / 關閉按鈕，跟網頁的按鈕疊成虛影。改成只從下緣往上延伸一大段，一樣蓋滿整個視窗，但不會畫按鈕
+            m = MARGINS(0, 0, 0, 30000) if mica else MARGINS(0, 0, 0, 0)
+            dwm.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(m))
             attr(38, 2 if mica else 1)  # 系統背景：Mica / 無
             form.BackColor = Color.Black if mica else ColorTranslator.FromHtml("#0b0b12")
             form.webview.DefaultBackgroundColor = Color.Transparent if mica else ColorTranslator.FromHtml("#0b0b12")

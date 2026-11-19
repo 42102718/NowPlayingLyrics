@@ -109,10 +109,14 @@ class Chrome:
         不透過 WinForms 的 FormBorderStyle：那樣 WinForms 會以為有標題列，每次放大再還原視窗就長高一截。
         WinForms 重設樣式後 (例如離開全螢幕) 要再呼叫一次。"""
         GWL_STYLE = -16
-        WS_EXTRA = 0x00C00000 | 0x00040000 | 0x00080000 | 0x00020000 | 0x00010000  # CAPTION THICKFRAME SYSMENU MIN MAX
+        WS_EXTRA = 0x00C00000 | 0x00040000 | 0x00020000 | 0x00010000  # CAPTION THICKFRAME MIN MAX
+        # 不要 WS_SYSMENU：有它 Windows 就會在右上角畫自己的 最小化 / 放大 / 關閉 按鈕 (標題列是我們拿掉的)，
+        # 跟網頁的按鈕疊成虛影。縮小、放大、貼齊、工作列點一下縮小都不需要它。
+        WS_SYSMENU = 0x00080000
         st = user32.GetWindowLongW(self.hwnd, GWL_STYLE)
-        if (st & WS_EXTRA) != WS_EXTRA:
-            user32.SetWindowLongW(self.hwnd, GWL_STYLE, st | WS_EXTRA)
+        want = (st | WS_EXTRA) & ~WS_SYSMENU
+        if st != want:
+            user32.SetWindowLongW(self.hwnd, GWL_STYLE, want)
         user32.SetWindowPos(self.hwnd, None, 0, 0, 0, 0,
                             SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)
 
