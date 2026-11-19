@@ -42,7 +42,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.8.0"
+VERSION = "1.8.1"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -99,7 +99,7 @@ DEFAULT_CONFIG = {
     "notch_monitor": "primary",    # 膠囊在哪個螢幕 (同上)
     "game": {"enabled": True, "notch": "alerts"},  # 遊戲模式：全螢幕時；膠囊 alerts 只彈重要提醒 / hide 藏起來
     "net_alert": True,             # 網路斷線 / 恢復時膠囊提醒
-    "notch_style": {"shape": "island", "color": "black"},  # 膠囊形狀 island/float/bar、顏色 black/album/theme
+    "notch_style": {"shape": "island", "color": "black", "hover": "smart"},  # 形狀 island/float/bar、顏色 black/album/theme、展開 smart/fast/click
     "wallpaper": {"enabled": False, "monitor": "primary"},
     "share": {"folder": "", "name": ""},
     "chat": {"channel": "", "token": "", "bot": "", "commands": "!song !歌名 !這什麼歌 !歌"},  # 直播聊天室點歌指令 (Twitch)  # 和朋友共享歌詞的雲端資料夾、顯示的名字  # 桌布模式：舞台放在桌面圖示後面
@@ -127,7 +127,8 @@ def load_config():
         cfg["net_alert"] = bool(saved.get("net_alert", True))
         ns = saved.get("notch_style") if isinstance(saved.get("notch_style"), dict) else {}
         cfg["notch_style"] = {"shape": ns.get("shape") if ns.get("shape") in ("island", "float", "bar") else "island",
-                              "color": ns.get("color") if ns.get("color") in ("black", "album", "theme") else "black"}
+                              "color": ns.get("color") if ns.get("color") in ("black", "album", "theme") else "black",
+                              "hover": ns.get("hover") if ns.get("hover") in ("smart", "fast", "click") else "smart"}
         if isinstance(saved.get("timer"), dict):
             cfg["timer"] = {"custom": int(saved["timer"].get("custom", 20))}
         ch = saved.get("chat") or {}
@@ -224,6 +225,29 @@ MUSIC_HINT = re.compile(
     r"\s[-–—]\s|\b(?:m/?v|official|audio|lyrics?|cover|remix|live|acoustic|instrumental|karaoke|ost|"
     r"sped\s*up|slowed|nightcore)\b|歌詞|歌词|翻唱|音樂|音乐|歌曲|主題曲|主题曲|插曲|片尾曲|片頭曲|伴奏|純音樂|"
     r"가사|커버|歌ってみた|カバー", re.I)
+# 動畫 / 影集 / 影音平台：標題常是「某動畫 [1] - 巴哈姆特動畫瘋」，裡面的「 - 」會被誤認成「歌手 - 歌名」，AI 就去聽寫台詞
+VIDEO_SITE = re.compile(
+    r"動畫瘋|动画疯|巴哈姆特|ani\.gamer|bilibili|哔哩哔哩|嗶哩嗶哩|netflix|disney\+|crunchyroll|愛奇藝|爱奇艺|iqiyi|"
+    r"騰訊視頻|腾讯视频|优酷|優酷|kktv|line tv|friday影音|myvideo|catchplay|hami video|prime video|wetv|\bviu\b|"
+    r"第\s*\d+\s*[集話话季]|\[\s*\d{1,3}\s*\]|\bEP\.?\s*\d{1,3}\b|\bepisode\s*\d+|\bS\d{1,2}E\d{1,3}\b", re.I)
+SONG_WORD = re.compile(r"主題曲|主题曲|片頭曲|片头曲|片尾曲|插曲|\b(?:OP|ED|AMV|MV|lyrics?|full song|song)\b|歌詞|歌词|歌曲|翻唱", re.I)
+# 伴奏 / 卡拉 OK 版：沒有人聲，AI 聽不出歌詞；用原曲的歌詞 (伴奏通常跟原曲同一個編曲，時間對得上，正好跟著唱)
+INST_TAG = re.compile(
+    r"[\(\[【（「]?\s*(?:(?:ktv|KTV)\s*)?(?:純伴奏|纯伴奏|伴奏版?|伴唱版?|導唱|导唱|卡拉\s*ok|カラオケ|オフボーカル|"
+    r"karaoke(?:\s*ver(?:sion|\.)?)?|instrumental(?:\s*ver(?:sion|\.)?)?|\binst\.?(?=\W|$)|off\s*vocal|"
+    r"消音版?|去人聲版?|去人声版?|無人聲版?|无人声版?)\s*[\)\]】）」]?", re.I)
+
+
+def strip_inst(title):
+    """「晴天 (伴奏)」「晴天 KTV伴奏版」→「晴天」；不是伴奏版就回傳 None。"""
+    if not INST_TAG.search(title or ""):
+        return None
+    t = INST_TAG.sub(" ", title)
+    t = re.sub(r"\b(?:ktv|KTV)\b|純音樂|纯音乐", " ", t)
+    t = re.sub(r"[\(\[【（「]\s*[\)\]】）」]", " ", t)  # 拿掉後剩下的空括號
+    return re.sub(r"\s+", " ", t).strip(" -–—|｜/*") or None
+
+
 MUSIC_CHANNEL = re.compile(r"\s-\sTopic$|VEVO$|\bmusic\b|\brecords?\b|音樂|音乐|唱片", re.I)
 
 
@@ -255,6 +279,8 @@ def media_kind(track) -> str:
     dur = float(track.get("duration") or 0)
     if SHORT_TAG.search(title) or SHORT_TAG.search(artist) or 0 < dur < 60:
         return "short"
+    if (VIDEO_SITE.search(title) or VIDEO_SITE.search(artist)) and not SONG_WORD.search(title):
+        return "video"  # 動畫、影集：不讓 AI 聽 (會聽寫到台詞)
     if MUSIC_HINT.search(title) or MUSIC_CHANNEL.search(artist):
         return "music"
     return "video"
@@ -404,7 +430,7 @@ def merge_translation(lines, tlines):
 
 
 # ───────────────────────── 歌詞來源 ─────────────────────────
-CREDIT = re.compile(r"^(作词|作詞|作曲|编曲|編曲|制作人|製作人|监制|監製|混音|母带|母帶|和声|和聲|录音|錄音|吉他|贝斯|貝斯|鼓|"
+CREDIT = re.compile(r"^(作词|作詞|作曲|编曲|編曲|制作人|製作人|监制|監製|混音|母带|母帶|和声|和聲|合声|合聲|伴唱|录音|錄音|吉他|贝斯|貝斯|鼓|"
                     r"出品|发行|發行|统筹|統籌|企划|企劃|策划|策劃|营销|營銷|宣传|宣傳|监修|監修|弦乐|弦樂|配唱|"
                     r"词|詞|曲|OP|SP|Lyricist|Lyrics|Composer|Arranger|Producer|Mixing|Mastering|Recording)"
                     r"[^:：]{0,24}[:：]", re.I)  # 允許「監製Executive Producer：」這種中英混合
@@ -773,6 +799,7 @@ class Media:
 
     async def snapshot(self):
         sessions = []
+        others = []
         for s in self.mgr.get_sessions():
             try:
                 p = await s.try_get_media_properties_async()
@@ -782,6 +809,9 @@ class Media:
                 continue
             app = s.source_app_user_model_id
             src = classify_source(app, p.title, p.artist)
+            if pb.playback_status == PLAYING:
+                others.append((app, p.title, media_kind({"source": src, "app": app, "title": p.title, "artist": p.artist,
+                                                "duration": (tl.end_time - tl.start_time).total_seconds()})))
             if config.get("music_only", True) and not is_music_app(app, src):
                 continue  # 瀏覽器、抖音、影片播放器：不讀 (隱私，開台時不會露出其他東西)
             playing = pb.playback_status == PLAYING
@@ -801,6 +831,7 @@ class Media:
                 "position": pos, "duration": dur, "track_id": track_id,
                 "_thumb": p.thumbnail, "_session": s, "_raw": tl.position.total_seconds(),
             })
+        state["playing_apps"] = others  # [(app id, 標題, music/video/short)]
         return sessions
 
     def pick(self, sessions):
@@ -1112,8 +1143,11 @@ async def fetch_lyrics(track):
             await broadcast({"type": "lyrics", **state["lyrics"]})
         return
     # 一般影片：歌手 (頻道) 也要對得上才算，避免標題剛好跟某首歌同名
-    res = await lyrics.find(track["title"], track["artist"], track["album"], track["duration"],
+    inst = strip_inst(track["title"])
+    res = await lyrics.find(inst or track["title"], track["artist"], track["album"], track["duration"],
                             need_artist=(kind == "video"))
+    if inst:
+        res = {**res, "inst": True}  # 伴奏版：顯示的是原曲的歌詞
     if kind == "video" and not res.get("synced") and not res.get("override"):
         res = {**res, "kind": "video"}
     if state["track"] and state["track"]["track_id"] == track["track_id"]:
@@ -1124,7 +1158,7 @@ async def fetch_lyrics(track):
                 AI.set_job(track, Lyrics.key(track["title"], track["artist"]),
                            [{"t": None, "text": l["text"]} for l in res["lines"]] if res.get("ai") == "aligned" else None,
                            improve=True)
-            elif res.get("synced") or res.get("override") or res.get("ai") or kind != "music":
+            elif res.get("synced") or res.get("override") or res.get("ai") or kind != "music" or inst:  # 伴奏沒有人聲，AI 聽不出來
                 AI.set_job(None)
             else:  # 沒有同步歌詞 → AI 接手 (有純文字歌詞就只對時)
                 AI.set_job(track, Lyrics.key(track["title"], track["artist"]),
@@ -1427,6 +1461,8 @@ async def ws_handler(request):
                     ns["shape"] = d["shape"]
                 if d.get("color") in ("black", "album", "theme"):
                     ns["color"] = d["color"]
+                if d.get("hover") in ("smart", "fast", "click"):
+                    ns["hover"] = d["hover"]
                 save_config()
             elif d.get("type") == "notch_set":  # 設定裡的膠囊開關 (不會把主視窗收起來)
                 set_notch(bool(d.get("value")))
@@ -2520,7 +2556,7 @@ def make_app():
     app.router.add_get("/stage", stage_page)
 
     async def icon_png(request):
-        return web.FileResponse(ROOT / "icon.png", headers={"Cache-Control": "max-age=86400"})
+        return web.FileResponse(ROOT / "icon.png", headers={"Cache-Control": "no-cache"})  # 換圖示後馬上看得到 (之前快取一天)
     app.router.add_get("/icon.png", icon_png)
 
     async def show(request):

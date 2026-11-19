@@ -136,6 +136,7 @@ html.mica #grain{display:none}
 .line.active{transform:scale(1);color:transparent;filter:none!important;opacity:1!important}
 .line.active .txt{background:linear-gradient(90deg,var(--hi) calc(var(--p,0)*100% - 6%),rgba(var(--ink),.55) calc(var(--p,0)*100% + 6%));-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
 .line.active .tr{color:rgba(var(--ink),.85)}
+.line.tent .txt{opacity:.55;transition:opacity .4s}  /* AI 還在聽、可能還會改的字 */
 .line.past{color:rgba(var(--ink),.5)}
 .line.empty{min-height:.6em}
 .interlude{display:flex;gap:.35em;padding:20px 0;height:clamp(40px,6vh,64px);align-items:center}
@@ -601,7 +602,10 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
   <div class="row col" title="膠囊的底色 (字一直都是白色)">顏色
     <div class="seg" id="notch-color" style="grid-template-columns:repeat(3,1fr)"><button data-color="black">黑色</button><button data-color="album">專輯色</button><button data-color="theme">跟著風格</button></div>
   </div>
-  <p class="hint" style="margin:4px 0 0">動態島貼在螢幕上緣；浮動膠囊離上緣一點點、有影子；極簡細條平常只是一條播放進度，滑鼠移上去才展開。</p>
+  <div class="row col" title="滑鼠移到膠囊上時什麼時候展開">滑鼠移上去
+    <div class="seg" id="notch-hover" style="grid-template-columns:repeat(3,1fr)"><button data-hover="smart">停一下才展開</button><button data-hover="fast">馬上展開</button><button data-hover="click">點一下才展開</button></div>
+  </div>
+  <p class="hint" style="margin:4px 0 0">「停一下才展開」：滑鼠只是經過 (去點瀏覽器分頁、拖視窗) 不會跳出來，停在膠囊上才展開。<br>動態島貼在螢幕上緣；浮動膠囊離上緣一點點、有影子；極簡細條平常只是一條播放進度，滑鼠移上去才展開。</p>
   <label class="row" title="網路斷超過 6 秒時膠囊會提醒，恢復時也會說一聲">網路斷線提醒 <span class="switch"><input type="checkbox" id="net-alert"><span></span></span></label>
   <h3>遊戲模式</h3>
   <p class="hint">玩全螢幕遊戲、看全螢幕影片時，Hummi 自動退到一邊，不擋畫面、不搶效能。</p>
@@ -743,6 +747,7 @@ function onState(m){
       const ns = cfg.notch_style || {};
       document.querySelectorAll('#notch-shape [data-shape]').forEach(b => b.classList.toggle('on', b.dataset.shape === (ns.shape || 'island')));
       document.querySelectorAll('#notch-color [data-color]').forEach(b => b.classList.toggle('on', b.dataset.color === (ns.color || 'black')));
+      document.querySelectorAll('#notch-hover [data-hover]').forEach(b => b.classList.toggle('on', b.dataset.hover === (ns.hover || 'smart')));
       const catOn = (cfg.notch_opts || {}).cat !== false;
       document.querySelectorAll('#notch-right [data-cat]').forEach(b => b.classList.toggle('on', (b.dataset.cat === '1') === catOn));
       const gm = cfg.game || {}; $('#game-on').checked = gm.enabled !== false;
@@ -846,8 +851,28 @@ function extractColors(img){
 }
 
 function onLyrics(m){
+  const prev = lyr;
   lyr = m;
-  if (track && m.track_id === track.track_id) renderLyrics();
+  if (!(track && m.track_id === track.track_id)) return;
+  // AI 邊聽邊寫：每秒都會更新，只改有變的那幾行，不整個重畫 (不然畫面會一直跳)
+  if (m.ai === 'live' && prev?.ai === 'live' && prev.track_id === m.track_id && m.synced && lineEls.length) patchLive(m.lines);
+  else renderLyrics();
+}
+
+function patchLive(lines){
+  while (lineEls.length > lines.length) lineEls.pop().remove();
+  lines.forEach((l, i) => {
+    let d = lineEls[i];
+    if (!d){
+      d = document.createElement('div');
+      d.appendChild(Object.assign(document.createElement('span'), {className: 'txt'}));
+      els.lyrics.appendChild(d); lineEls.push(d);
+    }
+    d.className = 'line' + (l.text ? '' : ' empty') + (l.tent ? ' tent' : '') + (i === activeIdx ? ' active' : '');
+    const txt = d.querySelector('.txt');
+    if (txt.textContent !== (l.text || '')) txt.textContent = l.text || '';
+    d.onclick = () => { send({type:'seek', t: Math.max(0, l.t - offset)}); anchorPos = l.t - offset; anchorAt = performance.now(); };
+  });
 }
 
 function setStatus(text, sub='', spin=false, actions=false){
@@ -866,7 +891,8 @@ function renderLyrics(){
   if (!lyr.lines?.length){ statusKey = ''; showNoLyrics(); return; }
   els.status.classList.add('hide');
   $('#lyr-src').textContent = `歌詞來源：${lyr.source}${lyr.synced ? '' : '（未同步）'}${lyr.override ? '・手動指定' : ''}`
-    + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() ? '・AI 對時中' : '');
+    + (lyr.inst ? '・伴奏版，顯示原曲歌詞' : '')
+    + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() && !lyr.inst ? '・AI 對時中' : '');
   if (lyr.ai === 'live') $('#lyr-src').insertAdjacentHTML('afterbegin', '<span class="ai-dot"></span>');
   if (lyr.override){ const b = document.createElement('button'); b.textContent = '恢復自動'; b.onclick = resetLyrics; $('#lyr-src').appendChild(b); }
 
@@ -880,7 +906,7 @@ function renderLyrics(){
   els.lyrics.appendChild(intro);
   lyr.lines.forEach((l, i) => {
     const d = document.createElement('div');
-    d.className = 'line' + (l.text ? '' : ' empty');
+    d.className = 'line' + (l.text ? '' : ' empty') + (l.tent ? ' tent' : '');
     const txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = l.text || '';
     d.appendChild(txt);
     if (l.tr){ const tr = document.createElement('span'); tr.className = 'tr'; tr.textContent = l.tr; d.appendChild(tr); }
@@ -1585,7 +1611,7 @@ function renderChat(m){
 let hotkeysEdit = 0, apEdit = 0, monitors = [];
 $('#wp-on').onchange = e => { apEdit = performance.now(); send({type: 'wallpaper', enabled: e.target.checked}); };
 $('#net-alert').onchange = e => { apEdit = performance.now(); send({type: 'net_alert', value: e.target.checked}); };
-for (const [id, k] of [['notch-shape', 'shape'], ['notch-color', 'color']])
+for (const [id, k] of [['notch-shape', 'shape'], ['notch-color', 'color'], ['notch-hover', 'hover']])
   document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => { apEdit = performance.now();
     send({type: 'notch_style', [k]: b.dataset[k]});
     document.querySelectorAll(`#${id} button`).forEach(x => x.classList.toggle('on', x === b)); });

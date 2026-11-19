@@ -16,6 +16,7 @@ import os
 import re
 import threading
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -31,7 +32,9 @@ MODEL_FILES = ["config.json", "preprocessor_config.json", "tokenizer.json", "voc
 CUBLAS_PKG = ("nvidia-cublas-cu12", "12.9.2.10")
 UA = "NowPlayingLyrics (AI lyrics downloader)"
 
-LIVE_EVERY = 4.0      # 幾秒聽寫一次
+LIVE_EVERY = 4.0      # 幾秒聽寫一次 (CPU；顯示卡夠快時會自動縮短到 LIVE_FAST 秒)
+LIVE_FAST = 1.0       # 顯示卡最快幾秒聽寫一次
+LIVE_TENT = 1.8       # 結尾離「現在」這麼近的句子可能還沒唱完：先淡淡地顯示
 LIVE_WINDOW = 15.0    # 每次看最近幾秒
 FINAL_COVERAGE = 0.75  # 聽到幾成以上才做整首精修並存檔
 IDLE_UNLOAD = 600     # 閒置幾秒後釋放模型 (把顯示卡記憶體還給遊戲)
@@ -51,22 +54,65 @@ def log(*a):
 
 
 # ───────────────────────── 下載 ─────────────────────────
-def _download(url, dest: Path, on_progress, label):
+def fmt_eta(sec):
+    sec = int(max(0, sec))
+    if sec < 60:
+        return f"{sec} 秒"
+    if sec < 3600:
+        return f"{sec // 60} 分 {sec % 60:02d} 秒"
+    return f"{sec // 3600} 小時 {sec % 3600 // 60} 分"
+
+
+def _download(url, dest: Path, on_progress, label, retries=6):
+    """下載到 .part；斷線、關掉程式後再來會從斷掉的地方接著下載 (HTTP Range)，不用從頭。"""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:
-        total = int(r.headers.get("Content-Length") or 0)
-        done = 0
-        while True:
-            chunk = r.read(1 << 20)
-            if not chunk:
-                break
-            f.write(chunk)
-            done += len(chunk)
-            if total:
-                on_progress(label, done / total, done, total)
-    tmp.replace(dest)
+    speed = 0.0  # 每秒幾 bytes (平滑過)
+    for attempt in range(retries + 1):
+        have = tmp.stat().st_size if tmp.exists() else 0
+        headers = {"User-Agent": UA}
+        if have:
+            headers["Range"] = f"bytes={have}-"
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as r:
+                cr = r.headers.get("Content-Range") or ""  # bytes 1000-1999/2000
+                m = re.match(r"bytes (\d+)-\d+/(\d+)", cr)
+                if r.status == 206 and m and int(m.group(1)) == have:
+                    total, mode = int(m.group(2)), "ab"
+                    if have:
+                        log(f"resume {dest.name} from {have / 1e6:,.0f} MB")
+                else:  # 伺服器不支援接續：從頭來
+                    have, mode = 0, "wb"
+                    total = int(r.headers.get("Content-Length") or 0)
+                done = have
+                last_t, last_d = time.perf_counter(), done
+                with open(tmp, mode) as f:
+                    while True:
+                        chunk = r.read(1 << 20)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        done += len(chunk)
+                        now = time.perf_counter()
+                        if now - last_t >= 0.5:
+                            inst = (done - last_d) / (now - last_t)
+                            speed = inst if speed == 0 else speed * 0.7 + inst * 0.3
+                            last_t, last_d = now, done
+                        if total:
+                            eta = (total - done) / speed if speed > 0 else None
+                            on_progress(label, done / total, done, total, speed=speed, eta=eta)
+            if total and done < total:
+                raise IOError(f"連線中斷 ({done}/{total})")
+            tmp.replace(dest)
+            return
+        except Exception as e:
+            if isinstance(e, urllib.error.HTTPError) and e.code == 416 and have:
+                # 要的範圍超過檔案 = .part 已經是完整的了 (或是壞掉)：檢查大小
+                tmp.unlink(missing_ok=True)
+            if attempt >= retries:
+                raise
+            log(f"download {dest.name} failed ({e!r}), retry {attempt + 1}/{retries}")
+            time.sleep(min(30, 2 * (attempt + 1)))
 
 
 def _dev_model_path():
@@ -330,6 +376,7 @@ class AIEngine:
         self.model = None
         self.device = None
         self.last_used = 0.0
+        self.live_every = LIVE_EVERY  # 依照實際聽寫花多久自動調整
         self.status = {"state": "idle", "detail": "", "progress": None, "device": None}
         threading.Thread(target=self._capture_loop, daemon=True).start()
         threading.Thread(target=self._worker_loop, daemon=True).start()
@@ -407,12 +454,15 @@ class AIEngine:
                 t, _ = self._pos()
                 paused_fs = (self.cfg().get("pause_fullscreen", True) and (self.config.get("game") or {}).get("enabled", True)
                              and fullscreen_app_running())
+                mixed = bool(job and t) and self._mixed(t, src)
                 active = (job and t and t["track_id"] == job.track_id and t["playing"]
-                          and self.cfg().get("enabled", True) and not paused_fs)
+                          and self.cfg().get("enabled", True) and not paused_fs and not mixed)
                 if not active:
                     src = self._close_src(src)
                     if job and paused_fs and self.status["state"] in ("listening", "paused"):
                         self._set_status("paused", "全螢幕遊戲執行中，AI 暫停")
+                    elif job and mixed and self.status["state"] in ("listening", "paused"):
+                        self._set_status("paused", "同時有影片在播放，AI 暫停 (不然會聽到台詞)")
                     time.sleep(0.3)
                     continue
                 if self.status["state"] == "paused":
@@ -454,6 +504,18 @@ class AIEngine:
                 src = self._close_src(src)
                 time.sleep(1)
 
+    def _mixed(self, t, src):
+        """錄到的聲音會不會混到別的影片：錄整台電腦時有別的程式在播，或同一個瀏覽器有別的分頁在播影片。"""
+        others = [(app, kind) for app, title, kind in (self.state.get("playing_apps") or [])
+                  if (app, title) != (t.get("app"), t.get("title"))]
+        if not others:
+            return False
+        if src is not None and src[0] == "sys":
+            return True
+        from procloop import exe_for_app
+        mine = (exe_for_app(t.get("app", "")) or "").lower()
+        return any(kind != "music" and (exe_for_app(app) or "").lower() == mine for app, kind in others if mine)
+
     @staticmethod
     def _open_src(want):
         if want[0] == "proc":
@@ -481,8 +543,14 @@ class AIEngine:
     # ───── 模型 ─────
     def _load_model(self):
         import ctranslate2
-        prog = lambda label, p, done, total: self._set_status(  # noqa: E731
-            "downloading", f"第一次使用，下載{label}… {done / 1e6:,.0f} / {total / 1e6:,.0f} MB", p)
+        def prog(label, p, done, total, speed=0.0, eta=None):
+            extra = ""
+            if speed:
+                extra += f"・{speed / 1e6:,.1f} MB/s"
+            if eta is not None:
+                extra += f"・約剩 {fmt_eta(eta)}"
+            self._set_status("downloading", f"第一次使用，下載{label}… {done / 1e6:,.0f} / {total / 1e6:,.0f} MB{extra}"
+                             "（只要下載一次，中斷了下次會接著下載）", p)
         path = ensure_model(prog)
         from faster_whisper import WhisperModel
         if ctranslate2.get_cuda_device_count() > 0:
@@ -564,9 +632,9 @@ class AIEngine:
             return
 
         # 2) 即時聽寫 (只有完全沒歌詞時)
-        if job.plain or job.improve or not t["playing"] or time.time() - job.last_live < LIVE_EVERY:
+        if job.plain or job.improve or not t["playing"] or time.time() - job.last_live < self.live_every:
             return
-        end = pos - 0.4
+        end = pos - 0.15
         start = max(0.0, end - LIVE_WINDOW)
         if end - start < 3 or job.coverage(start, end) < 0.6:
             return
@@ -575,9 +643,20 @@ class AIEngine:
         if float(np.sqrt((audio ** 2).mean())) < 0.004:
             return  # 幾乎沒聲音
         self._set_status("listening", "正在聽寫…")
+        t0 = time.perf_counter()
         segs = self._transcribe(audio, job, beam=2)
+        took = time.perf_counter() - t0
+        # 聽寫花的時間 × 3 當作間隔 (留空給遊戲和其他程式)；顯示卡通常 0.2～0.4 秒 → 每 1 秒一次
+        self.live_every = max(LIVE_FAST, min(LIVE_EVERY, took * 3)) if self.device == "GPU" else LIVE_EVERY
         keep_before = start + 1.5 if start > 0 else 0.0
-        new = [{"t": round(start + s.start, 2), "text": txt} for s, txt in segs if start + s.start >= keep_before]
+        new = []
+        for s, txt in segs:
+            if start + s.start < keep_before:
+                continue
+            ln = {"t": round(start + s.start, 2), "text": txt}
+            if start + s.end > end - LIVE_TENT:
+                ln["tent"] = True  # 可能還沒唱完，下一次聽寫會補完 / 修正
+            new.append(ln)
         job.live = [l for l in job.live if l["t"] < keep_before] + new
         if job is self.job:
             self.on_update(job.track_id, job.key, {"source": "AI 聽寫中", "synced": True, "lines": list(job.live),

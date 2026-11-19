@@ -41,7 +41,7 @@ user32.GetWindowPlacement.argtypes = [wt.HWND, ctypes.c_void_p]
 user32.SetWindowPlacement.argtypes = [wt.HWND, ctypes.c_void_p]
 
 WM_NCCALCSIZE, WM_NCHITTEST, WM_COMMAND, WM_GETMINMAXINFO = 0x83, 0x84, 0x111, 0x24
-HTCLIENT, HTTOP, HTTOPLEFT, HTTOPRIGHT = 1, 12, 13, 14
+HTCLIENT, HTCAPTION, HTTOP, HTTOPLEFT, HTTOPRIGHT = 1, 2, 12, 13, 14
 SM_CXFRAME, SM_CYFRAME, SM_CXPADDEDBORDER = 32, 33, 92
 SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE = 0x20, 0x2, 0x1, 0x4, 0x10
 THBN_CLICKED = 0x1800
@@ -141,6 +141,10 @@ class Chrome:
                 return 0 if r == 0 else r
             if msg == WM_NCHITTEST:
                 r = comctl32.DefSubclassProc(hwnd, msg, wp, lp)
+                if r in (3, 8, 9, 20, 21):
+                    # Windows 以為右上角還有它自己的 最小化 / 放大 / 關閉 按鈕 (標題列是我們拿掉的)，
+                    # 滑鼠經過就會畫出原生按鈕，跟網頁的按鈕疊成虛影：當成一般標題列
+                    r = HTCAPTION
                 if r == HTCLIENT and not user32.IsZoomed(hwnd):
                     x, y = ctypes.c_short(lp & 0xFFFF).value, ctypes.c_short((lp >> 16) & 0xFFFF).value
                     rc = wt.RECT()

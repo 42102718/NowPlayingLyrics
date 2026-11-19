@@ -295,6 +295,7 @@ class Notch:
         self.bub_k, self.bub_v, self.bub_kind, self.bub_rect = 0.0, 0.0, None, None
         self.pill_w = 0
         self.pill_top = 0
+        self.hov_pts = []              # 滑鼠最近 0.2 秒的位置 (判斷是停住還是路過)
         self.fill_f, self.fillc, self.border = [0.0, 0.0, 0.0], (0, 0, 0), None
         self.thin_k = 0.0              # 極簡細條：1 = 完全是細條
         self.act_shown_at = 0.0
@@ -1497,9 +1498,10 @@ class Notch:
         if inside:
             self.leave_since = None
             if self.hover_since is None:
-                self.hover_since = now
-            elif not self.expanded and now - self.hover_since > 0.12 and not (
-                    self.activity and self.activity["kind"] in ("volume", "update", "updated")):
+                self.hover_since, self.hov_pts = now, []
+            self.hov_pts = [q for q in self.hov_pts if now - q[0] <= 0.2] + [(now, px, py)]
+            if not self.expanded and not (self.activity and self.activity["kind"] in ("volume", "update", "updated")) \
+                    and self.hover_intent(now, px, py):
                 self.expanded = True
                 self.activity = None
         else:
@@ -1509,6 +1511,24 @@ class Notch:
             elif self.expanded and now - self.leave_since > (0.8 if self.page != "main" else 0.35):
                 self.expanded = False
                 self.page = "main"
+
+    def hover_intent(self, now, px, py):
+        """滑鼠是真的要看膠囊，還是只是路過 (要去點瀏覽器分頁、拖視窗)？
+        smart：停在膠囊上 (0.2 秒內幾乎沒動) 才展開，按著滑鼠鍵 (拖分頁、選字) 時不展開
+        fast：移上去就展開；click：只有點一下才展開"""
+        mode = (self.config.get("notch_style") or {}).get("hover", "smart")
+        dwell = now - self.hover_since
+        if mode == "click":
+            return False
+        if mode == "fast":
+            return dwell > 0.12
+        if user32.GetAsyncKeyState(0x01) & 0x8000 or user32.GetAsyncKeyState(0x02) & 0x8000:
+            self.hover_since, self.hov_pts = now, [(now, px, py)]  # 放開後要重新停一下
+            return False
+        if dwell < 0.22:
+            return False
+        moved = max(math.hypot(px - x, py - y) for _, x, y in self.hov_pts)
+        return moved < self.px(14)
 
     def check_fullscreen(self, now):
         """膠囊那個螢幕上有全螢幕遊戲 / 影片：膠囊先藏起來。順便跟著設定換螢幕。"""
