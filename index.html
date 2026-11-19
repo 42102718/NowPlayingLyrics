@@ -1041,7 +1041,7 @@ function renderLyrics(){
   if (!lyr.lines?.length){ statusKey = ''; showNoLyrics(); return; }
   els.status.classList.add('hide');
   $('#lyr-src').textContent = `歌詞來源：${lyr.source}${lyr.synced ? '' : '（未同步）'}${lyr.override ? '・手動指定' : ''}`
-    + (lyr.inst ? '・伴奏版，顯示原曲歌詞' : '')
+    + (lyr.inst ? (lyr.scaled && Math.abs(lyr.scaled - 1) > .03 ? '・器樂版，原曲歌詞的時間是按長度推算的 (對不上可用 ← → 調整)' : '・伴奏版，顯示原曲歌詞') : '')
     + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() && !lyr.inst ? '・AI 對時中' : '');
   if (lyr.ai === 'live') $('#lyr-src').insertAdjacentHTML('afterbegin', '<span class="ai-dot"></span>');
   if (lyr.override){ const b = document.createElement('button'); b.textContent = '恢復自動'; b.onclick = resetLyrics; $('#lyr-src').appendChild(b); }

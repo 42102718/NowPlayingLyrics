@@ -42,7 +42,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.8.1"
+VERSION = "1.8.2"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -254,6 +254,39 @@ INST_TAG = re.compile(
     r"(?:鋼琴|钢琴|吉他|木吉他|八音盒|音樂盒|音乐盒|古箏|古筝|二胡|小提琴|大提琴|口琴|長笛|长笛|琵琶|笛子|電音|电音|純音樂|纯音乐|輕音樂|轻音乐)(?:演奏|獨奏|独奏)?版|"
     r"(?:piano|guitar|acoustic guitar|music\s*box|violin|cello|lullaby)\s*(?:ver(?:sion|\.)?|cover|arrangement|instrumental)|"
     r"(?<=[\(\[【（])\s*(?:piano|guitar|music\s*box|violin)\s*(?=[\)\]】）]))\s*[\)\]】）」]?", re.I)
+
+
+# 歌手 / 專輯看得出是器樂翻奏 (例如「林子安AnViolin」、「Piano Collection」)：標題沒寫也當伴奏
+INST_ARTIST = re.compile(r"piano|violin|cello|guitar|music\s*box|kalimba|lullaby|ocarina|鋼琴|钢琴|小提琴|大提琴|吉他|八音盒|音樂盒|音乐盒|"
+                         r"古箏|古筝|二胡|琵琶|演奏", re.I)
+# 專輯要寫得很明確 (Billy Joel 的專輯就叫〈Piano Man〉，不能因為有 Piano 就當伴奏)
+INST_ALBUM = re.compile(r"(?:piano|violin|cello|guitar|music\s*box|kalimba|lullaby)\s*(?:collection|covers?|versions?|ver\.?|arrangements?|"
+                        r"instrumentals?|renditions?|tribute|lullab(?:y|ies))|instrumentals?|karaoke|伴奏|演奏|純音樂|纯音乐|"
+                        r"(?:鋼琴|钢琴|小提琴|吉他|八音盒|音樂盒|音乐盒|古箏|古筝)(?:曲|版|演奏|翻奏|cover)|cover(?:s|\s*album)?", re.I)
+
+
+def inst_title(track):
+    """是伴奏 / 器樂版就回傳原曲歌名 (去掉伴奏字樣)，不是就回傳 None。"""
+    t = strip_inst(track.get("title") or "")
+    if t:
+        return t
+    artist, album = track.get("artist") or "", track.get("album") or ""
+    if INST_ARTIST.search(artist) or (INST_ALBUM.search(album) and not re.search(r"翻唱|vocal|sung|歌ってみた", album, re.I)):
+        return clean_title(track.get("title") or "") or None
+    return None
+
+
+def scale_lines(lines, k):
+    """翻奏的速度跟原曲不同：整首的時間按長度比例拉長 / 縮短。"""
+    out = []
+    for l in lines:
+        n = dict(l)
+        if n.get("t") is not None:
+            n["t"] = round(n["t"] * k, 2)
+        if n.get("w"):
+            n["w"] = [[w[0] * k, w[1] * k, w[2]] for w in n["w"]]
+        out.append(n)
+    return out
 
 
 def strip_inst(title):
@@ -1161,14 +1194,18 @@ async def fetch_lyrics(track):
             await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
         return
     # 一般影片：歌手 (頻道) 也要對得上才算，避免標題剛好跟某首歌同名
-    inst = strip_inst(track["title"])
+    inst = inst_title(track)
     res = await lyrics.find(inst or track["title"], track["artist"], track["album"], track["duration"],
                             need_artist=(kind == "video"))
     if inst and not res.get("synced") and not res.get("override") and track["artist"]:
         # 伴奏 / 鋼琴版的「歌手」常是演奏者 (例如 Jesse T 彈的〈紅色高跟鞋〉)，不是原唱：不帶歌手再用歌名找一次
         # (長度仍要差不多，避免拿到別首同名歌)
-        alt = await lyrics.find(inst, "", track["album"], track["duration"])
-        if alt.get("synced"):
+        # 先挑「原唱」(搜尋結果裡被提到最多次的歌手)，翻奏長度跟原曲不同就按比例調整時間。
+        # 不能只看長度：同名的別首歌長度剛好差不多就會配錯 (Way Back Home 配到同名的中文歌)
+        alt = await inst_scaled(inst, track["artist"], track.get("duration") or 0)
+        if alt is None and not track.get("duration"):
+            alt = await lyrics.find(inst, "", track["album"], 0)
+        if alt and alt.get("synced"):
             res = alt
     if inst:
         res = {**res, "inst": True}  # 伴奏版：顯示的是原曲的歌詞
@@ -1188,6 +1225,46 @@ async def fetch_lyrics(track):
                 AI.set_job(track, Lyrics.key(track["title"], track["artist"]),
                            [{"t": None, "text": l["text"], **({"tr": l["tr"]} if l.get("tr") else {})}
                             for l in res["lines"] if l["text"].strip()] or None)
+
+
+async def inst_scaled(title, artist, dur):
+    """不限長度找原曲的同步歌詞，按長度比例縮放時間 (只在比例合理時：0.7～1.45 倍)。"""
+    if not dur:
+        return None
+    for a in ([artist, ""] if artist else [""]):
+        try:
+            cands = lyrics.rank(await lyrics.search(title, a, duration=None), title, a, None)
+        except Exception as e:
+            print("[inst]", repr(e), flush=True)
+            return None
+        # 不帶歌手時，優先選「原唱」：搜尋結果裡版本最多的那位歌手 (翻唱、Live、伴奏版排後面)
+        tn = _fnorm(title)
+
+        def core(name):  # 「米津玄師 (よねづ けんし)」「米津玄師  MV「Lemon」」→ 米津玄師
+            return _fnorm(re.split(r"\s{2,}|\s*[\(（\[【「/]|\s+(?:mv|feat\.?|ft\.?)", name or "", flags=re.I)[0])
+        texts = [_fnorm((c.get("artist") or "") + " " + (c.get("title") or "")) for c in cands]
+
+        def fame(c):  # 這位歌手在所有結果裡被提到幾次 (翻唱的標題也常寫「翻自 米津玄師」)
+            k = core(c.get("artist"))
+            if len(k) < 2 or k in tn or tn in k:
+                return 0  # 歌手名字跟歌名一樣 (例如樂團 LemON)：不算
+            return sum(k in x for x in texts)
+        alt_v = lambda c: any(w in (c.get("title") or "").lower() for w in _COVER_WORDS)  # noqa: E731
+        import math
+        near = lambda c: abs(math.log(dur / c["duration"])) if c.get("duration") else 9  # noqa: E731  同一位歌手的幾個版本：挑長度最接近的
+        cands = sorted(cands, key=lambda c: (alt_v(c), -fame(c), near(c)))
+        for c in cands[:6]:
+            od = c.get("duration") or 0
+            if not od or not 0.7 <= dur / od <= 1.45:
+                continue
+            r = await lyrics.fetch(c)
+            if not (r and r["synced"] and r["lines"]):
+                continue
+            k = dur / od
+            lines = clean_lines(scale_lines(r["lines"], k), title, artist)
+            print(f"[inst] {title}: 用 {c.get('artist')} 的原曲歌詞，時間 ×{k:.2f} ({od:.0f}s → {dur:.0f}s)", flush=True)
+            return traditionalize({**r, "lines": lines, "scaled": round(k, 3)})
+    return None
 
 
 def on_ai_update(track_id, key, result, live):
