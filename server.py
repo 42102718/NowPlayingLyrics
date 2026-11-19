@@ -99,6 +99,7 @@ DEFAULT_CONFIG = {
     "notch_monitor": "primary",    # 膠囊在哪個螢幕 (同上)
     "game": {"enabled": True, "notch": "alerts"},  # 遊戲模式：全螢幕時；膠囊 alerts 只彈重要提醒 / hide 藏起來
     "net_alert": True,             # 網路斷線 / 恢復時膠囊提醒
+    "jp_reading": "off",           # 日文讀音：off / furigana (漢字標平假名) / hiragana (整句平假名) / romaji
     "notch_style": {"shape": "island", "color": "black", "hover": "smart"},  # 形狀 island/float/bar、顏色 black/album/theme、展開 smart/fast/click
     "wallpaper": {"enabled": False, "monitor": "primary"},
     "share": {"folder": "", "name": ""},
@@ -125,6 +126,7 @@ def load_config():
         cfg["game"] = {"enabled": bool(gm.get("enabled", True)),
                        "notch": gm.get("notch") if gm.get("notch") in ("show", "alerts", "hide") else "alerts"}
         cfg["net_alert"] = bool(saved.get("net_alert", True))
+        cfg["jp_reading"] = saved.get("jp_reading") if saved.get("jp_reading") in ("off", "furigana", "hiragana", "romaji") else "off"
         ns = saved.get("notch_style") if isinstance(saved.get("notch_style"), dict) else {}
         cfg["notch_style"] = {"shape": ns.get("shape") if ns.get("shape") in ("island", "float", "bar") else "island",
                               "color": ns.get("color") if ns.get("color") in ("black", "album", "theme") else "black",
@@ -186,15 +188,45 @@ def show_tr():
 
 
 def lyr_view(lyr):
-    """給主視窗、舞台的歌詞：翻譯關掉時不送翻譯 (原本的資料還留著，打開馬上就有)。"""
-    if not lyr or show_tr() or not any(l.get("tr") for l in lyr.get("lines") or []):
+    """給主視窗、舞台的歌詞：翻譯關掉時不送翻譯 (原本的資料還留著，打開馬上就有)；
+    日文讀音打開時加上 ruby (漢字標音) 或 rd (整句平假名 / 羅馬拼音)。"""
+    if not lyr:
         return lyr
-    return {**lyr, "lines": [{k: v for k, v in l.items() if k != "tr"} for l in lyr["lines"]]}
+    lines = lyr.get("lines") or []
+    tr_off = not show_tr() and any(l.get("tr") for l in lines)
+    mode = config.get("jp_reading", "off")
+    if not tr_off and mode == "off":
+        return lyr
+    if tr_off:
+        lines = [{k: v for k, v in l.items() if k != "tr"} for l in lines]
+    if mode != "off":
+        try:
+            import jp_reading
+            lines = jp_reading.apply(lines, mode)
+        except Exception as e:
+            print("[jp]", repr(e), flush=True)
+    return {**lyr, "lines": lines}
 
 
 # ───────────────────────── 繁體轉換 ─────────────────────────
 _cc = OpenCC("s2tw")
 KANA = re.compile(r"[぀-ヿ]")
+
+
+_cc_s = None
+
+
+def to_simp(s: str) -> str:
+    """網易雲、酷狗、QQ 音樂只認簡體：「愛你是我的秘密」搜不到，「爱你是我的秘密」才找得到。日文不轉。"""
+    global _cc_s
+    if not s or KANA.search(s):
+        return s
+    if _cc_s is None:
+        _cc_s = OpenCC("t2s")
+    try:
+        return _cc_s.convert(s)
+    except Exception:
+        return s
 
 
 def to_trad(s: str) -> str:
@@ -261,18 +293,50 @@ INST_ARTIST = re.compile(r"piano|violin|cello|guitar|music\s*box|kalimba|lullaby
                          r"古箏|古筝|二胡|琵琶|演奏", re.I)
 # 專輯要寫得很明確 (Billy Joel 的專輯就叫〈Piano Man〉，不能因為有 Piano 就當伴奏)
 INST_ALBUM = re.compile(r"(?:piano|violin|cello|guitar|music\s*box|kalimba|lullaby)\s*(?:collection|covers?|versions?|ver\.?|arrangements?|"
-                        r"instrumentals?|renditions?|tribute|lullab(?:y|ies))|instrumentals?|karaoke|伴奏|演奏|純音樂|纯音乐|"
-                        r"(?:鋼琴|钢琴|小提琴|吉他|八音盒|音樂盒|音乐盒|古箏|古筝)(?:曲|版|演奏|翻奏|cover)|cover(?:s|\s*album)?", re.I)
+                        r"instrumentals?|renditions?|tribute|lullab(?:y|ies))|\binstrumentals?\b|karaoke|伴奏|演奏|純音樂|纯音乐|"
+                        r"(?:鋼琴|钢琴|小提琴|吉他|八音盒|音樂盒|音乐盒|古箏|古筝)(?:曲|版|演奏|翻奏|cover)|\bcover(?:s|\s*album)?\b", re.I)
+
+
+# 翻唱、改編、變速版：歌詞跟原曲一樣，找不到就用原唱的版本 (速度不同就按比例調時間)
+COVER_TAG = re.compile(
+    r"[\(（\[【]?\s*(?:女[声聲]版|男[声聲]版|女版|男版|翻唱版?|cover版?|dj\s*版|dj\s*remix|remix\s*版|抖音版|"
+    r"\d\.\d+\s*x|[0-9.]+\s*倍速?|加速版?|降速版?|慢速版?|慢放版?|降[调調]版?|升[调調]版?|"
+    r"氛[围圍]版|治[愈癒]版|[伤傷]感版|[热熱]搜版|片段|女生版|男生版|童[声聲]版|合唱版|对唱版|對唱版)\s*[\)）\]】]?", re.I)
+
+
+def cover_base(title):
+    """翻唱 / 改編版的原曲歌名；不是就 None。"""
+    t, who = orig_singer(title)
+    if who or COVER_TAG.search(t):
+        base = clean_title(COVER_TAG.sub(" ", t))
+        base = PAREN.sub(" ", base).strip(" -–—|") or base
+        return re.sub(r"\s+", " ", base).strip() or None
+    return None
+
+
+# 標題直接寫了原唱：「稻香 (鋼琴版) [原唱: 周杰倫]」「Lemon (Originally by 米津玄師)」「小幸運 翻自 田馥甄」
+ORIG_SINGER = re.compile(
+    r"[\(\[【（「]\s*(?:原唱(?:者)?|原曲|翻自|cover\s*of|cover\s*[:：]|originally\s*(?:performed\s*)?by|orig\.?\s*by)\s*[:：]?\s*([^\)\]】）」]+?)\s*[\)\]】）」]"
+    r"|(?:^|\s)(?:原唱(?:者)?|翻自|originally\s*by)\s*[:：]?\s*(\S[^\(\[【（]*?)\s*$", re.I)
+
+
+def orig_singer(title):
+    """(去掉原唱說明的歌名, 原唱) ；沒寫就是 (原本的歌名, None)。"""
+    m = ORIG_SINGER.search(title or "")
+    if not m:
+        return title, None
+    who = (m.group(1) or m.group(2) or "").strip(" -–—|")
+    return re.sub(r"\s+", " ", (title[:m.start()] + " " + title[m.end():])).strip(" -–—|"), who or None
 
 
 def inst_title(track):
     """是伴奏 / 器樂版就回傳原曲歌名 (去掉伴奏字樣)，不是就回傳 None。"""
-    t = strip_inst(track.get("title") or "")
+    t = strip_inst(orig_singer(track.get("title") or "")[0])
     if t:
         return t
     artist, album = track.get("artist") or "", track.get("album") or ""
     if INST_ARTIST.search(artist) or (INST_ALBUM.search(album) and not re.search(r"翻唱|vocal|sung|歌ってみた", album, re.I)):
-        return clean_title(track.get("title") or "") or None
+        return clean_title(orig_singer(track.get("title") or "")[0]) or None
     return None
 
 
@@ -389,9 +453,44 @@ def _primary_artist(a: str) -> str:
     return re.split(r"\s*(?:/|、|&|,|，|\bx\b|×)\s*", a, maxsplit=1)[0].strip() or a.strip()
 
 
+# 歌名常被包在括號 / 引號裡：周杰倫 Jay Chou【晴天 Sunny Day】Official MV、YOASOBI「アイドル」、NewJeans 'Ditto' Official MV
+_BRACKETS = [r"「([^」]{1,40})」", r"『([^』]{1,40})』", r"《([^》]{1,40})》", r"“([^”]{1,40})”", r"【([^】]{1,40})】",  # 引號比【】更像歌名
+             r"‘([^’]{1,40})’", r"(?:^|\s)'([^']{1,40})'(?=\s|$)", r'(?:^|\s)"([^"]{1,40})"(?=\s|$)']
+_JUNK_INNER = re.compile(r"^\s*(?:中字|中文字幕|中日字幕|中韓字幕|中英字幕|繁中字幕|官方|官方版|mv|m/v|official.*|hd|4k|lyrics?.*|歌詞.*|动态歌词|動態歌詞|"
+                         r"完整版|高音質|高音质|live|cover|翻唱|karaoke|ktv|中日歌詞|韓中字|가사|해석|純享版|纯享版|首播|新歌|單曲|单曲)\s*$", re.I)
+
+
+def bracket_variants(raw, artist):
+    """括號 / 引號裡短短的字 = 歌名，括號外面剩下的 (去掉 Official MV 之類) = 歌手。"""
+    out = []
+    for pat in _BRACKETS:
+        for m in re.finditer(pat, raw or ""):
+            inner = m.group(1).strip()
+            if not inner or _JUNK_INNER.match(inner) or re.search(r"[,，。！？!?]", inner):
+                continue
+            outside = PAREN.sub(" ", clean_title(raw[:m.start()] + " " + raw[m.end():])).strip(" -–—|｜/*")
+            names = [inner]
+            cjk = re.sub(r"\s+[A-Za-z][A-Za-z\s'’.&!?-]*$", "", inner).strip()  # 「晴天 Sunny Day」→ 晴天
+            if cjk and cjk != inner:
+                names.append(cjk)
+            # 【嗚米X咩栗】「愛你是我的秘密」：另一組括號裡的字是歌手
+            others = [x.strip() for x in re.findall(r"【([^】]{1,30})】", raw) if x.strip() != inner and not _JUNK_INNER.match(x)]
+            for nm in names:
+                if outside:
+                    out.append((nm, _primary_artist(outside)))
+                for o in others[:1]:
+                    out.append((nm, o))
+                    parts = re.split(r"\s*(?:[xX×&/、,，]|\bfeat\.?)\s*", o)
+                    if len(parts) > 1:
+                        out.append((nm, parts[0]))
+                out.append((nm, artist))
+    return out
+
+
 def title_variants(title: str, artist: str):
     """產生幾組 (歌名, 歌手) 嘗試搜尋。"""
     t, a = clean_title(title), clean_artist(artist)
+    head = bracket_variants(title, a)
     # 「分明在 IG 聽過? : Unstable - Tom Frane」→ 冒號前面是影片標語
     m = re.search(r"\s[:：]\s|:\s", t)
     if m and " - " in t[m.end():]:
@@ -419,13 +518,25 @@ def title_variants(title: str, artist: str):
         mm = re.match(r"^(.*?)\s*[\(（](.+?)[\)）]\s*$", tt)
         if mm:
             out += [(mm.group(1).strip(), aa), (mm.group(2).strip(), aa)]
+    out = head + out  # 括號裡的歌名最可能是對的，先試
+    mm = re.match(r"^([^A-Za-z\s]*[㐀-鿿][^A-Za-z]*?)\s*([A-Za-z][A-Za-z\s'’.&!?-]+)$", t)
+    if mm and not head:
+        out += [(mm.group(1).strip(), a), (mm.group(2).strip(), a)]
+    # 歌手中英並列「周杰倫 Jay Chou」：搜尋時多一串英文名反而找不到 → 中文、英文各試一次
+    split = []
+    for tt, aa in out:
+        m = re.match(r"^\s*([^A-Za-z]*[^\sA-Za-z])\s+([A-Za-z][A-Za-z\s.'&-]+)\s*$", aa or "") \
+            or re.match(r"^\s*([A-Za-z][A-Za-z\s.'&-]+?)\s+([^\sA-Za-z][^A-Za-z]*)\s*$", aa or "")
+        if m:
+            split += [(tt, m.group(1).strip()), (tt, m.group(2).strip())]
+    out = out[:2] + split[:4] + out[2:]
     seen, res = set(), []
     for x in out:
         x = (x[0].strip(" -–—/*"), x[1].strip(" -–—/*"))
         if x[0] and x not in seen:
             seen.add(x)
             res.append(x)
-    return res[:8]
+    return res[:10]
 
 
 def title_matches(query: str, cand: str) -> int:
@@ -481,7 +592,7 @@ def merge_translation(lines, tlines):
 
 
 # ───────────────────────── 歌詞來源 ─────────────────────────
-CREDIT = re.compile(r"^(作词|作詞|作曲|编曲|編曲|制作人|製作人|监制|監製|混音|母带|母帶|和声|和聲|合声|合聲|伴唱|录音|錄音|吉他|贝斯|貝斯|鼓|"
+CREDIT = re.compile(r"^(原唱|作词|作詞|作曲|编曲|編曲|制作人|製作人|监制|監製|混音|母带|母帶|和声|和聲|合声|合聲|伴唱|录音|錄音|吉他|贝斯|貝斯|鼓|"
                     r"出品|发行|發行|统筹|統籌|企划|企劃|策划|策劃|营销|營銷|宣传|宣傳|监修|監修|弦乐|弦樂|配唱|"
                     r"词|詞|曲|OP|SP|Lyricist|Lyrics|Composer|Arranger|Producer|Mixing|Mastering|Recording)"
                     r"[^:：]{0,24}[:：]", re.I)  # 允許「監製Executive Producer：」這種中英混合
@@ -506,10 +617,20 @@ def has_real_lyrics(lines) -> bool:
     return len(real) >= 3
 
 
+_ODD_CHARS = re.compile("[﻿⺀-⿟]")
+
+
+def _fix_chars(t):
+    import unicodedata
+    return re.sub("[⺀-⿟]", lambda m: unicodedata.normalize("NFKC", m.group(0)), t.replace("﻿", "")).strip()
+
+
 def clean_lines(lines, title="", artist="", *more):
     """去掉「作詞：xxx」這類製作資訊，以及開頭的「歌名 - 歌手」標題行。
     more：其他可能的 (歌名, 歌手)，例如手動選的那首歌。"""
     pairs = [(_norm(t), _norm(a)) for t, a in [(title, artist), *zip(more[::2], more[1::2])]]
+    lines = [{**l, "text": _fix_chars(l.get("text") or "")} if _ODD_CHARS.search(l.get("text") or "") else l
+             for l in lines]  # 看不見的 BOM、長得一樣的康熙部首字 (⼀⼼⾬)
     out = []
     started = False
     for i, l in enumerate(lines):
@@ -640,8 +761,9 @@ class Lyrics:
 
     # ───── 搜尋 (五個來源同時) ─────
     async def search(self, title, artist, limit=8, duration=None):
-        res = await asyncio.gather(self._s_lrclib(title, artist, limit), self._s_netease(title, artist, limit),
-                                   self._s_kugou(title, artist, limit), self._s_qq(title, artist, limit),
+        st, sa = to_simp(title), to_simp(artist)  # 中國的三個來源用簡體搜
+        res = await asyncio.gather(self._s_lrclib(title, artist, limit), self._s_netease(st, sa, limit),
+                                   self._s_kugou(st, sa, limit), self._s_qq(st, sa, limit),
                                    self._s_lyricsplus(title, artist, duration), return_exceptions=True)
         out = []
         for r in res:
@@ -1193,22 +1315,7 @@ async def fetch_lyrics(track):
                                "kind": "short"}
             await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
         return
-    # 一般影片：歌手 (頻道) 也要對得上才算，避免標題剛好跟某首歌同名
-    inst = inst_title(track)
-    res = await lyrics.find(inst or track["title"], track["artist"], track["album"], track["duration"],
-                            need_artist=(kind == "video"))
-    if inst and not res.get("synced") and not res.get("override") and track["artist"]:
-        # 伴奏 / 鋼琴版的「歌手」常是演奏者 (例如 Jesse T 彈的〈紅色高跟鞋〉)，不是原唱：不帶歌手再用歌名找一次
-        # (長度仍要差不多，避免拿到別首同名歌)
-        # 先挑「原唱」(搜尋結果裡被提到最多次的歌手)，翻奏長度跟原曲不同就按比例調整時間。
-        # 不能只看長度：同名的別首歌長度剛好差不多就會配錯 (Way Back Home 配到同名的中文歌)
-        alt = await inst_scaled(inst, track["artist"], track.get("duration") or 0)
-        if alt is None and not track.get("duration"):
-            alt = await lyrics.find(inst, "", track["album"], 0)
-        if alt and alt.get("synced"):
-            res = alt
-    if inst:
-        res = {**res, "inst": True}  # 伴奏版：顯示的是原曲的歌詞
+    res, inst = await resolve_lyrics(track, kind)
     if kind == "video" and not res.get("synced") and not res.get("override"):
         res = {**res, "kind": "video"}
     if state["track"] and state["track"]["track_id"] == track["track_id"]:
@@ -1227,6 +1334,38 @@ async def fetch_lyrics(track):
                             for l in res["lines"] if l["text"].strip()] or None)
 
 
+async def resolve_lyrics(track, kind="music"):
+    """找這首歌的歌詞 (不廣播)：回傳 (結果, 是不是伴奏版的原曲歌名)。測試也直接呼叫這個。"""
+    # 一般影片：歌手 (頻道) 也要對得上才算，避免標題剛好跟某首歌同名
+    inst = inst_title(track)
+    res = await lyrics.find(inst or track["title"], track["artist"], track["album"], track["duration"],
+                            need_artist=(kind == "video"))
+    cover = None if inst else cover_base(track["title"])
+    if cover and not res.get("synced") and not res.get("override"):
+        # 翻唱 / 女聲版 / 0.8x…：歌手常是翻唱的人，長度也可能不同 → 用原唱的版本，按比例調時間
+        singer = orig_singer(track["title"])[1]
+        dur = track.get("duration") or 0
+        alt = await inst_scaled(cover, singer or track["artist"], dur) if dur else None
+        if alt is None:
+            alt = await lyrics.find(cover, singer or "", track["album"], dur if not singer else 0)
+        if alt and alt.get("synced"):
+            res = {**alt, "cover": True}
+    if inst and not res.get("synced") and not res.get("override") and track["artist"]:
+        # 伴奏 / 鋼琴版的「歌手」常是演奏者 (例如 Jesse T 彈的〈紅色高跟鞋〉)，不是原唱：不帶歌手再用歌名找一次
+        # (長度仍要差不多，避免拿到別首同名歌)
+        # 先挑「原唱」(搜尋結果裡被提到最多次的歌手)，翻奏長度跟原曲不同就按比例調整時間。
+        # 不能只看長度：同名的別首歌長度剛好差不多就會配錯 (Way Back Home 配到同名的中文歌)
+        singer = orig_singer(track["title"])[1]  # 標題寫了原唱就用原唱找
+        alt = await inst_scaled(inst, singer or track["artist"], track.get("duration") or 0)
+        if alt is None and not track.get("duration"):
+            alt = await lyrics.find(inst, "", track["album"], 0)
+        if alt and alt.get("synced"):
+            res = alt
+    if inst:
+        res = {**res, "inst": True}  # 伴奏版：顯示的是原曲的歌詞
+    return res, inst
+
+
 async def inst_scaled(title, artist, dur):
     """不限長度找原曲的同步歌詞，按長度比例縮放時間 (只在比例合理時：0.7～1.45 倍)。"""
     if not dur:
@@ -1241,7 +1380,7 @@ async def inst_scaled(title, artist, dur):
         tn = _fnorm(title)
 
         def core(name):  # 「米津玄師 (よねづ けんし)」「米津玄師  MV「Lemon」」→ 米津玄師
-            return _fnorm(re.split(r"\s{2,}|\s*[\(（\[【「/]|\s+(?:mv|feat\.?|ft\.?)", name or "", flags=re.I)[0])
+            return _fnorm(re.split(r"\s{2,}|\s*[\(（\[【「/]|\s+(?:mv|feat\.?|ft\.?)\b", name or "", flags=re.I)[0])
         texts = [_fnorm((c.get("artist") or "") + " " + (c.get("title") or "")) for c in cands]
 
         def fame(c):  # 這位歌手在所有結果裡被提到幾次 (翻唱的標題也常寫「翻自 米津玄師」)
@@ -1558,6 +1697,11 @@ async def ws_handler(request):
             elif d.get("type") == "net_alert":
                 config["net_alert"] = bool(d.get("value"))
                 save_config()
+            elif d.get("type") == "jp_reading" and d.get("value") in ("off", "furigana", "hiragana", "romaji"):
+                config["jp_reading"] = d["value"]
+                save_config()
+                if state["lyrics"]:
+                    await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
             elif d.get("type") == "notch_style":
                 ns = config.setdefault("notch_style", {"shape": "island", "color": "black"})
                 if d.get("shape") in ("island", "float", "bar"):

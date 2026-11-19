@@ -133,6 +133,11 @@ html.mica #grain{display:none}
   transition:transform .6s cubic-bezier(.22,.9,.24,1),color .4s,filter .6s,opacity .6s;}
 .line:hover{background:rgba(var(--ink),.06)}
 .line .tr{display:block;font:600 .55em/1.35 var(--font);margin-top:.3em;opacity:.8}
+.line .rd{display:block;font:600 .5em/1.35 var(--font);margin-top:.25em;opacity:.7;letter-spacing:.02em}
+.line.active .rd{color:rgba(var(--ink),.8)}
+.line ruby{ruby-position:over}
+.line rt{font-size:.45em;font-weight:600;letter-spacing:.02em;opacity:.8;color:var(--dim);-webkit-text-fill-color:currentColor}
+.line.active rt{color:var(--hi);opacity:.9}
 .line.active{transform:scale(1);color:transparent;filter:none!important;opacity:1!important}
 .line.active .txt{background:linear-gradient(90deg,var(--hi) calc(var(--p,0)*100% - 6%),rgba(var(--ink),.55) calc(var(--p,0)*100% + 6%));-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
 .line.active .tr{color:rgba(var(--ink),.85)}
@@ -620,6 +625,14 @@ html.theme-switch *,html.theme-switch *::before,html.theme-switch *::after{trans
       <p class="hint">外文歌每一句下面多一行中文翻譯 (有翻譯的歌才有)，所有畫面一起套用。</p>
     </div>
   </section>
+  <section class="grp"><h3>日文讀音</h3>
+    <div class="card">
+      <div class="seg four" id="jp-reading" title="日文歌的讀音 (主視窗、舞台的 Hummi 效果)">
+        <button data-jp="off">關</button><button data-jp="furigana">漢字標平假名</button><button data-jp="hiragana">整句平假名</button><button data-jp="romaji">羅馬拼音</button>
+      </div>
+      <p class="hint">只有日文歌會顯示。「漢字標平假名」在漢字上方標小字讀音；另外兩種在每句下面多一行。讀音是自動轉的，少數字可能讀錯。</p>
+    </div>
+  </section>
   <section class="grp"><h3>AI 歌詞</h3>
     <p class="desc">找不到同步歌詞時，AI 聽正在播放的聲音：沒歌詞就邊聽邊寫，有歌詞沒時間就自動對時；聽完會存起來，下次就完全同步。</p>
     <div class="card">
@@ -894,6 +907,7 @@ function onState(m){
     if (performance.now() - apEdit > 1500) document.querySelectorAll('[data-ap]').forEach(i => i.checked = (cfg.auto_pause || {})[i.dataset.ap] !== false);
     if (performance.now() - apEdit > 1500){ $('#tb-progress').checked = cfg.taskbar_progress !== false; $('#notch-on').checked = cfg.notch !== false;
       $('#net-alert').checked = cfg.net_alert !== false;
+      document.querySelectorAll('#jp-reading [data-jp]').forEach(b => b.classList.toggle('on', b.dataset.jp === (cfg.jp_reading || 'off')));
       const ns = cfg.notch_style || {};
       document.querySelectorAll('#notch-shape [data-shape]').forEach(b => b.classList.toggle('on', b.dataset.shape === (ns.shape || 'island')));
       document.querySelectorAll('#notch-color [data-color]').forEach(b => b.classList.toggle('on', b.dataset.color === (ns.color || 'black')));
@@ -1019,8 +1033,11 @@ function patchLive(lines){
       els.lyrics.appendChild(d); lineEls.push(d);
     }
     d.className = 'line' + (l.text ? '' : ' empty') + (l.tent ? ' tent' : '') + (i === activeIdx ? ' active' : '');
-    const txt = d.querySelector('.txt');
-    if (txt.textContent !== (l.text || '')) txt.textContent = l.text || '';
+    const txt = d.querySelector('.txt'), key = (l.text || '') + JSON.stringify(l.ruby || '');
+    if (txt.dataset.k !== key){ txt.dataset.k = key; setLineText(txt, l); }
+    let rd = d.querySelector('.rd');
+    if (l.rd && !rd){ rd = document.createElement('span'); rd.className = 'rd'; txt.after(rd); }
+    if (rd){ if (l.rd) rd.textContent = l.rd; else rd.remove(); }
     d.onclick = () => { send({type:'seek', t: Math.max(0, l.t - offset)}); anchorPos = l.t - offset; anchorAt = performance.now(); };
   });
 }
@@ -1041,6 +1058,7 @@ function renderLyrics(){
   if (!lyr.lines?.length){ statusKey = ''; showNoLyrics(); return; }
   els.status.classList.add('hide');
   $('#lyr-src').textContent = `歌詞來源：${lyr.source}${lyr.synced ? '' : '（未同步）'}${lyr.override ? '・手動指定' : ''}`
+    + (lyr.cover && !lyr.inst ? '・翻唱 / 改編版，顯示原曲歌詞' : '')
     + (lyr.inst ? (lyr.scaled && Math.abs(lyr.scaled - 1) > .03 ? '・器樂版，原曲歌詞的時間是按長度推算的 (對不上可用 ← → 調整)' : '・伴奏版，顯示原曲歌詞') : '')
     + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() && !lyr.inst ? '・AI 對時中' : '');
   if (lyr.ai === 'live') $('#lyr-src').insertAdjacentHTML('afterbegin', '<span class="ai-dot"></span>');
@@ -1057,13 +1075,28 @@ function renderLyrics(){
   lyr.lines.forEach((l, i) => {
     const d = document.createElement('div');
     d.className = 'line' + (l.text ? '' : ' empty') + (l.tent ? ' tent' : '');
-    const txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = l.text || '';
+    const txt = document.createElement('span'); txt.className = 'txt'; setLineText(txt, l);
     d.appendChild(txt);
+    if (l.rd){ const rd = document.createElement('span'); rd.className = 'rd'; rd.textContent = l.rd; d.appendChild(rd); }
     if (l.tr){ const tr = document.createElement('span'); tr.className = 'tr'; tr.textContent = l.tr; d.appendChild(tr); }
     d.onclick = () => { send({type:'seek', t: Math.max(0, l.t - offset)}); anchorPos = l.t - offset; anchorAt = performance.now(); };
     els.lyrics.appendChild(d); lineEls.push(d);
   });
   lineEls.intro = intro;
+}
+
+// 漢字上方標讀音：l.ruby = [[開始位置, 字數, 讀音], ...]
+const escHtml = s => s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function setLineText(el, l){
+  const t = l.text || '';
+  if (!l.ruby || !l.ruby.length){ el.textContent = t; return; }
+  let html = '', p = 0;
+  for (const [o, n, r] of l.ruby){
+    if (o < p) continue;
+    html += escHtml(t.slice(p, o)) + '<ruby>' + escHtml(t.slice(o, o + n)) + '<rt>' + escHtml(r) + '</rt></ruby>';
+    p = o + n;
+  }
+  el.innerHTML = html + escHtml(t.slice(p));
 }
 
 function findIdx(t){
@@ -1787,6 +1820,9 @@ function renderChat(m){
 // ───── 快捷鍵 ─────
 let hotkeysEdit = 0, apEdit = 0, monitors = [];
 $('#wp-on').onchange = e => { apEdit = performance.now(); send({type: 'wallpaper', enabled: e.target.checked}); };
+document.querySelectorAll('#jp-reading [data-jp]').forEach(b => b.onclick = () => { apEdit = performance.now();
+  send({type: 'jp_reading', value: b.dataset.jp});
+  document.querySelectorAll('#jp-reading [data-jp]').forEach(x => x.classList.toggle('on', x === b)); });
 $('#net-alert').onchange = e => { apEdit = performance.now(); send({type: 'net_alert', value: e.target.checked}); };
 for (const [id, k] of [['notch-shape', 'shape'], ['notch-color', 'color'], ['notch-hover', 'hover']])
   document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => { apEdit = performance.now();

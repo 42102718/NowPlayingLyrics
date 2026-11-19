@@ -16,3 +16,4 @@ hidapi
 pyusb
 libusb-package
 pyserial
+pykakasi

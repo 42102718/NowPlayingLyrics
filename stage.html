@@ -37,6 +37,9 @@ body.transparent #vignette{display:none}
   letter-spacing:.01em;will-change:transform,opacity,filter}
 .ln.next{--k:var(--next,1)}  /* 下一句的大小 (設定 → 外觀 → 下一句大小) */
 .ln .tr{display:block;font-weight:700;font-size:.42em;margin-top:.45em;opacity:.75;letter-spacing:.02em}
+.ln .w{position:relative}
+.ln .w .rt{position:absolute;left:0;bottom:100%;width:calc(var(--n,1) * 2.6em);margin-bottom:-.1em;text-align:center;font-size:.36em;font-weight:700;line-height:1;
+  font-style:normal;white-space:nowrap;letter-spacing:0;color:#fff;-webkit-text-fill-color:#fff;opacity:.85;pointer-events:none}
 .w{display:inline-block;white-space:pre;will-change:transform}
 /* 共用：逐字填色 (--p = 這個字唱到幾成) */
 .fill .w{background:linear-gradient(90deg,var(--accent) calc(var(--p,0)*100%),var(--dim) calc(var(--p,0)*100% + .01%));
@@ -527,7 +530,7 @@ function normalize(raw){
       let acc = l.t;
       words = tk.map((s, j) => { const d = span * weight[j] / total; const w = {t: acc, d, s}; acc += d; return w; });
     }
-    return {t: l.t, end: Math.max(nextT, l.t + .5), text: l.text, tr: l.tr || '', words};
+    return {t: l.t, end: Math.max(nextT, l.t + .5), text: l.text, tr: l.tr || '', rd: l.rd || '', ruby: l.ruby || null, words};
   });
 }
 
@@ -602,9 +605,31 @@ function lineEl(i){
     s.style.setProperty('--fr', ((Math.random() - .5) * 120).toFixed(0) + 'deg');
     el.appendChild(s);
   }
+  addReading(el, l);
   stage.appendChild(el);
   layoutLine(el, l);
   return el;
+}
+// 日文讀音：漢字上方的小字 (掛在那幾個字的第一個方塊上，寬度跨過整個詞)；整句平假名 / 羅馬拼音放在下面一行
+function addReading(el, l){
+  if (l.ruby && l.ruby.length){
+    const spans = [...el.querySelectorAll('.w')];
+    const txt = spans.map(s => s.textContent);
+    let k = 0;
+    for (const [o, n, r] of l.ruby){
+      const surf = (l.text || '').slice(o, o + n);
+      for (let j = k; j < spans.length; j++){
+        let acc = '', m = j;
+        while (m < spans.length && acc.length < surf.length){ acc += txt[m]; m++; }
+        if (acc.trim() === surf){
+          const rt = document.createElement('i'); rt.className = 'rt'; rt.textContent = r;
+          rt.style.setProperty('--n', m - j);
+          spans[j].appendChild(rt); k = m; break;
+        }
+      }
+    }
+  }
+  if (l.rd){ const s = document.createElement('span'); s.className = 'tr rd'; s.textContent = l.rd; el.appendChild(s); }
 }
 function layoutLine(el, l){
   const ws = [...el.querySelectorAll('.w')];
