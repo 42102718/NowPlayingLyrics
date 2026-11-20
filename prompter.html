@@ -6,7 +6,7 @@
 <title>Hummi 小抄</title>
 <style>
 /* 提詞小抄：給唱歌的人自己看 (不放進直播畫面)。只追求好讀、好跟唱。 */
-:root{--bg:#0b0b12;--fg:#fff;--dim:rgba(255,255,255,.42);--fill:#ffd54a;--size:1;--font:"Noto Sans TC","Inter",system-ui,sans-serif}
+:root{--u:min(1vw,1.9vh);--bg:#0b0b12;--fg:#fff;--dim:rgba(255,255,255,.42);--fill:#ffd54a;--size:1;--font:"Noto Sans TC","Inter",system-ui,sans-serif}
 body.light{--bg:#f6f4ee;--fg:#16161c;--dim:rgba(22,22,28,.42);--fill:#e0531f}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased;user-select:none}
@@ -16,35 +16,41 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-
 #top .k{font-variant-numeric:tabular-nums}
 #bar{position:fixed;left:0;right:0;bottom:0;height:4px;background:rgba(127,127,127,.18)}
 #bar i{display:block;height:100%;width:0;background:var(--fill)}
-#wrap{position:absolute;inset:40px 22px 26px;display:flex;flex-direction:column;justify-content:center;gap:calc(14px * var(--size))}
-.l{white-space:pre-wrap;word-break:break-word;line-height:1.3;transition:opacity .25s}
-#prev{font:700 calc(18px * var(--size)) var(--font);color:var(--dim);opacity:.7}
-#cur{font:900 calc(46px * var(--size)) var(--font);letter-spacing:-.01em;min-height:1.3em}
+#wrap{position:absolute;inset:38px 18px 22px;display:flex;flex-direction:column;justify-content:center;gap:calc(1.6 * var(--u) * var(--size));overflow:hidden}
+/* 每句最多兩行 (目前這句三行)，超過就截掉，不會擠成一坨 */
+.l{word-break:break-word;line-height:1.3;transition:opacity .25s;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;flex:none}
+#prev{font:700 calc(2.4 * var(--u) * var(--size))/1.3 var(--font);color:var(--dim);opacity:.7}
+#cur{font:900 calc(6 * var(--u) * var(--size))/1.3 var(--font);letter-spacing:-.01em;min-height:1.3em;-webkit-line-clamp:3}
 #cur .w{color:var(--fg)}
 #cur .w.on{color:var(--fill)}
 #cur .w.part{background:linear-gradient(90deg,var(--fill) var(--wp),var(--fg) var(--wp));-webkit-background-clip:text;background-clip:text;color:transparent}
 /* 整句填色時讀音不能跟著變透明：讀音 / 整句平假名用自己的顏色 (唱過的地方會變成填色) */
 #cur rt,#cur .rd{-webkit-text-fill-color:currentColor;color:var(--fg);background:none}
 #cur .w.sung rt,#cur .w.sung .rd{color:var(--fill)}
-#next{font:800 calc(30px * var(--size)) var(--font);color:var(--fg);opacity:.62}
-#next2{font:700 calc(22px * var(--size)) var(--font);color:var(--dim)}
+#next{font:800 calc(3.9 * var(--u) * var(--size))/1.3 var(--font);color:var(--fg);opacity:.62}
+#next2{font:700 calc(2.9 * var(--u) * var(--size))/1.3 var(--font);color:var(--dim)}
+/* 視窗很矮：只留目前這句和下一句 */
+@media (max-height:300px){#prev,#next2{display:none}}
+@media (max-height:190px){#next{display:none}#top{display:none}#wrap{inset:6px 12px 8px}}
 .rd{display:block;font-size:.5em;font-weight:600;opacity:.75;margin-top:.15em}
 .l ruby{ruby-position:over}
 .l rt{font-size:.42em;font-weight:600;opacity:.85}
 /* 間奏 / 前奏倒數 */
-#cd{display:none;align-items:center;gap:14px;font:800 calc(22px * var(--size)) var(--font);color:var(--dim)}
+#cd{display:none;align-items:center;gap:14px;font:800 calc(2.9 * var(--u) * var(--size)) var(--font);color:var(--dim);flex:none}
 #cd.on{display:flex}
-#cd .n{font:900 calc(54px * var(--size)) var(--font);color:var(--fill);font-variant-numeric:tabular-nums;min-width:1em;text-align:center}
+#cd .n{font:900 calc(6.5 * var(--u) * var(--size)) var(--font);color:var(--fill);font-variant-numeric:tabular-nums;min-width:1em;text-align:center}
 #cd .gbar{flex:1;height:8px;border-radius:4px;background:rgba(127,127,127,.2);overflow:hidden}
 #cd .gbar i{display:block;height:100%;width:0;background:var(--fill)}
-#msg{font:700 calc(26px * var(--size)) var(--font);color:var(--dim)}
-#plain{position:absolute;inset:40px 22px 26px;overflow:auto;font:700 calc(24px * var(--size))/1.6 var(--font);white-space:pre-wrap;display:none}
+#msg{font:700 calc(3.4 * var(--u) * var(--size)) var(--font);color:var(--dim)}
+#plain{position:absolute;inset:38px 18px 22px;overflow:auto;font:700 calc(3 * var(--u) * var(--size))/1.6 var(--font);white-space:pre-wrap;display:none}
+#pin{border:0;background:rgba(127,127,127,.15);color:var(--dim);font:600 12px var(--font);height:24px;padding:0 10px;border-radius:12px;cursor:pointer;white-space:nowrap}
+#pin.on{background:var(--fill);color:#111}
 #help{position:fixed;right:12px;bottom:12px;font:500 11px var(--font);color:var(--dim);opacity:0;transition:opacity .3s}
 body.ui #help{opacity:1}
 </style>
 </head>
 <body>
-<div id="top"><span class="t" id="song">Hummi 小抄</span><span class="k" id="clock"></span></div>
+<div id="top"><span class="t" id="song">Hummi 小抄</span><span class="k" id="clock"></span><button id="pin" title="讓小抄浮在所有視窗上面 (玩遊戲、開 OBS 時也看得到)">📌 置頂</button></div>
 <div id="wrap">
   <div class="l" id="prev"></div>
   <div id="cd"><span id="cd-txt">間奏</span><span class="n" id="cd-n"></span><span class="gbar"><i id="cd-bar"></i></span></div>
@@ -55,7 +61,7 @@ body.ui #help{opacity:1}
 </div>
 <div id="plain"></div>
 <div id="bar"><i></i></div>
-<div id="help">＋ ／ − 或滾輪：字的大小　← →：歌詞早 / 晚 0.25 秒　L：亮 / 暗</div>
+<div id="help">＋ ／ − 或滾輪：字的大小　← →：歌詞早 / 晚 0.25 秒　L：亮 / 暗　T：置頂</div>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => (s || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
@@ -221,6 +227,19 @@ addEventListener('wheel', e => { size = Math.max(.5, Math.min(2.6, +(size + (e.d
   try { localStorage.setItem('prompter.size', size); } catch {} }, {passive: true});
 let uiT;
 addEventListener('mousemove', () => { document.body.classList.add('ui'); clearTimeout(uiT); uiT = setTimeout(() => document.body.classList.remove('ui'), 2500); });
+// 置頂：預設關 (會被其他視窗蓋住，跟一般視窗一樣)；按 📌 或 T 打開，會記住
+let pinned = false;
+try { pinned = localStorage.getItem('prompter.pin') === '1'; } catch {}
+function applyPin(){
+  $('#pin').classList.toggle('on', pinned);
+  $('#pin').textContent = pinned ? '📌 已置頂' : '📌 置頂';
+  window.pywebview?.api?.set_on_top?.(pinned);
+}
+function togglePin(){ pinned = !pinned; try { localStorage.setItem('prompter.pin', pinned ? '1' : '0'); } catch {} applyPin(); }
+$('#pin').onclick = togglePin;
+addEventListener('keydown', e => { if (e.key === 't' || e.key === 'T') togglePin(); });
+addEventListener('pywebviewready', applyPin);
+applyPin();
 connect();
 requestAnimationFrame(frame);
 </script>

@@ -2314,6 +2314,21 @@ def open_stage():
 prompter_window = None
 
 
+class PrompterApi:
+    """小抄視窗的 📌 置頂開關。"""
+
+    def set_on_top(self, on):
+        # 不用 window.on_top：從這條執行緒改 WinForms 的 TopMost 會卡住整個程式 (主視窗的置頂也是這樣修的)
+        import ctypes, ctypes.wintypes as wt
+        u = ctypes.windll.user32
+        u.FindWindowW.restype = wt.HWND
+        u.SetWindowPos.argtypes = [wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wt.UINT]
+        hwnd = u.FindWindowW(None, "Hummi 小抄")
+        if hwnd:  # HWND_TOPMOST / HWND_NOTOPMOST；NOSIZE|NOMOVE|NOACTIVATE|ASYNCWINDOWPOS
+            u.SetWindowPos(hwnd, wt.HWND(-1 if on else -2), 0, 0, 0, 0, 0x1 | 0x2 | 0x10 | 0x4000)
+        return bool(on)
+
+
 def open_prompter():
     """提詞小抄：給唱歌的人自己看的小視窗 (固定在最上層，不會出現在直播畫面，除非 OBS 去擷取它)。"""
     global prompter_window
@@ -2324,7 +2339,8 @@ def open_prompter():
         import webview
         if prompter_window is None:
             prompter_window = webview.create_window("Hummi 小抄", f"http://127.0.0.1:{PORT}/prompter?v={VERSION}",
-                                                    width=760, height=380, on_top=True, background_color="#0b0b12")
+                                                    width=760, height=380, min_size=(320, 140),
+                                                    background_color="#0b0b12", js_api=PrompterApi())
 
             def on_closing():
                 if quitting:
