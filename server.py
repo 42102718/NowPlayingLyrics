@@ -1748,6 +1748,8 @@ async def ws_handler(request):
                 save_config()
             elif d.get("type") == "folia":
                 set_option("folia", bool(d.get("value")))
+            elif d.get("type") == "open_prompter":
+                await asyncio.get_running_loop().run_in_executor(None, open_prompter)
             elif d.get("type") == "open_stage":
                 await asyncio.get_running_loop().run_in_executor(None, open_stage)
             elif d.get("type") == "settings_window":
@@ -2056,6 +2058,7 @@ def start_tray():
                              ("battery", "裝置電量"), ("gestures", "滾輪調音量、左右滑切歌")]
         ])),
         P("打開舞台", lambda i, it: open_stage()),
+        P("提詞小抄 (唱歌時看)", lambda i, it: open_prompter()),
         P("裝置電量", lambda i, it: open_devices()),
         pystray.Menu.SEPARATOR,
         P("顯示浮動歌詞", toggle("enabled"), checked=lambda it: ov["enabled"]),
@@ -2290,6 +2293,34 @@ def open_stage():
         show_window()
     except Exception as e:
         print("[stage]", repr(e), flush=True)
+
+
+prompter_window = None
+
+
+def open_prompter():
+    """提詞小抄：給唱歌的人自己看的小視窗 (固定在最上層，不會出現在直播畫面，除非 OBS 去擷取它)。"""
+    global prompter_window
+    if window is None:
+        webbrowser.open(f"http://127.0.0.1:{PORT}/prompter")
+        return
+    try:
+        import webview
+        if prompter_window is None:
+            prompter_window = webview.create_window("Hummi 小抄", f"http://127.0.0.1:{PORT}/prompter?v={VERSION}",
+                                                    width=760, height=380, on_top=True, background_color="#0b0b12")
+
+            def on_closing():
+                if quitting:
+                    return True
+                prompter_window.hide()
+                return False
+            prompter_window.events.closing += on_closing
+        else:
+            prompter_window.show()
+            prompter_window.restore()
+    except Exception as e:
+        print("[prompter]", repr(e), flush=True)
 
 
 wallpaper_window = None
@@ -2807,6 +2838,10 @@ def make_app():
     async def stage_page(request):
         return web.FileResponse(ROOT / "stage.html", headers={"Cache-Control": "no-store"})
     app.router.add_get("/stage", stage_page)
+
+    async def prompter_page(request):
+        return web.FileResponse(ROOT / "prompter.html", headers={"Cache-Control": "no-store"})
+    app.router.add_get("/prompter", prompter_page)
 
     async def icon_png(request):
         return web.FileResponse(ROOT / "icon.png", headers={"Cache-Control": "no-cache"})  # 換圖示後馬上看得到 (之前快取一天)

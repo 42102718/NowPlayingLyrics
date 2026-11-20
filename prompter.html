@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hummi 小抄</title>
+<style>
+/* 提詞小抄：給唱歌的人自己看 (不放進直播畫面)。只追求好讀、好跟唱。 */
+:root{--bg:#0b0b12;--fg:#fff;--dim:rgba(255,255,255,.42);--fill:#ffd54a;--size:1;--font:"Noto Sans TC","Inter",system-ui,sans-serif}
+body.light{--bg:#f6f4ee;--fg:#16161c;--dim:rgba(22,22,28,.42);--fill:#e0531f}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased;user-select:none}
+#top{position:fixed;left:0;right:0;top:0;display:flex;align-items:center;gap:10px;padding:10px 16px;font:600 13px var(--font);color:var(--dim)}
+#top .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#top .t b{color:var(--fg);font-weight:700}
+#top .k{font-variant-numeric:tabular-nums}
+#bar{position:fixed;left:0;right:0;bottom:0;height:4px;background:rgba(127,127,127,.18)}
+#bar i{display:block;height:100%;width:0;background:var(--fill)}
+#wrap{position:absolute;inset:40px 22px 26px;display:flex;flex-direction:column;justify-content:center;gap:calc(14px * var(--size))}
+.l{white-space:pre-wrap;word-break:break-word;line-height:1.3;transition:opacity .25s}
+#prev{font:700 calc(18px * var(--size)) var(--font);color:var(--dim);opacity:.7}
+#cur{font:900 calc(46px * var(--size)) var(--font);letter-spacing:-.01em;min-height:1.3em}
+#cur .w{color:var(--fg)}
+#cur .w.on{color:var(--fill)}
+#cur .w.part{background:linear-gradient(90deg,var(--fill) var(--wp),var(--fg) var(--wp));-webkit-background-clip:text;background-clip:text;color:transparent}
+#next{font:800 calc(30px * var(--size)) var(--font);color:var(--fg);opacity:.62}
+#next2{font:700 calc(22px * var(--size)) var(--font);color:var(--dim)}
+.rd{display:block;font-size:.5em;font-weight:600;opacity:.75;margin-top:.15em}
+.l ruby{ruby-position:over}
+.l rt{font-size:.42em;font-weight:600;opacity:.85}
+/* 間奏 / 前奏倒數 */
+#cd{display:none;align-items:center;gap:14px;font:800 calc(22px * var(--size)) var(--font);color:var(--dim)}
+#cd.on{display:flex}
+#cd .n{font:900 calc(54px * var(--size)) var(--font);color:var(--fill);font-variant-numeric:tabular-nums;min-width:1em;text-align:center}
+#cd .gbar{flex:1;height:8px;border-radius:4px;background:rgba(127,127,127,.2);overflow:hidden}
+#cd .gbar i{display:block;height:100%;width:0;background:var(--fill)}
+#msg{font:700 calc(26px * var(--size)) var(--font);color:var(--dim)}
+#plain{position:absolute;inset:40px 22px 26px;overflow:auto;font:700 calc(24px * var(--size))/1.6 var(--font);white-space:pre-wrap;display:none}
+#help{position:fixed;right:12px;bottom:12px;font:500 11px var(--font);color:var(--dim);opacity:0;transition:opacity .3s}
+body.ui #help{opacity:1}
+</style>
+</head>
+<body>
+<div id="top"><span class="t" id="song">Hummi 小抄</span><span class="k" id="clock"></span></div>
+<div id="wrap">
+  <div class="l" id="prev"></div>
+  <div id="cd"><span id="cd-txt">間奏</span><span class="n" id="cd-n"></span><span class="gbar"><i id="cd-bar"></i></span></div>
+  <div class="l" id="cur"></div>
+  <div class="l" id="next"></div>
+  <div class="l" id="next2"></div>
+  <div id="msg"></div>
+</div>
+<div id="plain"></div>
+<div id="bar"><i></i></div>
+<div id="help">＋ ／ − 或滾輪：字的大小　← →：歌詞早 / 晚 0.25 秒　L：亮 / 暗</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => (s || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+// 工作人員名單不算歌詞 (跟舞台同一套規則)
+const CREDIT = /^(作词|作詞|作曲|编曲|編曲|制作|製作|监制|監製|混音|母带|母帶|和声|和聲|录音|錄音|吉他|贝斯|貝斯|鼓|键盘|鍵盤|弦乐|弦樂|出品|发行|發行|统筹|統籌|企划|企劃|策划|策劃|营销|營銷|宣传|宣傳|监修|監修|配唱|人声|人聲|版权|版權|原唱|OP|SP|ISRC|词|詞|曲|Lyricist|Lyrics|Composer|Arranger|Producer|Mixing|Mastering|Recording)[^:：]{0,24}[:：]/i;
+const CREDIT2 = /(produced|written|composed|arranged|mixed|mastered)\s+by|©|℗|版權所有|版权所有|未經許可|未经许可|^\s*\S{1,12}\s*[:：]\s*\S{1,20}\s*$/i;
+const isCredit = (s, i) => CREDIT.test(s.trim()) || CREDIT2.test(s.trim()) && (i < 10 || /by|©|℗|版權|版权/i.test(s));
+
+let track = null, lyr = null, lines = [], pending = null, offset = 0;
+let anchorPos = 0, anchorAt = performance.now(), playing = false;
+const now = () => anchorPos + (playing ? (performance.now() - anchorAt) / 1000 : 0);
+let size = 1, light = false;
+try { size = +localStorage.getItem('prompter.size') || 1; light = localStorage.getItem('prompter.light') === '1'; } catch {}
+const applyLook = () => { document.documentElement.style.setProperty('--size', size); document.body.classList.toggle('light', light); };
+applyLook();
+
+// 這句大概要唱幾秒：中日韓文一個字算一個，英文一個單字算一個
+const units = t => ((t || '').match(/[぀-ヿ㐀-鿿豈-﫿가-힯]/g) || []).length
+                 + ((t || '').match(/[A-Za-z0-9'’]+/g) || []).length;
+const singLen = l => units(l.text) * .42 + 2;
+function prepare(raw){
+  return (raw || []).filter((l, i) => l.t != null && (l.text || '').trim() && !isCredit(l.text, i));
+}
+function onLyrics(m){
+  if (m.loading) return;
+  if (!track || m.track_id !== track.track_id){ pending = m; return; }
+  lyr = m;
+  lines = m.synced ? prepare(m.lines) : [];
+  last = '';
+  const plain = !m.synced && (m.lines || []).length;
+  $('#plain').style.display = plain ? 'block' : 'none';
+  $('#wrap').style.display = plain ? 'none' : 'flex';
+  if (plain) $('#plain').textContent = m.lines.map(l => l.text).join('\n');
+}
+function onState(m){
+  if (m.config) offset = +m.config.offset || 0;
+  const t = m.track;
+  if (!t){ track = null; lines = []; playing = false; return; }
+  const changed = !track || track.track_id !== t.track_id;
+  const pos = t.position + (t.playing ? Math.max(0, Date.now() / 1000 - t.ts) : 0);
+  if (changed || t.playing !== playing || Math.abs(now() - pos) > .35){ anchorPos = pos; anchorAt = performance.now(); }
+  playing = t.playing; track = t;
+  $('#song').innerHTML = `<b>${esc(t.title)}</b>　${esc(t.artist || '')}`;
+  if (changed){
+    lyr = null; lines = []; last = '';
+    if (pending && pending.track_id === t.track_id) onLyrics(pending);
+    pending = null;
+  }
+}
+
+// 一句的文字 (有日文讀音就加上 ruby；rd = 整句平假名 / 羅馬拼音)
+function lineHtml(l){
+  if (!l) return '';
+  const t = l.text || '';
+  let html = '', p = 0;
+  for (const [o, n, r] of (l.ruby || [])){
+    if (o < p) continue;
+    html += esc(t.slice(p, o)) + '<ruby>' + esc(t.slice(o, o + n)) + '<rt>' + esc(r) + '</rt></ruby>';
+    p = o + n;
+  }
+  html += esc(t.slice(p));
+  return html + (l.rd ? `<span class="rd">${esc(l.rd)}</span>` : '');
+}
+// 目前這句：拆成一段一段 (有逐字時間就用，沒有就照字數平均分)，唱到的填色
+function curWords(l, end){
+  if (l.w && l.w.length) return l.w.filter(w => w[2] !== '').map(w => ({t: w[0], d: Math.max(.08, w[1] || .25), s: w[2]}));
+  const parts = (l.text || '').match(/[぀-ヿ㐀-鿿豈-﫿가-힯]|[^\s぀-ヿ㐀-鿿豈-﫿가-힯]+\s*|\s+/g) || [];
+  const span = Math.max(.6, Math.min(end - l.t, singLen(l)));
+  const wt = parts.map(s => /\s/.test(s) && !s.trim() ? .2 : Math.max(1, s.trim().length * (/[a-z]/i.test(s) ? .45 : 1)));
+  const total = wt.reduce((a, b) => a + b, 0) || 1;
+  let acc = l.t;
+  return parts.map((s, i) => { const d = span * wt[i] / total; const w = {t: acc, d, s}; acc += d; return w; });
+}
+
+let last = '', words = [];
+function frame(){
+  requestAnimationFrame(frame);
+  const t = now() + offset;
+  const dur = track?.duration || 0;
+  $('#clock').textContent = track ? `${fmt(now())} / ${fmt(dur)}` : '';
+  $('#bar i').style.width = dur ? Math.min(100, now() / dur * 100) + '%' : '0';
+  if (!track){ setMsg('沒有在播放音樂'); return; }
+  if (!lyr){ setMsg('正在找歌詞…'); return; }
+  if (!lyr.synced){ return; }
+  if (!lines.length){ setMsg('這首歌沒有歌詞'); return; }
+  setMsg('');
+  let idx = -1;
+  for (let i = 0; i < lines.length; i++){ if (lines[i].t <= t) idx = i; else break; }
+  const cur = lines[idx], nx = lines[idx + 1], nx2 = lines[idx + 2];
+  // 這句大概唱到什麼時候 (下一句開始、或照字數估)
+  const end = cur ? Math.min(nx ? nx.t : cur.t + 8, cur.t + singLen(cur) + 1.2) : 0;
+  const gapToNext = nx ? nx.t - t : Infinity;
+  const inGap = idx < 0 || (cur && t > end + .3 && gapToNext > 1.2);
+  const key = idx + '|' + inGap;
+  if (key !== last){
+    last = key;
+    if (inGap){
+      // 前奏 / 間奏：上面顯示剛唱完的，中間倒數，下面是接下來要唱的
+      $('#prev').innerHTML = cur ? lineHtml(cur) : '';
+      $('#cur').innerHTML = '';
+      $('#next').innerHTML = lineHtml(nx);
+      $('#next2').innerHTML = lineHtml(nx2);
+      $('#cd-txt').textContent = idx < 0 ? '前奏' : '間奏';
+    } else {
+      $('#prev').innerHTML = lineHtml(lines[idx - 1]);
+      words = curWords(cur, nx ? nx.t : cur.t + 6);
+      // 有日文讀音時直接顯示整句 (填色只做整句)，不然逐段填色
+      if (cur.ruby || cur.rd) $('#cur').innerHTML = `<span class="w all">${lineHtml(cur)}</span>`;
+      else $('#cur').innerHTML = words.map(w => `<span class="w">${esc(w.s)}</span>`).join('');
+      $('#next').innerHTML = lineHtml(nx);
+      $('#next2').innerHTML = lineHtml(nx2);
+    }
+    $('#cd').classList.toggle('on', inGap);
+  }
+  if (inGap){
+    const from = cur ? end : 0, total = Math.max(.5, (nx ? nx.t : from) - from);
+    const left = Math.max(0, (nx ? nx.t : 0) - t);
+    $('#cd-n').textContent = left <= 3.2 ? Math.ceil(left) || '' : '';
+    $('#cd-bar').style.width = Math.min(100, (1 - left / total) * 100) + '%';
+    return;
+  }
+  const spans = $('#cur').querySelectorAll('.w');
+  if (spans.length === 1 && spans[0].classList.contains('all')){
+    const p = Math.max(0, Math.min(1, (t - cur.t) / Math.max(.5, end - cur.t)));
+    spans[0].classList.add('part'); spans[0].style.setProperty('--wp', (p * 100).toFixed(1) + '%');
+    return;
+  }
+  spans.forEach((s, i) => {
+    const w = words[i]; if (!w) return;
+    const p = (t - w.t) / w.d;
+    s.classList.toggle('on', p >= 1);
+    s.classList.toggle('part', p > 0 && p < 1);
+    if (p > 0 && p < 1) s.style.setProperty('--wp', (p * 100).toFixed(0) + '%');
+  });
+}
+function setMsg(s){
+  if ($('#msg').textContent !== s){ $('#msg').textContent = s; if (s){ ['#prev', '#cur', '#next', '#next2'].forEach(x => $(x).innerHTML = ''); $('#cd').classList.remove('on'); last = ''; } }
+}
+
+let ws;
+const send = m => { try { ws.readyState === 1 && ws.send(JSON.stringify(m)); } catch {} };
+function connect(){
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onclose = () => setTimeout(connect, 1000);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'state') onState(m);
+    else if (m.type === 'lyrics') onLyrics(m);
+  };
+}
+addEventListener('keydown', e => {
+  if (e.key === '+' || e.key === '='){ size = Math.min(2.6, +(size + .1).toFixed(2)); }
+  else if (e.key === '-' || e.key === '_'){ size = Math.max(.5, +(size - .1).toFixed(2)); }
+  else if (e.key === 'ArrowLeft'){ offset = +(offset - .25).toFixed(2); send({type: 'offset', value: offset}); return; }
+  else if (e.key === 'ArrowRight'){ offset = +(offset + .25).toFixed(2); send({type: 'offset', value: offset}); return; }
+  else if (e.key === 'l' || e.key === 'L'){ light = !light; }
+  else return;
+  applyLook();
+  try { localStorage.setItem('prompter.size', size); localStorage.setItem('prompter.light', light ? '1' : '0'); } catch {}
+});
+addEventListener('wheel', e => { size = Math.max(.5, Math.min(2.6, +(size + (e.deltaY < 0 ? .05 : -.05)).toFixed(2))); applyLook();
+  try { localStorage.setItem('prompter.size', size); } catch {} }, {passive: true});
+let uiT;
+addEventListener('mousemove', () => { document.body.classList.add('ui'); clearTimeout(uiT); uiT = setTimeout(() => document.body.classList.remove('ui'), 2500); });
+connect();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
