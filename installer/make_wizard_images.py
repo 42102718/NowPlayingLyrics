@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 import os
 
 HERE = Path(__file__).parent
-ICON = Image.open(HERE.parent / "icon.png").convert("RGBA")
+ICON = Image.open(HERE.parent / "assets" / "icon.png").convert("RGBA")
 FONT = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "segoeuib.ttf")
 
 

@@ -9,11 +9,13 @@ import os
 import sys
 
 FROZEN = getattr(sys, "frozen", False)  # 打包成 .exe 時為 True
-# 程式資源 (index.html)：打包後在 _MEIPASS，原始碼執行時在本資料夾
-RES_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-# 使用者資料 (設定、紀錄、瀏覽器快取)：打包後放 %APPDATA%\NowPlayingLyrics
+# 專案資料夾 (app/ 的上一層)：web/ 網頁、assets/ 圖示
+PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 程式資源：打包後在 _MEIPASS (裡面一樣是 web/、assets/)，原始碼執行時在專案資料夾
+RES_DIR = getattr(sys, "_MEIPASS", PROJECT_DIR)
+# 使用者資料 (設定、紀錄、瀏覽器快取)：打包後放 %APPDATA%\NowPlayingLyrics，原始碼執行時放 devdata/
 DATA_DIR = (os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "NowPlayingLyrics")
-            if FROZEN else os.path.dirname(os.path.abspath(__file__)))
+            if FROZEN else os.path.join(PROJECT_DIR, "devdata"))
 os.makedirs(DATA_DIR, exist_ok=True)
 
 if sys.stdout:
@@ -39,6 +41,8 @@ from winrt.windows.media.control import (
 from winrt.windows.storage.streams import DataReader
 
 ROOT = Path(RES_DIR)
+WEB = ROOT / "web"        # index.html、stage.html、prompter.html、folia_web/
+ASSETS = ROOT / "assets"  # 圖示
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
@@ -1804,7 +1808,7 @@ async def art_handler(request):
 
 
 async def index(request):
-    return web.FileResponse(ROOT / "index.html", headers={"Cache-Control": "no-store"})
+    return web.FileResponse(WEB / "index.html", headers={"Cache-Control": "no-store"})
 
 
 # ───────────────────────── 更新 (GitHub Releases) ─────────────────────────
@@ -2033,8 +2037,8 @@ def start_tray():
         print("[tray]", e)
         return
     try:
-        p = ROOT / "icon_small.png"  # 小尺寸專用的簡化版 (精緻版縮到 64 px 會糊)
-        img = Image.open(p if p.exists() else ROOT / "icon.png").convert("RGBA").resize((64, 64), Image.LANCZOS)
+        p = ASSETS / "icon_small.png"  # 小尺寸專用的簡化版 (精緻版縮到 64 px 會糊)
+        img = Image.open(p if p.exists() else ASSETS / "icon.png").convert("RGBA").resize((64, 64), Image.LANCZOS)
     except Exception:
         img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
         ImageDraw.Draw(img).ellipse((2, 2, 62, 62), fill=(124, 92, 255))
@@ -2864,19 +2868,19 @@ def make_app():
     import playercap  # 內嵌 Folia 歌詞效果的資料來源 (PlayerCap 格式) + /folia/ 靜態檔
     hub = playercap.PlayerCapHub(state, config, VERSION)
     hub.port = PORT
-    hub.routes(app, ROOT)
+    hub.routes(app, WEB)  # /folia/ = web/folia_web
     app["playercap"] = hub
 
     async def stage_page(request):
-        return web.FileResponse(ROOT / "stage.html", headers={"Cache-Control": "no-store"})
+        return web.FileResponse(WEB / "stage.html", headers={"Cache-Control": "no-store"})
     app.router.add_get("/stage", stage_page)
 
     async def prompter_page(request):
-        return web.FileResponse(ROOT / "prompter.html", headers={"Cache-Control": "no-store"})
+        return web.FileResponse(WEB / "prompter.html", headers={"Cache-Control": "no-store"})
     app.router.add_get("/prompter", prompter_page)
 
     async def icon_png(request):
-        return web.FileResponse(ROOT / "icon.png", headers={"Cache-Control": "no-cache"})  # 換圖示後馬上看得到 (之前快取一天)
+        return web.FileResponse(ASSETS / "icon.png", headers={"Cache-Control": "no-cache"})  # 換圖示後馬上看得到 (之前快取一天)
     app.router.add_get("/icon.png", icon_png)
 
     async def show(request):

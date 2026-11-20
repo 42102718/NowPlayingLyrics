@@ -1,6 +1,6 @@
 # Hummi 哼哼
 
-<img src="icon.png" width="96" align="right">
+<img src="assets/icon.png" width="96" align="right">
 
 即時顯示 **Spotify / YouTube Music** 正在播放歌曲的同步歌詞：主視窗、遊戲上的浮動歌詞、螢幕頂端的小膠囊，還有給唱歌台用的全螢幕舞台。Windows 10 / 11。(1.4 以前叫 Now Playing Lyrics)
 
@@ -88,9 +88,19 @@ build.bat
 installer\build-installer.bat
 ```
 
-輸出在 `release\Hummi-Setup-<版本>.exe`。開發時可以用 `start-debug.bat` (瀏覽器模式)。
+輸出在 `release\Hummi-Setup-<版本>.exe`。開發時可以用 `start.bat` 直接從原始碼執行，或 `start-debug.bat` (瀏覽器模式)；原始碼執行時的設定和紀錄放在 `devdata\`。
 
-`folia_web/` 是打包好的 Folia 網頁版。要更新它，照 `folia_web/FOLIA_SOURCE.txt` 的方式用 Node.js 重新打包。
+專案結構：
+
+| 資料夾 | 內容 |
+|---|---|
+| `app\` | Python 程式 (`server.py` 是進入點) |
+| `web\` | 主視窗、舞台、提詞小抄的網頁，以及內嵌的 Folia (`web\folia_web\`) |
+| `assets\` | 圖示 (`icon_source.webp` 是原圖，`tools\make_icon.py` 會產生其他尺寸) |
+| `tools\` | 開發用的小工具 |
+| `installer\` | 安裝程式 (Inno Setup) |
+
+`web\folia_web\` 是打包好的 Folia 網頁版。要更新它，照 `web\folia_web\FOLIA_SOURCE.txt` 的方式用 Node.js 重新打包。
 
 ## 授權
 

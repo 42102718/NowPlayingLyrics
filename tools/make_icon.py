@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 S = 1024
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent / "assets"  # 圖示都在 assets/
 CX, CY = 512, 618  # 臉的中心
 
 
@@ -314,7 +314,7 @@ else:                   # 沒有的話用程式畫的貓
     small = build(False)
 sharp = SOURCE is not None
 big.resize((256, 256), Image.LANCZOS).save(ROOT / "icon.png")
-big.resize((512, 512), Image.LANCZOS).save(ROOT / "icon_preview.png")
+big.resize((512, 512), Image.LANCZOS).save(ROOT.parent / "devdata" / "icon_preview.png")
 # 128 px 以上用原圖，64 px 以下用加強對比的版本 (Windows 會自己挑最接近的尺寸)
 sized(small, 64, sharp).save(ROOT / "icon_small.png")  # 系統匣用
 frames = [sized(small, n, sharp) for n in (16, 24, 32, 48, 64)] + [big.resize((n, n), Image.LANCZOS) for n in (128, 256)]
