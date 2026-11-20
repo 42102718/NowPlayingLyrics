@@ -23,6 +23,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-
 #cur .w{color:var(--fg)}
 #cur .w.on{color:var(--fill)}
 #cur .w.part{background:linear-gradient(90deg,var(--fill) var(--wp),var(--fg) var(--wp));-webkit-background-clip:text;background-clip:text;color:transparent}
+/* 整句填色時讀音不能跟著變透明：讀音 / 整句平假名用自己的顏色 (唱過的地方會變成填色) */
+#cur rt,#cur .rd{-webkit-text-fill-color:currentColor;color:var(--fg);background:none}
+#cur .w.sung rt,#cur .w.sung .rd{color:var(--fill)}
 #next{font:800 calc(30px * var(--size)) var(--font);color:var(--fg);opacity:.62}
 #next2{font:700 calc(22px * var(--size)) var(--font);color:var(--dim)}
 .rd{display:block;font-size:.5em;font-weight:600;opacity:.75;margin-top:.15em}
@@ -178,7 +181,7 @@ function frame(){
   const spans = $('#cur').querySelectorAll('.w');
   if (spans.length === 1 && spans[0].classList.contains('all')){
     const p = Math.max(0, Math.min(1, (t - cur.t) / Math.max(.5, end - cur.t)));
-    spans[0].classList.add('part'); spans[0].style.setProperty('--wp', (p * 100).toFixed(1) + '%');
+    spans[0].classList.add('part'); spans[0].classList.toggle('sung', p >= 1); spans[0].style.setProperty('--wp', (p * 100).toFixed(1) + '%');
     return;
   }
   spans.forEach((s, i) => {

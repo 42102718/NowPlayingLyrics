@@ -42,7 +42,7 @@ ROOT = Path(RES_DIR)
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.8.2"
+VERSION = "1.8.3"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -530,11 +530,12 @@ def title_variants(title: str, artist: str):
     # 歌手中英並列「周杰倫 Jay Chou」：搜尋時多一串英文名反而找不到 → 中文、英文各試一次
     split = []
     for tt, aa in out:
+        split.append((tt, aa))
         m = re.match(r"^\s*([^A-Za-z]*[^\sA-Za-z])\s+([A-Za-z][A-Za-z\s.'&-]+)\s*$", aa or "") \
             or re.match(r"^\s*([A-Za-z][A-Za-z\s.'&-]+?)\s+([^\sA-Za-z][^A-Za-z]*)\s*$", aa or "")
-        if m:
+        if m:  # 每一組都拆，拆出來的排在原本那組後面
             split += [(tt, m.group(1).strip()), (tt, m.group(2).strip())]
-    out = out[:2] + split[:4] + out[2:]
+    out = split
     seen, res = set(), []
     for x in out:
         x = (x[0].strip(" -–—/*"), x[1].strip(" -–—/*"))
@@ -767,15 +768,22 @@ class Lyrics:
     # ───── 搜尋 (五個來源同時) ─────
     async def search(self, title, artist, limit=8, duration=None):
         st, sa = to_simp(title), to_simp(artist)  # 中國的三個來源用簡體搜
-        res = await asyncio.gather(self._s_lrclib(title, artist, limit), self._s_netease(st, sa, limit),
-                                   self._s_kugou(st, sa, limit), self._s_qq(st, sa, limit),
-                                   self._s_lyricsplus(title, artist, duration), return_exceptions=True)
+        tasks = [asyncio.ensure_future(c) for c in (
+            self._s_lrclib(title, artist, limit), self._s_netease(st, sa, limit), self._s_kugou(st, sa, limit),
+            self._s_qq(st, sa, limit), self._s_lyricsplus(title, artist, duration))]
+        # 最多等 4 秒：哪個來源卡住就不等它 (之前一個來源沒回應，整首歌要等十幾秒才出歌詞)
+        done, pending = await asyncio.wait(tasks, timeout=4)
+        for t in pending:
+            t.cancel()
         out = []
-        for r in res:
-            if isinstance(r, list):
-                out.extend(r)
-            elif isinstance(r, Exception):
-                print("[search]", r)
+        for t in tasks:
+            if t not in done:
+                continue
+            r = t.exception() if not t.cancelled() else None
+            if r is not None:
+                print("[search]", repr(r))
+            elif isinstance(t.result(), list):
+                out.extend(t.result())
         return out
 
     async def _s_lrclib(self, title, artist, limit):
@@ -832,22 +840,30 @@ class Lyrics:
         params = {"title": title, "artist": artist}
         if duration:
             params["duration"] = str(round(duration))
-        d = None
         now = time.monotonic()
-        for host in LYRICSPLUS_HOSTS:
-            if self.lp_down.get(host, 0) > now:
-                continue  # 剛剛逾時過，先跳過 5 分鐘，免得拖慢其他來源
+        hosts = [h for h in LYRICSPLUS_HOSTS if self.lp_down.get(h, 0) <= now]  # 剛逾時過的先跳過 10 分鐘
+
+        async def one(host):
             try:
                 async with http.get(f"{host}/v2/lyrics/get", params=params,
-                                    timeout=aiohttp.ClientTimeout(total=6)) as r:
+                                    timeout=aiohttp.ClientTimeout(total=2.5)) as r:  # 這個服務常常沒回應：最多等 2.5 秒
                     if r.status == 404:
-                        break  # 伺服器有回應，只是沒有這首
+                        return "none"  # 伺服器有回應，只是沒有這首
                     if r.status == 200:
-                        d = json.loads(await r.text())
-                        break
+                        return json.loads(await r.text())
             except Exception as e:
-                self.lp_down[host] = now + 300
+                self.lp_down[host] = time.monotonic() + 600
                 print("[lyricsplus]", host, type(e).__name__)
+            return None
+        d = None
+        if hosts:  # 兩台同時問，先回來的就用
+            for fut in asyncio.as_completed([one(h) for h in hosts]):
+                r = await fut
+                if r == "none":
+                    break
+                if r:
+                    d = r
+                    break
         self.lp_cache[k] = d
         return d
 
