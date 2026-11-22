@@ -715,6 +715,28 @@ body.glass #settings{background:linear-gradient(180deg,rgba(var(--panel),.8),rgb
 body.glass input[type=text],body.glass input[type=search],body.glass input[type=password],body.glass select{
   box-shadow:inset 0 1px 3px rgba(0,0,0,.25)}
 body.glass #cover{box-shadow:0 40px 80px -20px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.1)}
+
+/* ═════ 換句動畫：新的一句從模糊到清楚浮上來 ═════ */
+.line.active.enter .txt{animation:lineIn .75s cubic-bezier(.2,.8,.2,1) both}
+@keyframes lineIn{0%{filter:blur(9px);opacity:.2}60%{filter:blur(1px);opacity:.95}100%{filter:none;opacity:1}}
+.line.just-left .txt{animation:lineOut .6s ease-out both}
+@keyframes lineOut{0%{filter:none}40%{filter:blur(2px)}100%{filter:none}}
+/* ═════ 開場：封面、歌名、控制、歌詞依序淡入 ═════ */
+body.intro #left > *,body.intro #right{animation:introRise .8s cubic-bezier(.2,.8,.2,1) both}
+body.intro #left > *:nth-child(1){animation-delay:.05s}
+body.intro #left > *:nth-child(2){animation-delay:.14s}
+body.intro #left > *:nth-child(3){animation-delay:.22s}
+body.intro #left > *:nth-child(4){animation-delay:.3s}
+body.intro #left > *:nth-child(5){animation-delay:.38s}
+body.intro #left > *:nth-child(n+6){animation-delay:.44s}
+body.intro #right{animation-delay:.3s}
+@keyframes introRise{from{opacity:0;transform:translateY(14px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+@media (prefers-reduced-motion:reduce){body.intro #left > *,body.intro #right,.line.active.enter .txt,.line.just-left .txt{animation:none}}
+/* ═════ 字型微調 ═════ */
+.line,#title,#artist,.dialog,#settings{font-feature-settings:"palt" 1,"kern" 1;text-rendering:optimizeLegibility}
+.line{letter-spacing:.005em}
+#t-cur,#t-dur,#offset-val,.times,.d,output{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+#title{letter-spacing:-.015em}
 </style>
 </head>
 <body>
@@ -822,6 +844,8 @@ body.glass #cover{box-shadow:0 40px 80px -20px rgba(0,0,0,.6),inset 0 0 0 1px rg
           <button data-layout="center" title="封面在上、歌詞在下，全部置中">置中</button><button data-layout="immersive" title="歌詞佔滿畫面，封面和控制縮成左下角的小卡">沉浸</button>
           <button data-layout="vinyl" title="封面變成黑膠唱片，播放時會轉">唱片</button></div>
       </div>
+      <label class="row" title="整個介面的主題色跟著專輯封面最鮮豔的顏色；封面太灰太暗時用原本風格的顏色">主題色跟著封面 <span class="switch"><input type="checkbox" id="cover-accent"><span></span></span></label>
+      <label class="row" title="切換選項、按按鈕、展開膠囊時很輕的「咔」聲。直播時 OBS 通常會錄到桌面聲音，所以預設關">操作音效 <span class="switch"><input type="checkbox" id="ui-sound"><span></span></span></label>
       <p class="hint">玻璃：選中時一片玻璃滑過去、按下去會彈一下。沉浸：歌詞佔滿畫面；唱片：封面變成會轉的黑膠。</p>
     </div>
   </section>
@@ -1180,6 +1204,8 @@ function onState(m){
     applyTheme(cfg.theme);
     if (performance.now() - lsEdit > 1500) applyLyrStyle(cfg.lyr_style);
     if (performance.now() - lookEdit > 1500) applyLook(cfg.ui_look);
+    if (performance.now() - accentEdit > 1500){ coverAccent = cfg.cover_accent !== false; $('#cover-accent').checked = coverAccent; applyAccent(); }
+    if (performance.now() - accentEdit > 1500){ uiSound = !!cfg.ui_sound; $('#ui-sound').checked = uiSound; }
     if (performance.now() - layoutEdit > 1500) applyLayout(cfg.layout);
     { const z = cfg.ui_zoom || 100, near = [90, 100, 115, 130, 150].reduce((a, b) => Math.abs(b - z) < Math.abs(a - z) ? b : a);
       document.querySelectorAll('#zooms [data-z]').forEach(b => b.classList.toggle('on', +b.dataset.z === near)); }
@@ -1271,6 +1297,9 @@ function extractColors(img){
     while (pick.length < 3) pick.push(px[pick.length * 50] || {r:60,g:60,b:90});
     albumColors = pick.map(p => `rgb(${p.r},${p.g},${p.b})`);
     applyBlobColors();
+    // 最鮮豔又不會太暗的那個顏色當主題色 (封面太灰太暗就不換)
+    vibrant = px.find(p => p.s > .32 && p.v > .35) || null;
+    applyAccent();
   }catch(e){}
 }
 
@@ -1392,7 +1421,10 @@ function frame(){
     lineEls.intro.classList.toggle('on', idx < 0);
     lineEls.forEach((el, i) => {
       const dist = Math.abs(i - idx);
+      const wasActive = el.classList.contains('active');
       el.classList.toggle('active', i === idx && !isGap);
+      if (i === idx && !isGap && !wasActive){ el.classList.add('enter'); setTimeout(() => el.classList.remove('enter'), 800); }
+      if (wasActive && i !== idx){ el.classList.add('just-left'); setTimeout(() => el.classList.remove('just-left'), 700); }
       el.classList.toggle('gap-now', i === idx && isGap);
       el.classList.toggle('past', i < idx);
       el.style.filter = dist === 0 ? '' : `blur(${Math.min(dist * .6, 3)}px)`;
@@ -2054,7 +2086,7 @@ document.addEventListener('pointermove', e => {
   const r = el.getBoundingClientRect();
   el.style.setProperty('--mx', (e.clientX - r.left) + 'px'); el.style.setProperty('--my', (e.clientY - r.top) + 'px');
 }, {passive: true});
-let lookEdit = 0, layoutEdit = 0;
+let lookEdit = 0, layoutEdit = 0, accentEdit = 0;
 function applyLook(v){
   v = v === 'flat' ? 'flat' : 'glass';
   document.body.classList.toggle('glass', v === 'glass');
@@ -2069,9 +2101,47 @@ function applyLayout(v){
   try { localStorage.setItem('layout', v); } catch {}
 }
 try { applyLook(localStorage.getItem('look') || 'glass'); applyLayout(localStorage.getItem('layout') || 'classic'); } catch { applyLook('glass'); }
+$('#cover-accent').onchange = e => { accentEdit = performance.now(); coverAccent = e.target.checked; applyAccent(); send({type: 'cover_accent', value: coverAccent}); };
+$('#ui-sound').onchange = e => { accentEdit = performance.now(); uiSound = e.target.checked; if (uiSound) tick(true); send({type: 'ui_sound', value: uiSound}); };
 document.querySelectorAll('#ui-looks [data-look]').forEach(b => b.onclick = () => { lookEdit = performance.now(); applyLook(b.dataset.look); send({type: 'ui_look', value: b.dataset.look}); });
 document.querySelectorAll('#layouts [data-layout]').forEach(b => b.onclick = () => { layoutEdit = performance.now(); applyLayout(b.dataset.layout); send({type: 'layout', value: b.dataset.layout}); });
 initGlassThumbs();
+
+
+// ───── 主題色跟著封面 ─────
+let coverAccent = true, vibrant = null;
+function hsl(r, g, b){ r /= 255; g /= 255; b /= 255; const mx = Math.max(r,g,b), mn = Math.min(r,g,b); let h = 0, s = 0; const l = (mx+mn)/2;
+  if (mx !== mn){ const d = mx - mn; s = l > .5 ? d/(2-mx-mn) : d/(mx+mn);
+    h = mx === r ? (g-b)/d + (g<b?6:0) : mx === g ? (b-r)/d + 2 : (r-g)/d + 4; h /= 6; }
+  return [h*360, s, l]; }
+function applyAccent(){
+  const st = document.body.style;
+  const light = ['dawn', 'paper', 'sakura', 'matcha'].includes(document.body.dataset.theme);
+  if (!coverAccent || !vibrant){ st.removeProperty('--accent'); st.removeProperty('--accent2'); return; }
+  const [h, s] = hsl(vibrant.r, vibrant.g, vibrant.b);
+  const sat = Math.round(Math.min(90, Math.max(55, s * 100)));
+  st.setProperty('--accent', light ? `hsl(${h|0} ${sat}% 42%)` : `hsl(${h|0} ${sat}% 74%)`);
+  st.setProperty('--accent2', light ? `hsl(${h|0} ${sat}% 38%)` : `hsl(${h|0} ${sat}% 58%)`);
+}
+// ───── 操作音效 (很輕的「咔」，預設關) ─────
+let uiSound = false, actx = null;
+function tick(high){
+  if (!uiSound) return;
+  try {
+    actx = actx || new AudioContext();
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(high ? 1480 : 990, t); o.frequency.exponentialRampToValueAtTime(high ? 1100 : 760, t + .05);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.05, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + .07);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + .08);
+  } catch {}
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest?.('button, .switch, label.row');
+  if (el) tick(!!el.closest('.seg, #set-tabs, .switch'));
+}, true);
+// ───── 開場動畫 ─────
+document.body.classList.add('intro');
+setTimeout(() => document.body.classList.remove('intro'), 1600);
 
 function applyLyrStyle(v){
   v = v || 'flow';
@@ -2090,6 +2160,7 @@ function applyTheme(t){
     // 換風格時先關掉所有過場動畫：幾百行歌詞一起慢慢變色會卡住，直接換掉比較乾淨
     document.documentElement.classList.add('theme-switch');
     document.body.dataset.theme = t;
+    applyAccent();  // 淺色 / 深色風格的主題色亮度不同
     void document.body.offsetHeight;
     setTimeout(() => document.documentElement.classList.remove('theme-switch'), 60);
     try { localStorage.setItem('theme', t); } catch {}

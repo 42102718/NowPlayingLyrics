@@ -1338,6 +1338,8 @@ class Notch:
             bd.rounded_rectangle(box, radius=r, outline=border[:3] + (int(border[3] * (1 - thin)),), width=max(2, self.d(1.4)))
         if thin < 0.99:
             self.glass_sheen(pill, r, shape == "float", 1 - thin)
+        if 0.02 < self.exk < 0.98:
+            self.liquid_sweep(pill, self.exk if self.expanded else 1 - self.exk)
         mask = self.pill_mask(W2, H2, r, round_top=shape == "float")
         pill.putalpha(mask)
         pill = pill.resize((w, h), Image.LANCZOS)
@@ -1415,6 +1417,48 @@ class Notch:
             l2 = layer.copy()
             l2.putalpha(l2.getchannel("A").point(lambda v: int(v * k)))
             pill.alpha_composite(l2)
+
+    _tick_path = None
+
+    def click_sound(self):
+        """很輕的「咔」(只在設定打開時)。第一次用到時產生一個很短的 wav。"""
+        if not self.config.get("ui_sound"):
+            return
+        try:
+            import os, struct, tempfile, wave, winsound
+            if Notch._tick_path is None or not os.path.exists(Notch._tick_path):
+                rate, n = 44100, int(44100 * 0.07)
+                frames = bytearray()
+                for i in range(n):
+                    t = i / rate
+                    f = 1300 - 4000 * t  # 往下滑的音高
+                    env = min(1.0, t / 0.004) * math.exp(-t / 0.018)
+                    frames += struct.pack("<h", int(32767 * 0.16 * env * math.sin(2 * math.pi * f * t)))
+                path = os.path.join(tempfile.gettempdir(), "hummi_tick.wav")
+                with wave.open(path, "wb") as w:
+                    w.setnchannels(1)
+                    w.setsampwidth(2)
+                    w.setframerate(rate)
+                    w.writeframes(bytes(frames))
+                Notch._tick_path = path
+            winsound.PlaySound(Notch._tick_path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+        except Exception as e:
+            print("[notch] sound", repr(e), flush=True)
+
+    def liquid_sweep(self, pill, k):
+        """展開 / 收起的動畫中：一道斜斜的光帶從左掃到右，像光線穿過玻璃。k = 0~1 動畫進度。"""
+        W2, H2 = pill.size
+        band = max(8, int(W2 * 0.22))
+        x = int(-band + (W2 + band * 2) * k)
+        strength = math.sin(math.pi * k)  # 中間最亮，頭尾淡出
+        row = Image.linear_gradient("L").rotate(90, expand=True).resize((band, 1))  # 0→255
+        prof = row.point(lambda v: int(255 * math.sin(math.pi * v / 255) ** 2 * 0.16 * strength))  # 中間亮兩邊淡
+        alpha = Image.new("L", (W2 + band * 2, H2), 0)
+        alpha.paste(prof.resize((band, H2)), (x + band, 0))
+        alpha = alpha.transform(alpha.size, Image.AFFINE, (1, 0.35, -H2 * 0.175, 0, 1, 0), Image.BILINEAR).crop((band, 0, band + W2, H2))  # 斜一點
+        layer = Image.new("RGBA", (W2, H2), (255, 255, 255, 0))
+        layer.putalpha(alpha)
+        pill.alpha_composite(layer)
 
     def draw_bar(self, pill, t, pos, alpha):
         """極簡細條：一條播放進度，顏色是專輯的顏色。"""
@@ -1731,6 +1775,9 @@ class Notch:
         else:
             self.thin_k = 0.0
         recolor = self.step_fill(t, dt)
+        if self.expanded and not getattr(self, "_was_expanded", False):
+            self.click_sound()
+        self._was_expanded = self.expanded
         self.exk = clamp(self.exk + (dt / 0.24) * (1 if self.expanded else -1), 0, 1)
         bubbling = self.step_bubble(dt)
         playing = bool(t and t["playing"])

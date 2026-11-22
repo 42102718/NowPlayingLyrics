@@ -61,6 +61,8 @@ DEFAULT_CONFIG = {
     "theme": "night",  # 主視窗風格：night 夜光 / dawn 晨霧 / mono 極簡 / neon 霓虹 / paper 紙本 / oasis 綠洲 / crimson 緋紅 /
     #                    cassette 卡帶 / vapor 蒸氣波 / ocean 深海 / sakura 櫻花 / matcha 抹茶
     "ui_look": "glass",   # 介面質感：glass 玻璃 / flat 簡潔
+    "cover_accent": True,  # 主題色跟著封面最鮮豔的顏色
+    "ui_sound": False,     # 操作時很輕的「咔」聲 (預設關：直播時 OBS 會錄到桌面聲音)
     "layout": "classic",  # 主視窗版面：classic 經典 / mirror 鏡像 / center 置中 / immersive 沉浸 / vinyl 唱片
     "lyr_style": "flow",  # 主視窗歌詞呈現：flow 流動 / clear 清晰 / center 置中 / spot 聚光 / karaoke 卡拉OK / type 打字機 / pop 彈跳
     "auto_pause": {"lock": True, "unplug": True, "resume": True},  # 鎖定 / 拔耳機時暫停，回來接著播
@@ -136,6 +138,8 @@ def load_config():
         cfg["game"] = {"enabled": bool(gm.get("enabled", True)),
                        "notch": gm.get("notch") if gm.get("notch") in ("show", "alerts", "hide") else "alerts"}
         cfg["net_alert"] = bool(saved.get("net_alert", True))
+        cfg["cover_accent"] = bool(saved.get("cover_accent", True))
+        cfg["ui_sound"] = bool(saved.get("ui_sound", False))
         cfg["ui_look"] = saved.get("ui_look") if saved.get("ui_look") in ('glass', 'flat') else "glass"
         cfg["layout"] = saved.get("layout") if saved.get("layout") in ('classic', 'mirror', 'center', 'immersive', 'vinyl') else "classic"
         cfg["lyr_style"] = saved.get("lyr_style") if saved.get("lyr_style") in ('flow', 'clear', 'center', 'spot', 'karaoke', 'type', 'pop') else "flow"
@@ -1844,6 +1848,9 @@ async def ws_handler(request):
                 save_config()
             elif d.get("type") == "lyr_style" and d.get("value") in ('flow', 'clear', 'center', 'spot', 'karaoke', 'type', 'pop'):
                 config["lyr_style"] = d["value"]
+                config_changed()
+            elif d.get("type") in ("cover_accent", "ui_sound"):
+                config[d["type"]] = bool(d.get("value"))
                 config_changed()
             elif d.get("type") == "ui_look" and d.get("value") in ('glass', 'flat'):
                 config["ui_look"] = d["value"]
