@@ -46,7 +46,7 @@ ASSETS = ROOT / "assets"  # 圖示
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.8.3"
+VERSION = "1.8.4"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -65,6 +65,7 @@ DEFAULT_CONFIG = {
     "taskbar_progress": True,  # 工作列圖示上顯示播放進度
     "hotkeys": True,     # 全域快捷鍵 Ctrl+Alt+… (遊戲裡也能切歌、調音量)
     "music_only": True,  # 只偵測音樂 App：不讀瀏覽器、抖音、影片播放器 (開台時不會露出其他分頁的標題)
+    "browser_music": False,  # 只偵測音樂 App 時，也讀瀏覽器裡的音樂平台 (YouTube Music、Spotify 網頁版…；一般影片照樣不讀)
     "notch_opts": {
         "battery": True,    # 藍牙裝置 / 筆電電量
         "peek": True,       # 換歌時彈出封面和歌名
@@ -125,6 +126,7 @@ def load_config():
             cfg["ui_zoom"] = 100
         cfg["theme"] = saved.get("theme") if saved.get("theme") in ('night', 'dawn', 'mono', 'neon', 'paper', 'oasis', 'crimson', 'cassette', 'vapor', 'ocean', 'sakura', 'matcha') else "night"
         cfg["music_only"] = bool(saved.get("music_only", True))
+        cfg["browser_music"] = bool(saved.get("browser_music", False))
         cfg["hotkeys"] = bool(saved.get("hotkeys", True))
         cfg["taskbar_progress"] = bool(saved.get("taskbar_progress", True))
         cfg["notch_monitor"] = str(saved.get("notch_monitor", "primary") or "primary")
@@ -388,6 +390,16 @@ MUSIC_APPS = ("applemusic", "apple music", "itunes", "zunemusic", "tidal", "deez
               "kkbox", "soundcloud", "pandora", "audirvana", "dopamine", "plexamp", "cider")
 
 
+def is_music_platform(src, title, artist, album):
+    """瀏覽器分頁裡是不是音樂平台在播歌：YouTube Music、Spotify 網頁版、Apple Music 網頁版都會給「專輯」；
+    YouTube 的「- Topic」、VEVO 這類音樂頻道也算。一般影片沒有專輯 → 不讀 (開台時不會露出其他分頁的標題)。"""
+    if src != "瀏覽器":
+        return False
+    if (album or "").strip():
+        return True
+    return bool(MUSIC_CHANNEL.search(artist or "")) and not SHORT_TAG.search(title or "")
+
+
 def media_kind(track) -> str:
     """music = 當成歌處理；video = 一般影片 (只在歌名、歌手都對得上時顯示歌詞，不讓 AI 聽)；short = 短影片 (完全不處理)。"""
     src, app = track.get("source"), (track.get("app") or "").lower()
@@ -403,6 +415,8 @@ def media_kind(track) -> str:
     dur = float(track.get("duration") or 0)
     if SHORT_TAG.search(title) or SHORT_TAG.search(artist) or 0 < dur < 60:
         return "short"
+    if (track.get("album") or "").strip() and not VIDEO_SITE.search(title):
+        return "music"  # 有專輯 = 音樂平台 (YouTube Music、Spotify 網頁版…)
     if (VIDEO_SITE.search(title) or VIDEO_SITE.search(artist)) and not SONG_WORD.search(title):
         return "video"  # 動畫、影集：不讓 AI 聽 (會聽寫到台詞)
     if MUSIC_HINT.search(title) or MUSIC_CHANNEL.search(artist):
@@ -658,6 +672,35 @@ def clean_lines(lines, title="", artist="", *more):
             if " - " in txt and l.get("t") is not None and l["t"] < 3:  # 「歌名 - 歌手」標題行
                 continue
         out.append(l)
+    return mark_gaps(out)
+
+
+# 間奏行：只有符號 (♪ … ～ —)，或寫著 Instrumental / 間奏 / Solo 的 → 變成空白行，各畫面統一顯示「♪ 間奏」
+_GAP_SYMBOLS = re.compile(r"^[\s♪♫♬♩🎵🎶~～…\.\-—–_*·•・。、,，!！?？()（）\[\]【】「」<>《》/|]*$")
+_GAP_WORDS = re.compile(r"^\s*[\(\[（【]?\s*(?:instrumental|music|interlude|solo|outro|intro|break|間奏|间奏|前奏|尾奏|"
+                        r"純音樂|纯音乐|伴奏|音樂|音乐|演奏)\s*[\)\]）】]?\s*$", re.I)
+_CJK = re.compile(r"[぀-ヿ㐀-鿿豈-﫿가-힯]")
+
+
+def _sing_len(text):
+    """這句大概要唱幾秒：中日韓文一個字算一個，英文一個單字算一個。"""
+    return len(_CJK.findall(text)) * 0.42 + len(re.findall(r"[A-Za-z0-9'’]+", text)) * 0.42 + 2
+
+
+def mark_gaps(lines):
+    """符號行變空白行；兩句之間空很久 (唱完後還有 8 秒以上) 就補一個空白行，畫面顯示「♪ 間奏」而不是一直停在上一句。"""
+    out = []
+    for i, l in enumerate(lines):
+        txt = l.get("text") or ""
+        if txt and (_GAP_SYMBOLS.match(txt) or _GAP_WORDS.match(txt)):
+            l = {**l, "text": ""}
+        out.append(l)
+        nxt = next((x for x in lines[i + 1:] if x.get("t") is not None), None)
+        if l.get("t") is None or not nxt or not (l.get("text") or "").strip():
+            continue
+        end = l["t"] + _sing_len(l["text"])
+        if nxt["t"] - end >= 8:
+            out.append({"t": round(end + 0.8, 2), "text": ""})
     return out
 
 
@@ -704,6 +747,30 @@ class Lyrics:
             print("[overrides]", e)
 
     # ───── 自動尋找 ─────
+    async def _other_length(self, title, artist, duration):
+        """歌名、歌手都一模一樣，只是版本長度不同 (例如 Spotify 2:52、網易雲 3:27)：
+        拿它的歌詞文字，不用它的時間 (版本不同時間一定對不上)，交給 AI 聽這個版本對時。"""
+        for t, a in title_variants(title, artist)[:3]:
+            if not a:
+                continue
+            try:
+                cands = self.rank(await self.search(t, a), t, a, None)
+            except Exception as e:
+                print("[other-length]", repr(e), flush=True)
+                return None
+            cands = [c for c in cands if title_matches(t, c.get("title")) == 2 and artist_matches(a, c.get("artist"))]
+            for c in cands[:3]:
+                r = await self.fetch(c)
+                if not (r and r["lines"]):
+                    continue
+                cd = c.get("duration") or 0
+                if r["synced"] and cd and abs(cd - duration) <= 10:
+                    return r  # 其實長度差不多 (前面沒找到只是剛好被別的條件擋掉)
+                print(f"[other-length] {t} / {a}: 版本長度不同 ({cd:.0f}s vs {duration:.0f}s)，用歌詞文字讓 AI 對時", flush=True)
+                return {**r, "synced": False, "other_length": True,
+                        "lines": [{"t": None, "text": l["text"]} for l in r["lines"] if (l.get("text") or "").strip()]}
+        return None
+
     async def find(self, title, artist, album, duration, need_artist=False):
         k = self.key(title, artist)
         if k in self.overrides:
@@ -723,6 +790,8 @@ class Lyrics:
                             break
                 if result and result["synced"]:
                     break
+        if not result and duration and artist:
+            result = await self._other_length(title, artist, duration)
         result = result or {"source": None, "synced": False, "lines": []}
         if result["lines"]:
             result["lines"] = clean_lines(result["lines"], title, artist)
@@ -1010,7 +1079,8 @@ class Media:
             if pb.playback_status == PLAYING:
                 others.append((app, p.title, media_kind({"source": src, "app": app, "title": p.title, "artist": p.artist,
                                                 "duration": (tl.end_time - tl.start_time).total_seconds()})))
-            if config.get("music_only", True) and not is_music_app(app, src):
+            if config.get("music_only", True) and not is_music_app(app, src) \
+                    and not (config.get("browser_music") and is_music_platform(src, p.title, p.artist, p.album_title)):
                 continue  # 瀏覽器、抖音、影片播放器：不讀 (隱私，開台時不會露出其他東西)
             playing = pb.playback_status == PLAYING
             pos = tl.position.total_seconds()
@@ -1763,6 +1833,9 @@ async def ws_handler(request):
                 start_hotkeys()
             elif d.get("type") == "volume":  # 主視窗 ↑ / ↓
                 await asyncio.to_thread(music_volume, float(d.get("delta") or 0))
+            elif d.get("type") == "browser_music":
+                config["browser_music"] = bool(d.get("value"))
+                save_config()
             elif d.get("type") == "music_only":
                 config["music_only"] = bool(d.get("value"))
                 save_config()

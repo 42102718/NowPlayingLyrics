@@ -144,6 +144,15 @@ html.mica #grain{display:none}
 .line.tent .txt{opacity:.55;transition:opacity .4s}  /* AI 還在聽、可能還會改的字 */
 .line.past{color:rgba(var(--ink),.5)}
 .line.empty{min-height:.6em}
+/* 間奏 */
+.line.gap .txt{display:inline-flex;align-items:center;gap:.4em;font-size:.55em;font-weight:700;color:var(--dim);letter-spacing:.08em}
+.line.gap .note{font-style:normal}
+.line.gap .dots{display:inline-flex;gap:.3em;margin-left:.2em}
+.line.gap .dots i{width:.32em;height:.32em;border-radius:50%;background:currentColor;opacity:.35}
+.line.gap.gap-now{filter:none!important;opacity:1!important}
+.line.gap.gap-now .txt{color:var(--hi)}
+.line.gap.gap-now .dots i{animation:breathe 1.8s ease-in-out infinite}
+.line.gap.gap-now .dots i:nth-child(2){animation-delay:.25s}.line.gap.gap-now .dots i:nth-child(3){animation-delay:.5s}
 .interlude{display:flex;gap:.35em;padding:20px 0;height:clamp(40px,6vh,64px);align-items:center}
 .interlude i{width:.45em;height:.45em;border-radius:50%;background:var(--hi);opacity:.3;font-size:clamp(24px,2.9vw,42px);transition:opacity .3s, transform .3s}
 .interlude.on i{animation:breathe 1.8s ease-in-out infinite}
@@ -879,7 +888,8 @@ body[data-ls="pop"] .line.active .txt{filter:drop-shadow(0 0 14px color-mix(in s
   <section class="grp"><h3>隱私</h3>
     <div class="card">
       <label class="row" title="開著時只讀 Spotify、YouTube Music 桌面版和音樂播放器；瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi (開台時不會露出其他分頁的標題)">只偵測音樂 App <span class="switch"><input type="checkbox" id="music-only"><span></span></span></label>
-      <p class="hint">開台時不會露出瀏覽器、影片的標題。用瀏覽器分頁聽 YouTube Music 要關掉，或改用桌面版。</p>
+      <label class="row" id="browser-music-row" title="用瀏覽器開 YouTube Music、Spotify 網頁版、Apple Music 網頁版聽歌時也讀得到；一般影片、其他分頁照樣不讀">也偵測瀏覽器裡的音樂平台 <span class="switch"><input type="checkbox" id="browser-music"><span></span></span></label>
+      <p class="hint">開台時不會露出瀏覽器、影片的標題。用瀏覽器聽 YouTube Music、Spotify 網頁版的話，打開下面的「也偵測瀏覽器裡的音樂平台」就好 (一般影片還是不會讀)。</p>
     </div>
   </section>
   <section class="grp"><h3>自動暫停</h3>
@@ -1014,6 +1024,8 @@ function onState(m){
     applyFont(cfg.font);
     micaOK = !!m.mica && document.body.classList.contains('app');
     if ($('#music-only') && performance.now() - musicOnlyEdit > 1500) $('#music-only').checked = cfg.music_only !== false;
+    if ($('#browser-music') && performance.now() - musicOnlyEdit > 1500) $('#browser-music').checked = !!cfg.browser_music;
+    if ($('#browser-music-row')) $('#browser-music-row').classList.toggle('disabled', cfg.music_only === false);
     if (performance.now() - hotkeysEdit > 1500) $('#hotkeys-on').checked = cfg.hotkeys !== false;
     if (performance.now() - apEdit > 1500) document.querySelectorAll('[data-ap]').forEach(i => i.checked = (cfg.auto_pause || {})[i.dataset.ap] !== false);
     if (performance.now() - apEdit > 1500){ $('#tb-progress').checked = cfg.taskbar_progress !== false; $('#notch-on').checked = cfg.notch !== false;
@@ -1171,6 +1183,7 @@ function renderLyrics(){
   els.status.classList.add('hide');
   $('#lyr-src').textContent = `歌詞來源：${lyr.source}${lyr.synced ? '' : '（未同步）'}${lyr.override ? '・手動指定' : ''}`
     + (lyr.cover && !lyr.inst ? '・翻唱 / 改編版，顯示原曲歌詞' : '')
+    + (lyr.other_length ? '・這個版本長度不同，AI 正在對時間' : '')
     + (lyr.inst ? (lyr.scaled && Math.abs(lyr.scaled - 1) > .03 ? '・器樂版，原曲歌詞的時間是按長度推算的 (對不上可用 ← → 調整)' : '・伴奏版，顯示原曲歌詞') : '')
     + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() && !lyr.inst ? '・AI 對時中' : '');
   if (lyr.ai === 'live') $('#lyr-src').insertAdjacentHTML('afterbegin', '<span class="ai-dot"></span>');
@@ -1186,8 +1199,11 @@ function renderLyrics(){
   els.lyrics.appendChild(intro);
   lyr.lines.forEach((l, i) => {
     const d = document.createElement('div');
-    d.className = 'line' + (l.text ? '' : ' empty') + (l.tent ? ' tent' : '');
+    const nextT = (lyr.lines.slice(i + 1).find(x => x.t != null && x.text) || {}).t;
+    const gap = !l.text && nextT != null && l.t != null && nextT - l.t >= 5;  // 間奏：顯示「♪ 間奏」，不要空空的
+    d.className = 'line' + (l.text ? '' : ' empty') + (gap ? ' gap' : '') + (l.tent ? ' tent' : '');
     const txt = document.createElement('span'); txt.className = 'txt'; setLineText(txt, l);
+    if (gap) txt.innerHTML = '<i class="note">♪</i>間奏<b class="dots"><i></i><i></i><i></i></b>';
     d.appendChild(txt);
     if (l.rd){ const rd = document.createElement('span'); rd.className = 'rd'; rd.textContent = l.rd; d.appendChild(rd); }
     if (l.tr){ const tr = document.createElement('span'); tr.className = 'tr'; tr.textContent = l.tr; d.appendChild(tr); }
@@ -1240,6 +1256,7 @@ function frame(){
     lineEls.forEach((el, i) => {
       const dist = Math.abs(i - idx);
       el.classList.toggle('active', i === idx && !isGap);
+      el.classList.toggle('gap-now', i === idx && isGap);
       el.classList.toggle('past', i < idx);
       el.style.filter = dist === 0 ? '' : `blur(${Math.min(dist * .6, 3)}px)`;
       el.style.opacity = Math.max(.25, 1 - dist * .12);
@@ -2006,7 +2023,9 @@ $('#keys-close').onclick = () => $('#keys-dialog').classList.remove('open');
 $('#keys-dialog').onclick = e => { if (e.target.id === 'keys-dialog') $('#keys-dialog').classList.remove('open'); };
 $('#keys-open').onclick = e => { e.stopPropagation(); openKeys(); };
 $('#hotkeys-on').onchange = e => { hotkeysEdit = performance.now(); send({type: 'hotkeys', value: e.target.checked}); };
-$('#music-only').onchange = e => { musicOnlyEdit = performance.now(); send({type: 'music_only', value: e.target.checked}); };
+$('#music-only').onchange = e => { musicOnlyEdit = performance.now(); send({type: 'music_only', value: e.target.checked});
+  $('#browser-music-row').classList.toggle('disabled', !e.target.checked); };
+$('#browser-music').onchange = e => { musicOnlyEdit = performance.now(); send({type: 'browser_music', value: e.target.checked}); };
 </script>
 </body>
 </html>
