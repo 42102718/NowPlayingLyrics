@@ -121,17 +121,51 @@ def _load_custom(info, size):
     return _font_cache[key]
 
 
-def pick_font(text, size):
-    lang = "ko" if any("\uac00" <= c <= "\ud7af" for c in text) else \
-           "ja" if any("\u3040" <= c <= "\u30ff" for c in text) else "zh"
-    cf = CUSTOM_FONT
-    if cf:
-        has_cjk = any(ord(c) >= 0x2E80 for c in text)
-        if not has_cjk or cf.get(lang):  # \u81ea\u9078\u5b57\u9ad4\u7f3a\u4e2d\u65e5\u97d3\u5b57\u6642\uff0c\u9000\u56de\u9810\u8a2d\u5b57\u9ad4\uff0c\u4e0d\u6703\u8b8a\u65b9\u6846
-            try:
-                return _load_custom(cf, size)
-            except Exception:
-                pass
+_cmap_cache = {}
+
+
+def _cmap(info):
+    """自選字體裡有哪些字 (字元表)；讀不到就回傳 None (當作全部都有)。"""
+    key = (info["path"], info["index"])
+    if key not in _cmap_cache:
+        try:
+            from fontTools.ttLib import TTFont
+            f = TTFont(info["path"], fontNumber=info["index"], lazy=True)
+            _cmap_cache[key] = frozenset(f.getBestCmap() or {})
+            f.close()
+        except Exception:
+            _cmap_cache[key] = None
+    return _cmap_cache[key]
+
+
+class MixedFont:
+    """一行字裡有些字自選字體沒有 (例如日文字體缺繁體字)：那些字改用預設字體，其他照用自選字體，基線對齊。"""
+
+    def __init__(self, runs):
+        self.runs = runs  # [(文字, 字體), ...]
+        ms = [f.getmetrics() for _, f in runs]
+        self.asc = max(a for a, _ in ms)
+        self.desc = max(d for _, d in ms)
+
+    def getlength(self, _text=None):
+        return sum(f.getlength(t) for t, f in self.runs)
+
+    def getmetrics(self):
+        return self.asc, self.desc
+
+
+def draw_text(draw, xy, text, font, **kw):
+    """ImageDraw.text，但也能畫 MixedFont (分段畫、基線對齊)。"""
+    if not isinstance(font, MixedFont):
+        draw.text(xy, text, font=font, **kw)
+        return
+    x, y = xy
+    for t, f in font.runs:
+        draw.text((x, y + font.asc - f.getmetrics()[0]), t, font=f, **kw)
+        x += f.getlength(t)
+
+
+def _default_font(lang, size):
     key = (lang, size)
     if key not in _font_cache:
         for f in FONT_FILES[lang]:
@@ -142,6 +176,34 @@ def pick_font(text, size):
         else:
             _font_cache[key] = ImageFont.load_default(size)
     return _font_cache[key]
+
+
+def pick_font(text, size):
+    lang = "ko" if any("\uac00" <= c <= "\ud7af" for c in text) else \
+           "ja" if any("\u3040" <= c <= "\u30ff" for c in text) else "zh"
+    cf = CUSTOM_FONT
+    if cf:
+        try:
+            custom = _load_custom(cf, size)
+        except Exception:
+            custom = None
+        if custom is not None:
+            have = _cmap(cf)
+            if have is None or all(ord(c) in have or c == " " for c in text):
+                return custom
+            # 逐字檢查：自選字體沒有的字用預設字體補 (不會變方框)
+            fb = _default_font(lang, size)
+            runs = []
+            for c in text:
+                f = custom if (ord(c) in have or c == " ") else fb
+                if runs and runs[-1][1] is f:
+                    runs[-1][0] += c
+                else:
+                    runs.append([c, f])
+            if all(f is fb for _, f in runs):
+                return fb
+            return MixedFont([(t, f) for t, f in runs])
+    return _default_font(lang, size)
 
 
 def scale_alpha(img, f):
@@ -170,12 +232,12 @@ class TextLayer:
         self.karaoke = karaoke
 
         sh = Image.new("RGBA", (self.W, self.H), (0, 0, 0, 0))
-        ImageDraw.Draw(sh).text((m, m + max(1, size // 20)), text, font=font, fill=(0, 0, 0, 210),
-                                stroke_width=max(1, size // 12), stroke_fill=(0, 0, 0, 210))
+        draw_text(ImageDraw.Draw(sh), (m, m + max(1, size // 20)), text, font, fill=(0, 0, 0, 210),
+                  stroke_width=max(1, size // 12), stroke_fill=(0, 0, 0, 210))
         self.shadow = sh.filter(ImageFilter.GaussianBlur(max(2.0, size / 9)))
 
         base = Image.new("RGBA", (self.W, self.H), (0, 0, 0, 0))
-        ImageDraw.Draw(base).text((m, m), text, font=font, fill=(255, 255, 255, 255))
+        draw_text(ImageDraw.Draw(base), (m, m), text, font, fill=(255, 255, 255, 255))
         if karaoke:
             self.dim = scale_alpha(base, 0.5)
             hi = Image.new("RGBA", (self.W, self.H), bright + (255,))
@@ -484,7 +546,7 @@ class Overlay:
             d.rounded_rectangle((1, 1, self.W - 2, self.H - 2), radius=int(14 * self.scale),
                                 fill=(20, 20, 30, 140), outline=(255, 255, 255, 160), width=max(1, int(2 * self.scale)))
             hint = "拖曳移動位置　·　Ctrl+Alt+L 鎖定"
-            d.text((self.pad, int(8 * self.scale)), hint, font=pick_font(hint, int(13 * self.scale)),
+            draw_text(d, (self.pad, int(8 * self.scale)), hint, pick_font(hint, int(13 * self.scale)),
                    fill=(255, 255, 255, 200))
         if t is None:
             if self.unlocked:

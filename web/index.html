@@ -737,6 +737,47 @@ body.intro #right{animation-delay:.3s}
 .line{letter-spacing:.005em}
 #t-cur,#t-dur,#offset-val,.times,.d,output{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 #title{letter-spacing:-.015em}
+
+/* ═════ 歌詞跟著節拍呼吸 ═════ */
+body.beat .line.active .txt{text-shadow:0 0 calc(var(--beat,0) * 26px) color-mix(in srgb,var(--accent) 60%,transparent),
+  0 0 calc(var(--beat,0) * 8px) color-mix(in srgb,var(--accent) 45%,transparent)}
+/* ═════ 封面立體感：跟著滑鼠微微傾斜，表面一道反光 ═════ */
+#cover-wrap{perspective:900px}
+#cover{transition:transform .5s cubic-bezier(.2,.8,.2,1),opacity .5s}
+#cover-wrap.tilting #cover{transition:transform .12s ease-out;transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(1.02)}
+#cover-wrap .sheen{position:absolute;inset:0;border-radius:22px;pointer-events:none;opacity:0;transition:opacity .4s;z-index:2;
+  background:radial-gradient(circle at var(--gx,50%) var(--gy,50%),rgba(255,255,255,.28),rgba(255,255,255,0) 55%)}
+#cover-wrap.tilting .sheen{opacity:1}
+body[data-layout="vinyl"] #cover-wrap .sheen{border-radius:50%}
+/* ═════ 沒在播歌：時鐘、日期、最近播放 ═════ */
+#idle{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;gap:14px;z-index:3}
+body.idle #idle{display:flex;animation:introRise .7s cubic-bezier(.2,.8,.2,1) both}
+body.idle #status{display:none}
+#idle .clock{font:200 clamp(64px,9vw,132px)/1 var(--font);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--hi)}
+#idle .date{font:500 clamp(15px,1.4vw,19px) var(--font);color:var(--dim);margin-top:-4px}
+#idle h4{font:700 12px var(--font);letter-spacing:.1em;color:var(--dim);margin-top:22px}
+#idle .recent{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;max-width:760px}
+#idle .recent button{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;border:1px solid rgba(var(--ink),.08);text-align:left;cursor:pointer;
+  background:linear-gradient(180deg,rgba(var(--ink),.08),rgba(var(--ink),.03));color:var(--fg);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+#idle .recent button:hover{background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.05))}
+#idle .recent .art{width:44px;height:44px;border-radius:9px;flex:none;background:linear-gradient(135deg,var(--c1),var(--c2));background-size:cover;background-position:center}
+#idle .recent .t{display:block;font:700 14px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#idle .recent .a{display:block;font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#idle .recent span:last-child{min-width:0}
+/* ═════ 設定的即時預覽卡 ═════ */
+#pv-card{display:flex;gap:14px;align-items:center;padding:14px;margin:12px 0;border-radius:14px;overflow:hidden;position:relative;
+  background:var(--bg0);border:1px solid rgba(var(--ink),.1)}
+#pv-card::before{content:"";position:absolute;inset:-30%;background:radial-gradient(circle at 20% 30%,var(--c1),transparent 55%),radial-gradient(circle at 80% 70%,var(--c2),transparent 55%);
+  filter:blur(30px);opacity:.55}
+#pv-card > *{position:relative}
+#pv-card .pv-art{width:64px;height:64px;border-radius:12px;flex:none;background:linear-gradient(135deg,var(--c1),var(--c2));box-shadow:0 12px 24px -10px rgba(0,0,0,.6)}
+#pv-card .pv-meta{min-width:0;flex:1}
+#pv-card .pv-l{font:800 15px/1.35 var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-feature-settings:"palt" 1}
+#pv-card .pv-l.on{font-size:19px;background:linear-gradient(90deg,var(--hi) 55%,rgba(var(--ink),.45) 62%);-webkit-background-clip:text;background-clip:text;color:transparent}
+#pv-card .pv-btn{margin-top:8px;display:flex;gap:6px}
+#pv-card .pv-btn i{display:inline-block;height:6px;border-radius:3px;background:var(--accent)}
+#pv-card .pv-btn i + i{background:rgba(var(--ink),.2)}
+#pv-tag{position:absolute;right:10px;top:8px;font:600 11px var(--font);color:var(--dim)}
 </style>
 </head>
 <body>
@@ -784,6 +825,7 @@ body.intro #right{animation-delay:.3s}
   </section>
 
   <section id="right">
+    <div id="idle"><div class="clock"></div><div class="date"></div><h4 hidden>最近播放</h4><div class="recent"></div></div>
     <div id="lyrics"></div>
     <div id="status"><span id="status-text">正在連線…</span><small id="status-sub"></small>
       <div id="status-actions"><button class="chip primary" data-open="search">🔍 手動搜尋歌詞</button><button class="chip" data-open="paste">📋 貼上歌詞 / 匯入 LRC</button></div></div>
@@ -818,6 +860,11 @@ body.intro #right{animation-delay:.3s}
 
   <!-- ───── 外觀 ───── -->
   <div class="pane on" data-pane="look">
+  <section class="grp"><h3>預覽</h3>
+    <div id="pv-card"><span id="pv-tag">目前的樣子</span><div class="pv-art"></div>
+      <div class="pv-meta"><div class="pv-l">上一句的歌詞在這裡</div><div class="pv-l on">現在唱到的這一句</div><div class="pv-l">下一句的歌詞</div>
+        <div class="pv-btn"><i style="width:46%"></i><i style="width:30%"></i></div></div></div>
+  </section>
   <section class="grp"><h3>風格</h3>
     <div class="card"><div id="themes">
       <button data-theme="night"><span class="sw" style="background:linear-gradient(135deg,#2a1f5c,#0b0b12)"><b style="background:#fff"></b><i style="background:#fff"></i></span>夜光</button>
@@ -1046,8 +1093,11 @@ body.intro #right{animation-delay:.3s}
   <div class="pane" data-pane="general">
   <section class="grp"><h3>隱私</h3>
     <div class="card">
-      <label class="row" title="開著時只讀 Spotify、YouTube Music 桌面版和音樂播放器；瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi (開台時不會露出其他分頁的標題)">只偵測音樂 App <span class="switch"><input type="checkbox" id="music-only"><span></span></span></label>
-      <label class="row" id="browser-music-row" title="用瀏覽器開 YouTube Music、Spotify 網頁版、Apple Music 網頁版聽歌時也讀得到；一般影片、其他分頁照樣不讀">也偵測瀏覽器裡的音樂平台 <span class="switch"><input type="checkbox" id="browser-music"><span></span></span></label>
+      <div class="row col" title="Hummi 要讀哪些正在播放的東西">偵測範圍
+        <div class="seg" id="detect-scope"><button data-scope="apps">只有音樂 App</button><button data-scope="platforms">＋瀏覽器音樂平台</button><button data-scope="all">全部</button></div>
+      </div>
+      <p class="hint" id="scope-hint"></p>
+      <div hidden><input type="checkbox" id="music-only"><span id="browser-music-row"><input type="checkbox" id="browser-music"></span></div>
     </div>
   </section>
   <section class="grp"><h3>自動暫停</h3>
@@ -1159,7 +1209,7 @@ const fmt = s => { s = Math.max(0, s|0); return `${(s/60)|0}:${String(s%60).padS
 
 function connect(){
   ws = new WebSocket(`ws://${location.host}/ws`);
-  ws.onopen = () => { $('#conn').classList.remove('show'); send({type:'hello', w: innerWidth, h: innerHeight, dpr: devicePixelRatio, app: document.body.classList.contains('app')}); };
+  ws.onopen = () => { $('#conn').classList.remove('show'); send({type:'hello', w: innerWidth, h: innerHeight, dpr: devicePixelRatio, app: document.body.classList.contains('app'), viz: !settingsOnly}); };
   ws.onclose = () => { $('#conn').classList.add('show'); setTimeout(connect, 1000); };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
@@ -1168,7 +1218,9 @@ function connect(){
     if (m.type === 'devices'){ devState = m; renderDevices(); return; }
     if (m.type === 'update'){ onUpdate(m); return; }
     if (m.type === 'share_status'){ $('#share-msg').textContent = `已設定！放入了 ${m.added} 首，資料夾裡現在共有 ${m.total} 首歌詞。`; return; }
-    m.type === 'state' ? onState(m) : onLyrics(m);
+    if (m.type === 'viz'){ onViz(m); return; }
+    if (m.type === 'state') onState(m);
+    else if (m.type === 'lyrics') onLyrics(m);  // 其他訊息 (例如舞台設定 stage_opt) 不能當成歌詞，不然會把歌詞蓋成空白
   };
 }
 const send = o => ws?.readyState === 1 && ws.send(JSON.stringify(o));
@@ -1222,7 +1274,10 @@ function onState(m){
     if (performance.now() - offsetEditedAt > 1500 && cfg.offset !== offset) setOffset(cfg.offset, false);
     syncSettings();
   }
+  if (m.recent) recent = m.recent;
+  if (m.config) renderScope();
   const t = m.track;
+  setTimeout(renderIdle, 0);
   if (!t){
     if (track){ track = null; lyr = null; renderLyrics(); }
     setStatus('沒有正在播放的音樂', '在 Spotify 或 YouTube Music 播一首歌吧');
@@ -2142,6 +2197,87 @@ document.addEventListener('click', e => {
 // ───── 開場動畫 ─────
 document.body.classList.add('intro');
 setTimeout(() => document.body.classList.remove('intro'), 1600);
+
+
+// ───── 偵測範圍 (三選一) ─────
+const SCOPE_HINT = {apps: '只讀 Spotify、YouTube Music 桌面版這類音樂 App。瀏覽器、影片都不讀，開台最安心。',
+  platforms: '音樂 App，加上瀏覽器裡的 YouTube Music、Spotify 網頁版這類音樂平台；一般影片、其他分頁不讀。',
+  all: '全部都讀：任何分頁、影片、播放器。開台時可能露出其他分頁的標題。'};
+function renderScope(){
+  const v = cfg?.music_only === false ? 'all' : cfg?.browser_music ? 'platforms' : 'apps';
+  document.querySelectorAll('#detect-scope [data-scope]').forEach(b => b.classList.toggle('on', b.dataset.scope === v));
+  $('#scope-hint').textContent = SCOPE_HINT[v];
+}
+document.querySelectorAll('#detect-scope [data-scope]').forEach(b => b.onclick = () => {
+  musicOnlyEdit = performance.now();
+  const v = b.dataset.scope;
+  cfg.music_only = v !== 'all'; cfg.browser_music = v === 'platforms';
+  send({type: 'music_only', value: cfg.music_only}); send({type: 'browser_music', value: cfg.browser_music});
+  renderScope();
+});
+// ───── 歌詞跟著節拍呼吸 ─────
+let beatV = 0, beatAvg = -1;
+function onViz(m){
+  const e = m.energy || 0;
+  if (beatAvg < 0) beatAvg = e;  // 第一個數值當起點，不然一開始每下都被當成重拍
+  beatAvg = beatAvg * .93 + e * .07;
+  const hit = e > beatAvg * 1.3 + .03 ? 1 : 0;   // 比平均大很多 = 重拍
+  beatV = Math.max(beatV * .86, Math.min(1, e * 1.2) * .35 + hit * .6);
+  document.documentElement.style.setProperty('--beat', beatV.toFixed(3));
+}
+document.body.classList.add('beat');
+// ───── 封面立體感 ─────
+(() => {
+  const w = $('#cover-wrap'); if (!w) return;
+  const sh = document.createElement('div'); sh.className = 'sheen'; w.appendChild(sh);
+  w.addEventListener('pointermove', e => {
+    const r = w.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    w.classList.add('tilting');
+    w.style.setProperty('--ry', ((x - .5) * 14).toFixed(2) + 'deg'); w.style.setProperty('--rx', ((.5 - y) * 14).toFixed(2) + 'deg');
+    w.style.setProperty('--gx', (x * 100).toFixed(1) + '%'); w.style.setProperty('--gy', (y * 100).toFixed(1) + '%');
+  });
+  w.addEventListener('pointerleave', () => { w.classList.remove('tilting'); w.style.removeProperty('--rx'); w.style.removeProperty('--ry'); });
+})();
+// ───── 沒在播歌：時鐘、日期、最近播放 ─────
+let recent = [];
+function renderIdle(){
+  const on = !track;
+  document.body.classList.toggle('idle', on);
+  if (!on) return;
+  const d = new Date();
+  $('#idle .clock').textContent = d.toLocaleTimeString('zh-TW', {hour: '2-digit', minute: '2-digit', hour12: false});
+  $('#idle .date').textContent = d.toLocaleDateString('zh-TW', {month: 'long', day: 'numeric', weekday: 'long'});
+  const box = $('#idle .recent'), key = JSON.stringify(recent.map(r => r.track_id));
+  if (box.dataset.k === key) return;
+  box.dataset.k = key; box.innerHTML = '';
+  $('#idle h4').hidden = !recent.length;
+  for (const r of recent.slice(0, 6)){
+    const b = document.createElement('button');
+    b.innerHTML = '<span class="art"></span><span><span class="t"></span><span class="a"></span></span>';
+    b.querySelector('.t').textContent = r.title || ''; b.querySelector('.a').textContent = r.artist || '';
+    if (r.has_art) b.querySelector('.art').style.backgroundImage = `url("/art?id=${encodeURIComponent(r.track_id)}")`;
+    b.title = '在原本的平台搜尋這首歌';
+    b.onclick = () => send({type: 'search_song', title: r.title, artist: r.artist, source: r.source});
+    box.appendChild(b);
+  }
+}
+setInterval(renderIdle, 1000 * 15);
+// ───── 設定的即時預覽：滑鼠移到風格 / 字體上先看看 ─────
+let pvTheme = null, pvFontTimer = 0;
+document.querySelectorAll('#themes [data-theme]').forEach(b => {
+  b.addEventListener('mouseenter', () => { pvTheme = pvTheme ?? document.body.dataset.theme; document.body.dataset.theme = b.dataset.theme; applyAccent();
+    $('#pv-tag').textContent = '預覽：' + b.textContent.trim(); });
+  b.addEventListener('mouseleave', () => { if (pvTheme != null && !b.classList.contains('on')) document.body.dataset.theme = pvTheme; pvTheme = null; applyAccent();
+    $('#pv-tag').textContent = '目前的樣子'; });
+  b.addEventListener('click', () => { pvTheme = null; });
+});
+$('#font-list').addEventListener('mouseover', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const fam = b.querySelector('.pv')?.style.fontFamily; if (!fam) return;
+  clearTimeout(pvFontTimer);
+  $('#pv-card').style.setProperty('--font', fam); $('#pv-tag').textContent = '預覽字體';
+});
+$('#font-list').addEventListener('mouseleave', () => { pvFontTimer = setTimeout(() => { $('#pv-card').style.removeProperty('--font'); $('#pv-tag').textContent = '目前的樣子'; }, 150); });
 
 function applyLyrStyle(v){
   v = v || 'flow';

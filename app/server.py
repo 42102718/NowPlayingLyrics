@@ -1673,6 +1673,13 @@ async def poll_loop():
                 track["accent"] = media.accent.get(cur["track_id"])
                 track["ts"] = time.time()
                 state["track"] = track
+                # 最近播過的歌 (沒在播歌時，主視窗顯示成卡片)
+                rec = runtime.setdefault("recent", [])
+                key = (track.get("title"), track.get("artist"))
+                rec[:] = [r for r in rec if (r["title"], r["artist"]) != key]
+                rec.insert(0, {"title": track.get("title"), "artist": track.get("artist"), "source": track.get("source"),
+                               "track_id": track.get("track_id"), "has_art": bool(track.get("has_art"))})
+                del rec[8:]
                 if cur["track_id"] != last_id:
                     last_id = cur["track_id"]
                     print("[track]", cur["source"], cur["title"], "-", cur["artist"], "playing" if cur["playing"] else "paused", flush=True)
@@ -1685,6 +1692,7 @@ async def poll_loop():
                 state["track"] = None
                 last_id = None
             await broadcast({"type": "state", "track": state["track"], "sessions": state["sessions"],
+                             "recent": runtime.get("recent", []),
                              "pinned": media.pinned, "config": public_config(), "unlocked": runtime["unlocked"],
                              "chat": CHAT.status if CHAT else "off",
                              "autostart": get_autostart(), "can_autostart": FROZEN, "version": VERSION,
@@ -1723,7 +1731,7 @@ async def ws_handler(request):
                 print("[page]", d, flush=True)
                 if d.get("app"):  # 打開主視窗時：超過 10 分鐘沒檢查就再看一次有沒有新版
                     asyncio.create_task(check_update(min_gap=600))
-                if d.get("stage"):  # 舞台頁面 (Hummi 舞台視窗 / OBS)：要即時音量
+                if d.get("stage") or d.get("viz"):  # 舞台頁面、主視窗 (歌詞跟著節拍呼吸)：要即時音量
                     stage_clients.add(ws)
             elif d.get("type") == "pin":
                 media.pinned = d.get("app") or None
@@ -1903,6 +1911,18 @@ async def ws_handler(request):
                 await asyncio.get_running_loop().run_in_executor(None, open_stage)
             elif d.get("type") == "settings_window":
                 await asyncio.get_running_loop().run_in_executor(None, open_settings)
+            elif d.get("type") == "search_song":
+                # 「最近播放」卡片：在原本的平台搜尋這首歌 (網址由這裡組，頁面只給歌名、歌手)
+                from urllib.parse import quote
+                q = quote(f'{str(d.get("title") or "")[:120]} {str(d.get("artist") or "")[:80]}'.strip())
+                if q:
+                    if d.get("source") == "Spotify":
+                        try:
+                            os.startfile(f"spotify:search:{q}")
+                        except Exception:
+                            webbrowser.open(f"https://open.spotify.com/search/{q}")
+                    else:
+                        webbrowser.open(f"https://music.youtube.com/search?q={q}")
             elif d.get("type") == "open_url":
                 u = str(d.get("url") or "")
                 if u.startswith("https://github.com/"):  # 只開 GitHub (下載頁、HaloBattery)
