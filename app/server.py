@@ -60,6 +60,8 @@ DEFAULT_CONFIG = {
     "ui_zoom": 100,    # 介面大小 % (字、按鈕一起放大，給看不清楚的人)
     "theme": "night",  # 主視窗風格：night 夜光 / dawn 晨霧 / mono 極簡 / neon 霓虹 / paper 紙本 / oasis 綠洲 / crimson 緋紅 /
     #                    cassette 卡帶 / vapor 蒸氣波 / ocean 深海 / sakura 櫻花 / matcha 抹茶
+    "ui_look": "glass",   # 介面質感：glass 玻璃 / flat 簡潔
+    "layout": "classic",  # 主視窗版面：classic 經典 / mirror 鏡像 / center 置中 / immersive 沉浸 / vinyl 唱片
     "lyr_style": "flow",  # 主視窗歌詞呈現：flow 流動 / clear 清晰 / center 置中 / spot 聚光 / karaoke 卡拉OK / type 打字機 / pop 彈跳
     "auto_pause": {"lock": True, "unplug": True, "resume": True},  # 鎖定 / 拔耳機時暫停，回來接著播
     "taskbar_progress": True,  # 工作列圖示上顯示播放進度
@@ -134,6 +136,8 @@ def load_config():
         cfg["game"] = {"enabled": bool(gm.get("enabled", True)),
                        "notch": gm.get("notch") if gm.get("notch") in ("show", "alerts", "hide") else "alerts"}
         cfg["net_alert"] = bool(saved.get("net_alert", True))
+        cfg["ui_look"] = saved.get("ui_look") if saved.get("ui_look") in ('glass', 'flat') else "glass"
+        cfg["layout"] = saved.get("layout") if saved.get("layout") in ('classic', 'mirror', 'center', 'immersive', 'vinyl') else "classic"
         cfg["lyr_style"] = saved.get("lyr_style") if saved.get("lyr_style") in ('flow', 'clear', 'center', 'spot', 'karaoke', 'type', 'pop') else "flow"
         if isinstance(saved.get("stage_live"), dict):
             cfg["stage_live"] = saved["stage_live"]
@@ -1801,6 +1805,12 @@ async def ws_handler(request):
                 save_config()
             elif d.get("type") == "lyr_style" and d.get("value") in ('flow', 'clear', 'center', 'spot', 'karaoke', 'type', 'pop'):
                 config["lyr_style"] = d["value"]
+                config_changed()
+            elif d.get("type") == "ui_look" and d.get("value") in ('glass', 'flat'):
+                config["ui_look"] = d["value"]
+                config_changed()
+            elif d.get("type") == "layout" and d.get("value") in ('classic', 'mirror', 'center', 'immersive', 'vinyl'):
+                config["layout"] = d["value"]
                 config_changed()
             elif d.get("type") == "net_alert":
                 config["net_alert"] = bool(d.get("value"))

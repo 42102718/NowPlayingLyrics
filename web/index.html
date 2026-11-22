@@ -593,6 +593,102 @@ body[data-ls="pop"] .line.active .txt{filter:drop-shadow(0 0 14px color-mix(in s
 #themes .sw{width:100%;height:34px;border-radius:8px;position:relative;overflow:hidden}
 #themes .sw i{position:absolute;left:8px;right:22px;height:4px;border-radius:2px;bottom:9px}
 #themes .sw b{position:absolute;left:8px;width:40%;height:4px;border-radius:2px;bottom:17px;opacity:.5}
+
+/* ═════ 玻璃質感 (body.glass)：選中時一片玻璃滑過去、按下去會彈、游標光暈 ═════ */
+.gthumb{display:none}
+body.glass .gthumb{display:block;position:absolute;left:0;top:0;z-index:0;border-radius:10px;pointer-events:none;opacity:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.07)),color-mix(in srgb,var(--accent) 24%,transparent);
+  border:1px solid rgba(255,255,255,.36);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65),inset 0 -10px 18px rgba(255,255,255,.05),0 8px 22px -6px rgba(0,0,0,.35);
+  backdrop-filter:blur(16px) saturate(1.8);
+  transition:transform .55s cubic-bezier(.3,1.35,.45,1),width .55s cubic-bezier(.3,1.35,.45,1),height .45s,opacity .25s}
+body.glass .seg,body.glass #set-tabs,body.glass #lyr-styles{position:relative}
+body.glass .seg{padding:3px;border-radius:13px;background:rgba(var(--ink),.06);border:1px solid rgba(var(--ink),.08);gap:3px}
+body.glass .seg > button{background:transparent;border-color:transparent;position:relative;z-index:1}
+body.glass .seg > button:hover{background:rgba(var(--ink),.06)}
+body.glass .seg > button.on{background:transparent!important;border-color:transparent!important;color:var(--hi)!important;box-shadow:none!important;font-weight:700}
+body.glass #set-tabs > button{position:relative;z-index:1}
+body.glass #set-tabs > button.on{background:transparent}
+body.glass #set-tabs button.on::before{display:none}
+body.glass #lyr-styles > button{position:relative;z-index:1;background:rgba(var(--ink),.03)}
+body.glass #lyr-styles > button.on{background:transparent;border-color:transparent;box-shadow:none}
+body.glass #lyr-styles .gthumb{border-radius:12px}
+/* 按下去縮一下再彈回 */
+body.glass button{transition:transform .22s cubic-bezier(.3,1.5,.5,1),background .2s,color .2s,box-shadow .2s}
+body.glass button:active:not(:disabled){transform:scale(.95)}
+/* 卡片、晶片、開關 */
+body.glass .card{background:linear-gradient(180deg,rgba(var(--ink),.075),rgba(var(--ink),.025));border-color:rgba(var(--ink),.1);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 12px 30px -20px rgba(0,0,0,.55);backdrop-filter:blur(18px)}
+body.glass .chip{background:linear-gradient(180deg,rgba(var(--ink),.15),rgba(var(--ink),.05));box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+body.glass .switch span{background:rgba(var(--ink),.16);box-shadow:inset 0 1px 3px rgba(0,0,0,.28)}
+body.glass .switch input:checked+span{background:linear-gradient(180deg,color-mix(in srgb,var(--accent2) 80%,#fff),var(--accent2));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 0 14px color-mix(in srgb,var(--accent2) 55%,transparent)}
+body.glass .switch span::after{background:linear-gradient(180deg,#fff,#e8e8ef);box-shadow:0 2px 6px rgba(0,0,0,.32),inset 0 -1px 1px rgba(0,0,0,.06);
+  transition:transform .35s cubic-bezier(.3,1.45,.5,1)}
+body.glass #transport #btn-play{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -6px 12px rgba(0,0,0,.08),0 12px 30px -8px rgba(0,0,0,.45)}
+/* 游標光暈：滑鼠在按鈕上時，玻璃上有一圈光跟著走 */
+body.glass :is(.ibtn,.chip,#lyr-styles button,#themes button,.seg button,#set-tabs button){overflow:hidden}
+body.glass :is(.ibtn,.chip,#lyr-styles button,#themes button,.seg button,#set-tabs button)::after{content:"";position:absolute;inset:0;border-radius:inherit;
+  pointer-events:none;opacity:0;transition:opacity .25s;
+  background:radial-gradient(90px circle at var(--mx,-200px) var(--my,-200px),rgba(255,255,255,.18),transparent 65%)}
+body.glass :is(.ibtn,.chip,#lyr-styles button,#themes button,.seg button,#set-tabs button):hover::after{opacity:1}
+body.glass .ibtn,body.glass #themes button{position:relative}
+body.glass .ibtn:hover{background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.03));box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
+
+/* ═════ 版面 (body[data-layout]) ═════ */
+/* 鏡像：歌詞在左、封面在右 (視窗太窄時跟經典一樣上下排) */
+@media (min-width:861px){
+  body[data-layout="mirror"] #app{grid-template-columns:1fr minmax(300px,38%)}
+  body[data-layout="mirror"] #left{order:2}
+  body[data-layout="mirror"] #right{order:1}
+}
+/* 置中：封面在上、歌詞在下 */
+body[data-layout="center"] #app{grid-template-columns:1fr;grid-template-rows:auto 1fr;gap:clamp(10px,2vh,22px);padding-top:clamp(18px,3vh,36px)}
+body[data-layout="center"] #left{align-items:center;text-align:center;gap:clamp(8px,1.4vh,14px)}
+body[data-layout="center"] #cover-wrap{align-self:center;width:clamp(80px,22vh,230px)}
+body[data-layout="center"] #title{margin-top:8px;-webkit-line-clamp:1}
+body[data-layout="center"] #progress{width:min(520px,100%)}
+body[data-layout="center"] #controls{justify-content:center}
+body[data-layout="center"] #lyr-src{margin-left:0}
+body[data-layout="center"] .line{text-align:center;transform-origin:center center}
+body[data-layout="center"] .interlude{justify-content:center}
+/* 沉浸：歌詞佔滿，封面和控制縮成左下角的玻璃小卡 */
+body[data-layout="immersive"] #app{grid-template-columns:1fr;padding-bottom:clamp(170px,26vh,230px)}
+body[data-layout="immersive"] #left{position:fixed;left:clamp(14px,2.4vw,32px);bottom:clamp(14px,2.4vh,28px);z-index:5;width:min(440px,calc(100vw - 28px));
+  flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:14px 16px;border-radius:22px;
+  background:linear-gradient(180deg,rgba(var(--ink),.12),rgba(var(--ink),.05));border:1px solid rgba(var(--ink),.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 20px 50px -20px rgba(0,0,0,.6);backdrop-filter:blur(28px) saturate(1.5)}
+body[data-layout="immersive"] #cover-wrap{width:58px}
+body[data-layout="immersive"] #cover{border-radius:12px}
+body[data-layout="immersive"] #cover-glow{display:none}
+body[data-layout="immersive"] .meta{flex:1}
+body[data-layout="immersive"] #source{display:none}
+body[data-layout="immersive"] #title{font-size:17px;margin-top:0;-webkit-line-clamp:1}
+body[data-layout="immersive"] #artist{font-size:13px;margin-top:2px}
+body[data-layout="immersive"] #progress,body[data-layout="immersive"] #controls{width:100%}
+body[data-layout="immersive"] #transport{position:absolute;right:16px;top:14px;gap:6px;margin:0}
+body[data-layout="immersive"] #transport button{transform:scale(.72)}
+body[data-layout="immersive"] #controls{justify-content:space-between}
+body[data-layout="immersive"] .ibtn{min-width:0;padding:6px 4px}
+body[data-layout="immersive"] #lyr-src{display:none}
+body[data-layout="immersive"] .line{font-size:clamp(28px,3.8vw,58px)}
+/* 唱片：封面變成黑膠，播放時轉 */
+body[data-layout="vinyl"] #cover{border-radius:50%;box-shadow:0 0 0 clamp(8px,1.6vw,18px) #111,0 0 0 calc(clamp(8px,1.6vw,18px) + 1px) rgba(255,255,255,.1),
+  0 30px 60px -10px rgba(0,0,0,.7);background:#111}
+body[data-layout="vinyl"] #cover-wrap{border-radius:50%}
+body[data-layout="vinyl"] #cover-wrap::before{content:"";position:absolute;inset:0;border-radius:50%;z-index:1;pointer-events:none;
+  background:repeating-radial-gradient(circle at 50% 50%,rgba(0,0,0,0) 0 3px,rgba(0,0,0,.12) 3px 4px),
+  conic-gradient(from 30deg,rgba(255,255,255,.12),transparent 25%,rgba(255,255,255,.08) 50%,transparent 75%,rgba(255,255,255,.12))}
+body[data-layout="vinyl"] #cover-wrap::after{content:"";position:absolute;left:50%;top:50%;width:11%;aspect-ratio:1;translate:-50% -50%;border-radius:50%;z-index:2;
+  background:var(--bg0);box-shadow:0 0 0 4px rgba(255,255,255,.12),inset 0 2px 4px rgba(0,0,0,.6)}
+body[data-layout="vinyl"] #cover-wrap:not(.paused) #cover{animation:vinyl 14s linear infinite}
+body[data-layout="vinyl"] #cover-wrap.paused #cover{transform:none;opacity:.85}
+body[data-layout="vinyl"] #cover-glow{border-radius:50%}
+@keyframes vinyl{to{transform:rotate(360deg)}}
+@media (max-width:860px){
+  body[data-layout="center"] #left{flex-direction:column}
+  body[data-layout="center"] #cover-wrap{width:84px}
+}
 </style>
 </head>
 <body>
@@ -689,6 +785,19 @@ body[data-ls="pop"] .line.active .txt{filter:drop-shadow(0 0 14px color-mix(in s
       <button data-theme="sakura"><span class="sw" style="background:linear-gradient(135deg,#fde7ee,#fbf1f4)"><b style="background:#5a2a3f"></b><i style="background:#e05a8a"></i></span>櫻花</button>
       <button data-theme="matcha"><span class="sw" style="background:linear-gradient(135deg,#e3ebd3,#f3f5ea)"><b style="background:#2f3d24"></b><i style="background:#5a8f3c"></i></span>抹茶</button>
     </div></div>
+  </section>
+  <section class="grp"><h3>介面質感與版面</h3>
+    <div class="card">
+      <div class="row col">質感
+        <div class="seg two" id="ui-looks"><button data-look="glass">✨ 玻璃</button><button data-look="flat">簡潔</button></div>
+      </div>
+      <div class="row col">版面
+        <div class="seg five" id="layouts"><button data-layout="classic" title="封面在左、歌詞在右">經典</button><button data-layout="mirror" title="歌詞在左、封面在右">鏡像</button>
+          <button data-layout="center" title="封面在上、歌詞在下，全部置中">置中</button><button data-layout="immersive" title="歌詞佔滿畫面，封面和控制縮成左下角的小卡">沉浸</button>
+          <button data-layout="vinyl" title="封面變成黑膠唱片，播放時會轉">唱片</button></div>
+      </div>
+      <p class="hint">玻璃：選中時一片玻璃滑過去、按下去會彈一下。沉浸：歌詞佔滿畫面；唱片：封面變成會轉的黑膠。</p>
+    </div>
   </section>
   <section class="grp"><h3>歌詞呈現</h3>
     <div class="card">
@@ -889,7 +998,6 @@ body[data-ls="pop"] .line.active .txt{filter:drop-shadow(0 0 14px color-mix(in s
     <div class="card">
       <label class="row" title="開著時只讀 Spotify、YouTube Music 桌面版和音樂播放器；瀏覽器、抖音、影片播放器在播什麼都不會出現在 Hummi (開台時不會露出其他分頁的標題)">只偵測音樂 App <span class="switch"><input type="checkbox" id="music-only"><span></span></span></label>
       <label class="row" id="browser-music-row" title="用瀏覽器開 YouTube Music、Spotify 網頁版、Apple Music 網頁版聽歌時也讀得到；一般影片、其他分頁照樣不讀">也偵測瀏覽器裡的音樂平台 <span class="switch"><input type="checkbox" id="browser-music"><span></span></span></label>
-      <p class="hint">開台時不會露出瀏覽器、影片的標題。用瀏覽器聽 YouTube Music、Spotify 網頁版的話，打開下面的「也偵測瀏覽器裡的音樂平台」就好 (一般影片還是不會讀)。</p>
     </div>
   </section>
   <section class="grp"><h3>自動暫停</h3>
@@ -1045,6 +1153,8 @@ function onState(m){
     renderShare();
     applyTheme(cfg.theme);
     if (performance.now() - lsEdit > 1500) applyLyrStyle(cfg.lyr_style);
+    if (performance.now() - lookEdit > 1500) applyLook(cfg.ui_look);
+    if (performance.now() - layoutEdit > 1500) applyLayout(cfg.layout);
     { const z = cfg.ui_zoom || 100, near = [90, 100, 115, 130, 150].reduce((a, b) => Math.abs(b - z) < Math.abs(a - z) ? b : a);
       document.querySelectorAll('#zooms [data-z]').forEach(b => b.classList.toggle('on', +b.dataset.z === near)); }
     renderChat(m);
@@ -1806,6 +1916,7 @@ $('#btn-find').onclick = () => openFind();
 setInterval(() => { const g = playing ? '\uF8AE' : '\uF5B0'; if ($('#btn-play').textContent !== g) $('#btn-play').textContent = g; }, 300);
 // 設定分頁 (記住上次看的)
 function setTab(name){
+  requestAnimationFrame(placeAllThumbs);
   document.querySelectorAll('#set-tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
   document.querySelectorAll('#settings .pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
   try { localStorage.setItem('setTab', name); } catch {}
@@ -1880,6 +1991,52 @@ $('#find-form').onsubmit = async e => {
 };
 // ───── 風格 ─────
 let themeEdit = 0;
+
+// ───── 玻璃質感：選中的那一個後面有一片玻璃，換選項時滑過去 ─────
+function initGlassThumbs(){
+  document.querySelectorAll('.seg, #set-tabs, #lyr-styles').forEach(box => {
+    if (box._place) return;
+    const th = document.createElement('span'); th.className = 'gthumb'; box.prepend(th);
+    const place = () => {
+      const on = [...box.children].find(c => c.tagName === 'BUTTON' && c.classList.contains('on'));
+      if (!on || !on.offsetWidth || !document.body.classList.contains('glass')){ th.style.opacity = 0; return; }
+      th.style.opacity = 1;
+      th.style.width = on.offsetWidth + 'px'; th.style.height = on.offsetHeight + 'px';
+      th.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+    };
+    box._place = place;
+    new MutationObserver(place).observe(box, {subtree: true, attributes: true, attributeFilter: ['class']});
+    new ResizeObserver(place).observe(box);
+    place();
+  });
+}
+const placeAllThumbs = () => document.querySelectorAll('.seg, #set-tabs, #lyr-styles').forEach(b => b._place && b._place());
+// 游標光暈：記住滑鼠在按鈕上的位置
+document.addEventListener('pointermove', e => {
+  const el = e.target.closest?.('.ibtn, .chip, #lyr-styles button, #themes button, .seg button, #set-tabs button');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty('--mx', (e.clientX - r.left) + 'px'); el.style.setProperty('--my', (e.clientY - r.top) + 'px');
+}, {passive: true});
+let lookEdit = 0, layoutEdit = 0;
+function applyLook(v){
+  v = v === 'flat' ? 'flat' : 'glass';
+  document.body.classList.toggle('glass', v === 'glass');
+  document.querySelectorAll('#ui-looks [data-look]').forEach(b => b.classList.toggle('on', b.dataset.look === v));
+  try { localStorage.setItem('look', v); } catch {}
+  placeAllThumbs();
+}
+function applyLayout(v){
+  v = ['classic', 'mirror', 'center', 'immersive', 'vinyl'].includes(v) ? v : 'classic';
+  if (document.body.dataset.layout !== v){ document.body.dataset.layout = v; activeIdx = -2; }
+  document.querySelectorAll('#layouts [data-layout]').forEach(b => b.classList.toggle('on', b.dataset.layout === v));
+  try { localStorage.setItem('layout', v); } catch {}
+}
+try { applyLook(localStorage.getItem('look') || 'glass'); applyLayout(localStorage.getItem('layout') || 'classic'); } catch { applyLook('glass'); }
+document.querySelectorAll('#ui-looks [data-look]').forEach(b => b.onclick = () => { lookEdit = performance.now(); applyLook(b.dataset.look); send({type: 'ui_look', value: b.dataset.look}); });
+document.querySelectorAll('#layouts [data-layout]').forEach(b => b.onclick = () => { layoutEdit = performance.now(); applyLayout(b.dataset.layout); send({type: 'layout', value: b.dataset.layout}); });
+initGlassThumbs();
+
 function applyLyrStyle(v){
   v = v || 'flow';
   if (document.body.dataset.ls !== v){ document.body.dataset.ls = v; activeIdx = -2; try { localStorage.setItem('ls', v); } catch {} }
