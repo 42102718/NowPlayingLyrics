@@ -143,6 +143,15 @@ def icon_font(size):
     return _fc[key]
 
 
+def paste_clipped(dst, src, x, y):
+    """alpha_composite，但 src 超出 dst 邊界也沒關係 (自動裁掉)。"""
+    sx, sy = max(0, -x), max(0, -y)
+    x, y = max(0, x), max(0, y)
+    w, h = min(src.width - sx, dst.width - x), min(src.height - sy, dst.height - y)
+    if w > 0 and h > 0:
+        dst.alpha_composite(src.crop((sx, sy, sx + w, sy + h)), (x, y))
+
+
 def fit(text, size, max_w, weight=600, min_size=None):
     """回傳 (font, 文字)：放不下先縮字，再不行就截斷加「…」。"""
     font = ui_font(text, size, weight)
@@ -651,21 +660,33 @@ class Notch:
 
     def ring(self, dr, cx, cy, r, level, color, width, kind=None, gsize=None, charging=False, now=0.0):
         """電量圓環 (中間放裝置圖示)。充電中：綠環慢慢呼吸 + 內側光暈；快沒電：紅色閃動。"""
-        box = (cx - r, cy - r, cx + r, cy + r)
-        dr.ellipse(box, outline=(255, 255, 255, 46), width=width)
+        K = 4  # 先畫在 4 倍大的圖上再縮小，圓弧才會平滑 (直接畫會一格一格的)
+        width = max(2, width * 0.8)
+        pad = int(width * 4) + 2
+        size = int(2 * r + 2 * pad)
+        big = Image.new("RGBA", (size * K, size * K), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(big)
+        c, R, w = size * K / 2, r * K, max(2, int(width * K))
+        box = (c - R, c - R, c + R, c + R)
+        bd.ellipse(box, outline=(255, 255, 255, 34), width=w)  # 底圈淡淡的
         end = -90 + 360 * clamp(level / 100, 0.03, 1)
         a = 255
         if charging:
             b = 0.5 + 0.5 * math.sin(now * 2 * math.pi / 2.4)
-            a = int(255 * (0.55 + 0.45 * b))
-            for i, ga in enumerate((80, 38, 16)):
-                o = width * (i + 1) * 0.9
-                dr.arc((box[0] + o, box[1] + o, box[2] - o, box[3] - o), -90, end, fill=color + (int(ga * b),),
-                       width=max(1, width // 2))
+            a = int(255 * (0.6 + 0.4 * b))
+            for i, ga in enumerate((70, 32, 14)):
+                o = w * (i + 1) * 0.95
+                bd.arc((box[0] + o, box[1] + o, box[2] - o, box[3] - o), -90, end, fill=color + (int(ga * b),), width=max(2, w // 2))
         elif level <= 15:
             a = int(255 * (0.45 + 0.55 * (0.5 + 0.5 * math.cos(now * 2 * math.pi / 1.1))))
         if level > 0:
-            dr.arc(box, start=-90, end=end, fill=color + (a,), width=width)
+            bd.arc(box, start=-90, end=end, fill=color + (a,), width=w)
+            rc = R - w / 2  # 兩端圓頭
+            for ang in (-90, end):
+                x, y = c + rc * math.cos(math.radians(ang)), c + rc * math.sin(math.radians(ang))
+                bd.ellipse((x - w / 2, y - w / 2, x + w / 2, y + w / 2), fill=color + (a,))
+        small = big.resize((size, size), Image.LANCZOS)
+        paste_clipped(dr._image, small, int(round(cx - size / 2)), int(round(cy - size / 2)))
         if kind:
             self.glyph(dr, kind if kind in GLYPH else "device", cx, cy, gsize or (r / self.s) * 0.95)
 
@@ -1315,6 +1336,8 @@ class Notch:
             if self.config.get("theme") == "neon" and (self.config.get("notch_style") or {}).get("color") == "theme":
                 bd.rounded_rectangle(box, radius=r, outline=border[:3] + (int(38 * (1 - thin)),), width=self.d(3))  # 霓虹的光暈
             bd.rounded_rectangle(box, radius=r, outline=border[:3] + (int(border[3] * (1 - thin)),), width=max(2, self.d(1.4)))
+        if thin < 0.99:
+            self.glass_sheen(pill, r, shape == "float", 1 - thin)
         mask = self.pill_mask(W2, H2, r, round_top=shape == "float")
         pill.putalpha(mask)
         pill = pill.resize((w, h), Image.LANCZOS)
@@ -1336,15 +1359,23 @@ class Notch:
             size = bs * clamp(0.35 + 0.65 * kk, 0, 1.08)
             cx = x0 + w - bs / 2 + (bs / 2 + gap + bs / 2) * kk
             cy = top + min(h, self.px(PILL_H)) / 2
-            goo = Image.new("L", img.size, 0)
+            G = 3  # 泡泡在 3 倍解析度畫，縮小後邊緣才圓滑
+            goo = Image.new("L", (img.width * G, img.height * G), 0)
             gd = ImageDraw.Draw(goo)
-            gd.rounded_rectangle((x0 + w - bs * 1.2, top, x0 + w - 1, top + self.px(PILL_H) - 1), radius=bs / 2, fill=255)
-            gd.ellipse((cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2), fill=255)
+            gd.rounded_rectangle(((x0 + w - bs * 1.2) * G, top * G, (x0 + w - 1) * G, (top + self.px(PILL_H) - 1) * G), radius=bs / 2 * G, fill=255)
+            gd.ellipse(((cx - size / 2) * G, (cy - size / 2) * G, (cx + size / 2) * G, (cy + size / 2) * G), fill=255)
             if kk < 0.98:
-                goo = goo.filter(ImageFilter.GaussianBlur(self.px(3.2))).point(lambda v: 0 if v < 96 else 255 if v > 150 else (v - 96) * 255 // 54)
+                goo = goo.filter(ImageFilter.GaussianBlur(self.px(3.2) * G)).point(lambda v: 0 if v < 96 else 255 if v > 150 else (v - 96) * 255 // 54)
+            goo = goo.resize(img.size, Image.LANCZOS)
             black = Image.new("RGBA", img.size, fill + (255,))
             black.putalpha(goo)
             img.alpha_composite(black)
+            if kk > 0.9:  # 分開之後，泡泡外圈一道細細的玻璃高光
+                hl = Image.new("RGBA", (int(size * G) + 4, int(size * G) + 4), (0, 0, 0, 0))
+                ImageDraw.Draw(hl).ellipse((1, 1, hl.width - 2, hl.height - 2), outline=(255, 255, 255, int(34 * clamp((kk - 0.9) * 10, 0, 1))),
+                                           width=max(2, int(self.px(1) * G * 0.8)))
+                hl = hl.resize((max(1, hl.width // G), max(1, hl.height // G)), Image.LANCZOS)
+                paste_clipped(img, hl, int(round(cx - hl.width / 2)), int(round(cy - hl.height / 2)))
             self.draw_bubble(img, cx, cy, size, clamp((kk - 0.35) / 0.5, 0, 1), now)
             if kk > 0.6:
                 self.bub_rect = (cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2)
@@ -1356,6 +1387,34 @@ class Notch:
         self.pill_top = top
         self.pill_w = w
         return img
+
+    _sheen_cache = {}
+
+    def glass_sheen(self, pill, r, round_top, k):
+        """黑玻璃的質感：上方微亮往下漸暗、邊緣一圈極細的高光 (只疊在本體上，不影響文字)。"""
+        W2, H2 = pill.size
+        key = (W2, H2, r, round_top)
+        layer = self._sheen_cache.get(key)
+        if layer is None:
+            layer = Image.new("RGBA", (W2, H2), (0, 0, 0, 0))
+            grad = Image.linear_gradient("L").resize((1, 256)).point(lambda v: int((255 - v) * 0.075))  # 上方 7%
+            g = grad.resize((W2, H2))
+            white = Image.new("RGBA", (W2, H2), (255, 255, 255, 0))
+            white.putalpha(g)
+            layer.alpha_composite(white)
+            edge = Image.new("RGBA", (W2, H2), (0, 0, 0, 0))
+            ImageDraw.Draw(edge).rounded_rectangle((0, 0 if round_top else -r, W2 - 1, H2 - 1), radius=r,
+                                                   outline=(255, 255, 255, 30), width=max(2, self.d(1)))
+            layer.alpha_composite(edge)
+            if len(self._sheen_cache) > 40:
+                self._sheen_cache.clear()
+            self._sheen_cache[key] = layer
+        if k >= 0.99:
+            pill.alpha_composite(layer)
+        else:
+            l2 = layer.copy()
+            l2.putalpha(l2.getchannel("A").point(lambda v: int(v * k)))
+            pill.alpha_composite(l2)
 
     def draw_bar(self, pill, t, pos, alpha):
         """極簡細條：一條播放進度，顏色是專輯的顏色。"""

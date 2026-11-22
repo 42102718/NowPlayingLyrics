@@ -689,6 +689,32 @@ body[data-layout="vinyl"] #cover-glow{border-radius:50%}
   body[data-layout="center"] #left{flex-direction:column}
   body[data-layout="center"] #cover-wrap{width:84px}
 }
+
+/* ═════ 玻璃：主視窗的其他元件 ═════ */
+body.glass .dialog{background:linear-gradient(180deg,rgba(var(--panel),.82),rgba(var(--panel),.7));backdrop-filter:blur(34px) saturate(1.6);
+  border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 40px 90px -20px rgba(0,0,0,.7)}
+body.glass .modal{background:rgba(0,0,0,.35);backdrop-filter:blur(6px)}
+body.glass .dialog header .tab.on{background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.06));box-shadow:inset 0 1px 0 rgba(255,255,255,.4);color:var(--hi)}
+body.glass #lyr-results button{background:linear-gradient(180deg,rgba(var(--ink),.06),rgba(var(--ink),.025));box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+body.glass #lyr-results button:hover{background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.05));border-color:rgba(255,255,255,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+body.glass #menu,body.glass #lyr-menu{background:linear-gradient(180deg,rgba(var(--panel),.78),rgba(var(--panel),.62));backdrop-filter:blur(30px) saturate(1.6);
+  border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 24px 60px -16px rgba(0,0,0,.6)}
+body.glass #lyr-menu button:hover,body.glass #menu button:hover{background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.04));box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
+body.glass #source{background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.05));border-color:rgba(255,255,255,.18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 6px 16px -8px rgba(0,0,0,.5)}
+body.glass #transport .side{background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.02));box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}
+body.glass #transport .side:hover{background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,.06))}
+body.glass #bar{background:rgba(var(--ink),.12);box-shadow:inset 0 1px 2px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.06)}
+body.glass #fill{box-shadow:0 0 14px rgba(var(--ink),.55),inset 0 1px 0 rgba(255,255,255,.5)}
+body.glass #upd-bar{background:linear-gradient(180deg,rgba(var(--panel),.82),rgba(var(--panel),.68));backdrop-filter:blur(26px) saturate(1.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 16px 40px -14px rgba(0,0,0,.6)}
+body.glass .dev-card{background:linear-gradient(180deg,rgba(var(--ink),.08),rgba(var(--ink),.03));box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+body.glass #settings{background:linear-gradient(180deg,rgba(var(--panel),.8),rgba(var(--panel),.66));border-color:rgba(255,255,255,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 30px 80px rgba(0,0,0,.55)}
+body.glass input[type=text],body.glass input[type=search],body.glass input[type=password],body.glass select{
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.25)}
+body.glass #cover{box-shadow:0 40px 80px -20px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.1)}
 </style>
 </head>
 <body>
@@ -1294,6 +1320,7 @@ function renderLyrics(){
   $('#lyr-src').textContent = `歌詞來源：${lyr.source}${lyr.synced ? '' : '（未同步）'}${lyr.override ? '・手動指定' : ''}`
     + (lyr.cover && !lyr.inst ? '・翻唱 / 改編版，顯示原曲歌詞' : '')
     + (lyr.other_length ? '・這個版本長度不同，AI 正在對時間' : '')
+    + (lyr.guessed ? `・依歌手和長度配對到〈${lyr.guessed_title || ''}〉，不對的話可以手動搜尋` : '')
     + (lyr.inst ? (lyr.scaled && Math.abs(lyr.scaled - 1) > .03 ? '・器樂版，原曲歌詞的時間是按長度推算的 (對不上可用 ← → 調整)' : '・伴奏版，顯示原曲歌詞') : '')
     + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() && !lyr.inst ? '・AI 對時中' : '');
   if (lyr.ai === 'live') $('#lyr-src').insertAdjacentHTML('afterbegin', '<span class="ai-dot"></span>');
@@ -1680,9 +1707,18 @@ function openLyrDialog(tab = 'search'){
   if (!track) return;
   dlg.classList.add('open');
   switchTab(tab);
-  const clean = s => (s || '').replace(/[\(\[【（「].*?[\)\]】）」]/g, ' ').replace(/\s+-\s+Topic$/i, '').replace(/\s+/g, ' ').trim();
-  $('#q-title').value = clean(track.title) || track.title || '';
-  $('#q-artist').value = clean(track.artist);
+  // 手動搜尋的預設值：拿掉 #標籤、【動態歌詞】、括號、「｜」後面的說明；上傳者是官方頻道時，歌手改從「歌手 - 歌名」拆
+  const CHANNEL = /官方頻道|官方频道|音樂頻道|音乐频道|NetEase\s*Cloud|網易雲音樂|网易云音乐|KKBOX|Records?\b|唱片|娛樂|娱乐|歌詞頻道|歌词频道|Entertainment/i;
+  const clean = s => (s || '').replace(/(^|[^A-Za-z0-9&])#[^\s#｜|【】\[\]]+/g, '$1 ')
+    .replace(/[\(\[【（「].*?[\)\]】）」]/g, ' ').replace(/(?:动态|動態|滚动|滾動|拼音)\s*(?:歌词|歌詞|lyrics?)/gi, ' ')
+    .split(/\s*[｜|]\s*/).map(x => x.trim()).filter(Boolean).join(' ')
+    .replace(/\s+-\s+Topic$/i, '').replace(/\s+/g, ' ').trim();
+  let qt = clean(track.title) || track.title || '', qa = clean(track.artist);
+  const dash = qt.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  if (dash && (!qa || CHANNEL.test(qa))){ qa = dash[1].trim(); qt = dash[2].trim(); }
+  if (CHANNEL.test(qa)) qa = '';
+  $('#q-title').value = qt;
+  $('#q-artist').value = qa;
   $('#lyr-reset').hidden = !lyr?.override;
   $('#lyr-results').innerHTML = '';
   $('#lyr-msg').className = 'msg';

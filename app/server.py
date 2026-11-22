@@ -450,7 +450,14 @@ def clean_artist(artist: str) -> str:
 # YouTube 影片標題的雜訊：【動態歌詞】[가사/해석]、#hashtag、表情符號、引號裡的歌詞摘句
 TAG_BLOCK = re.compile(r"[【\[][^】\]]*(?:[】\]]|$)")
 QUOTE_BLOCK = re.compile(r"[「『“\"《]([^」』”\"》]*)(?:[」』”\"》]|$)")
-HASHTAG = re.compile(r"(?:^|\s)#\S+")
+# 「死痞痞我们打个结#抖音歌曲」：# 常常直接黏在歌名後面 (前面是英文字母或數字的不算，例如 C#)
+HASHTAG = re.compile(r"(?<![A-Za-z0-9&])#[^\s#｜|【】\[\]]+")
+# 「动态Lyric」「動態歌詞」「拼音歌詞」這種影片說明
+LYRIC_VIDEO = re.compile(r"(?:动态|動態|滚动|滾動|拼音|中文|中日|中韓|中英)\s*(?:歌词|歌詞|lyrics?)\s*(?:版|video|字幕)?|(?:歌词|歌詞)\s*版", re.I)
+# 上傳者是官方頻道 / 唱片公司，不是歌手 (「網易雲音樂官方頻道」「XX Records」)：不能拿來當歌手搜
+CHANNEL_NAME = re.compile(r"官方頻道|官方频道|音樂頻道|音乐频道|官方帳號|官方账号|official\s*channel|music\s*channel|netease\s*cloud|"
+                          r"網易雲音樂|网易云音乐|kkbox|records?\b|entertainment|唱片|娛樂|娱乐|歌詞頻道|歌词频道|lyrics?\s*(?:channel|hub|vault)|"
+                          r"動態歌詞|动态歌词|好歌推薦|好歌推荐|music\s*(?:hub|lab|world|box)", re.I)
 EMOJI = re.compile(r"[\U0001F000-\U0001FFFF☀-➿⬀-⯿️‍♪♫♬]")
 FEAT = re.compile(r"\s*(?:[\*/]+\s*(?:with|feat\.?|ft\.?)\b.*|[\(（]\s*(?:feat\.?|ft\.?|with)\b[^\)）]*[\)）]"
                   r"|\s(?:feat\.?|ft\.?)\s.*)$", re.I)
@@ -471,6 +478,7 @@ def clean_title(title: str) -> str:
     t = HASHTAG.sub(" ", t)
     t = EMOJI.sub(" ", t)
     t = NOISE.sub(" ", t)
+    t = LYRIC_VIDEO.sub(" ", t)
     t = re.sub(r"\s+", " ", t).strip(" -–—|｜/*")
     return t
 
@@ -484,7 +492,8 @@ def _primary_artist(a: str) -> str:
 _BRACKETS = [r"「([^」]{1,40})」", r"『([^』]{1,40})』", r"《([^》]{1,40})》", r"“([^”]{1,40})”", r"【([^】]{1,40})】",  # 引號比【】更像歌名
              r"‘([^’]{1,40})’", r"(?:^|\s)'([^']{1,40})'(?=\s|$)", r'(?:^|\s)"([^"]{1,40})"(?=\s|$)']
 _JUNK_INNER = re.compile(r"^\s*(?:中字|中文字幕|中日字幕|中韓字幕|中英字幕|繁中字幕|官方|官方版|mv|m/v|official.*|hd|4k|lyrics?.*|歌詞.*|动态歌词|動態歌詞|"
-                         r"完整版|高音質|高音质|live|cover|翻唱|karaoke|ktv|中日歌詞|韓中字|가사|해석|純享版|纯享版|首播|新歌|單曲|单曲)\s*$", re.I)
+                         r"完整版|高音質|高音质|live|cover|翻唱|karaoke|ktv|中日歌詞|韓中字|가사|해석|純享版|纯享版|首播|新歌|單曲|单曲|"
+                         r"(?:动态|動態|滚动|滾動|拼音)\s*(?:歌词|歌詞|lyrics?)?|抖音.*|热门.*|熱門.*|必听.*|必聽.*)\s*$", re.I)
 
 
 def bracket_variants(raw, artist):
@@ -517,6 +526,8 @@ def bracket_variants(raw, artist):
 def title_variants(title: str, artist: str):
     """產生幾組 (歌名, 歌手) 嘗試搜尋。"""
     t, a = clean_title(title), clean_artist(artist)
+    if CHANNEL_NAME.search(a):
+        a = ""  # 上傳者是官方頻道 / 唱片公司：歌手要從標題裡拆
     head = bracket_variants(title, a)
     # 「分明在 IG 聽過? : Unstable - Tom Frane」→ 冒號前面是影片標語
     m = re.search(r"\s[:：]\s|:\s", t)
@@ -775,6 +786,32 @@ class Lyrics:
                         "lines": [{"t": None, "text": l["text"]} for l in r["lines"] if (l.get("text") or "").strip()]}
         return None
 
+    async def _artist_length(self, title, artist, duration):
+        """最後的備案：影片標題用的是歌裡的一句話或別名 (不是正式歌名)，照歌名配不到。
+        改用「歌手一模一樣 + 長度差不到 2 秒」，而且這位歌手只有剛好一首符合，才採用。"""
+        names = []
+        for t, a in title_variants(title, artist):
+            if a and not CHANNEL_NAME.search(a) and a not in names:
+                names.append(a)
+        for a in names[:2]:
+            try:
+                cands = await self.search("", a, limit=30)  # 只靠歌手找：多拿一些 (這位歌手的歌可能很多)
+            except Exception as e:
+                print("[artist-length]", repr(e), flush=True)
+                return None
+            hits = {}
+            for c in cands:
+                if artist_matches(a, c.get("artist")) and c.get("duration") and abs(c["duration"] - duration) <= 2:
+                    hits.setdefault(_fnorm(c.get("title") or ""), []).append(c)
+            if len(hits) != 1:
+                continue  # 沒有、或不只一首長度一樣：不猜
+            for c in next(iter(hits.values()))[:3]:
+                r = await self.fetch(c)
+                if r and r["synced"] and r["lines"]:
+                    print(f"[artist-length] {title} → {c.get('title')} / {c.get('artist')} (同歌手、同長度)", flush=True)
+                    return {**r, "guessed": True, "guessed_title": c.get("title")}
+        return None
+
     async def find(self, title, artist, album, duration, need_artist=False):
         k = self.key(title, artist)
         if k in self.overrides:
@@ -796,6 +833,8 @@ class Lyrics:
                     break
         if not result and duration and artist:
             result = await self._other_length(title, artist, duration)
+        if not result and duration:
+            result = await self._artist_length(title, artist, duration)
         result = result or {"source": None, "synced": False, "lines": []}
         if result["lines"]:
             result["lines"] = clean_lines(result["lines"], title, artist)

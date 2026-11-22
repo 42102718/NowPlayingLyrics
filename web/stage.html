@@ -318,6 +318,28 @@ body.ui.ctl #ctl{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 #ctl .vol{display:flex;align-items:center;gap:2px}
 body.obs #ctl{display:none!important}
 @media (prefers-reduced-motion:reduce){.ln,.w{transition:none!important;animation:none!important}}
+
+/* ═════ 玻璃 (跟主視窗的「介面質感」設定一樣) ═════ */
+.gthumb{display:none}
+body.glass .gthumb{display:block;position:absolute;left:0;top:0;z-index:0;border-radius:9px;pointer-events:none;opacity:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.3),rgba(255,255,255,.07)),rgba(139,108,255,.28);
+  border:1px solid rgba(255,255,255,.36);box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 8px 20px -6px rgba(0,0,0,.4);
+  backdrop-filter:blur(14px) saturate(1.8);transition:transform .55s cubic-bezier(.3,1.35,.45,1),width .55s cubic-bezier(.3,1.35,.45,1),height .45s,opacity .25s}
+body.glass #p-tabs,body.glass .seg2,body.glass .seg3,body.glass .grid{position:relative}
+body.glass #p-tabs > button,body.glass .seg2 > button,body.glass .seg3 > button,body.glass .grid > button{position:relative;z-index:1}
+body.glass #p-tabs > button.on,body.glass .seg2 > button.on,body.glass .seg3 > button.on,body.glass .grid > button.on{background:transparent;border-color:transparent;color:#fff}
+body.glass .grid > button.on small{opacity:.8}
+body.glass .grid .gthumb{border-radius:12px}
+body.glass .grid > button{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+body.glass #panel,body.glass #fd .box{background:linear-gradient(180deg,rgba(26,24,40,.78),rgba(16,15,26,.7));backdrop-filter:blur(34px) saturate(1.6);
+  border:1px solid rgba(255,255,255,.13);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 30px 80px -20px rgba(0,0,0,.7)}
+body.glass #ctl,body.glass #nolyr{background:linear-gradient(180deg,rgba(40,38,58,.62),rgba(16,16,26,.6));border-color:rgba(255,255,255,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 18px 50px -12px rgba(0,0,0,.6)}
+body.glass #gear,body.glass #home,body.glass #find{background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.04));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 20px -8px rgba(0,0,0,.5)}
+body.glass button{transition:transform .22s cubic-bezier(.3,1.5,.5,1),background .2s,color .2s,opacity .3s}
+body.glass button:active:not(:disabled){transform:scale(.95)}
+body.glass #ctl #c-play{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 20px -6px rgba(0,0,0,.5)}
 </style>
 </head>
 <body class="ui">
@@ -1255,9 +1277,18 @@ function fdTab(tab){
 }
 function openFind(){
   if (!track || OBS) return;
-  const clean = s => (s || '').replace(/[\(\[【（「].*?[\)\]】）」]/g, ' ').replace(/\s+-\s+Topic$/i, '').replace(/\s+/g, ' ').trim();
-  $('#fd-title').value = clean(track.title) || track.title || '';
-  $('#fd-artist').value = clean(track.artist);
+  // 手動搜尋的預設值：拿掉 #標籤、【動態歌詞】、括號、「｜」後面的說明；上傳者是官方頻道時，歌手改從「歌手 - 歌名」拆
+  const CHANNEL = /官方頻道|官方频道|音樂頻道|音乐频道|NetEase\s*Cloud|網易雲音樂|网易云音乐|KKBOX|Records?\b|唱片|娛樂|娱乐|歌詞頻道|歌词频道|Entertainment/i;
+  const clean = s => (s || '').replace(/(^|[^A-Za-z0-9&])#[^\s#｜|【】\[\]]+/g, '$1 ')
+    .replace(/[\(\[【（「].*?[\)\]】）」]/g, ' ').replace(/(?:动态|動態|滚动|滾動|拼音)\s*(?:歌词|歌詞|lyrics?)/gi, ' ')
+    .split(/\s*[｜|]\s*/).map(x => x.trim()).filter(Boolean).join(' ')
+    .replace(/\s+-\s+Topic$/i, '').replace(/\s+/g, ' ').trim();
+  let qt = clean(track.title) || track.title || '', qa = clean(track.artist);
+  const dash = qt.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  if (dash && (!qa || CHANNEL.test(qa))){ qa = dash[1].trim(); qt = dash[2].trim(); }
+  if (CHANNEL.test(qa)) qa = '';
+  $('#fd-title').value = qt;
+  $('#fd-artist').value = qa;
   fd.classList.add('open'); fdTab('search'); fdSearch();
   setTimeout(() => $('#fd-title').focus(), 50);
 }
@@ -1336,7 +1367,8 @@ if (params.has('app') && !OBS){
   $('#tb').addEventListener('click', e => e.stopPropagation());
 }
 $('#home').onclick = e => { e.stopPropagation(); if (document.body.classList.contains('inwin') || !window.pywebview?.api?.back) location.href = '/?app=1'; else window.pywebview.api.back(); };
-$('#gear').onclick = e => { e.stopPropagation(); $('#panel').classList.toggle('open'); };
+$('#gear').onclick = e => { e.stopPropagation(); $('#panel').classList.toggle('open');
+  requestAnimationFrame(() => document.querySelectorAll('#p-tabs, .seg2, .seg3, #panel .grid').forEach(b => b._place && b._place())); };
 $('#panel').onclick = e => e.stopPropagation();
 addEventListener('click', () => $('#panel').classList.remove('open'));
 // App 的舞台視窗用 App 自己的全螢幕 (網頁的全螢幕在 App 視窗裡沒有作用)；瀏覽器 / OBS 用網頁的
@@ -1364,7 +1396,28 @@ document.documentElement.addEventListener('mouseleave', () => { clearTimeout(uiT
   if (!$('#panel').classList.contains('open')){ document.body.classList.remove('ui'); $('#hint').classList.remove('show'); } });
 
 addEventListener('resize', resize);
+
+// 玻璃質感：跟主視窗同一個設定 (同一個網址，localStorage 共用)
+try { if (!OBS && localStorage.getItem('look') !== 'flat') document.body.classList.add('glass'); } catch {}
+function initGlassThumbs(){
+  document.querySelectorAll('#p-tabs, .seg2, .seg3, #panel .grid').forEach(box => {
+    if (box._place) return;
+    const th = document.createElement('span'); th.className = 'gthumb'; box.prepend(th);
+    const place = () => {
+      if (th.parentNode !== box) box.prepend(th);  // 效果清單整份重畫時滑塊會被清掉：補回來
+      const on = [...box.children].find(c => c.tagName === 'BUTTON' && c.classList.contains('on'));
+      if (!on || !on.offsetWidth){ th.style.opacity = 0; return; }
+      th.style.opacity = 1; th.style.width = on.offsetWidth + 'px'; th.style.height = on.offsetHeight + 'px';
+      th.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+    };
+    box._place = place;
+    new MutationObserver(place).observe(box, {subtree: true, attributes: true, attributeFilter: ['class'], childList: true});
+    new ResizeObserver(place).observe(box);
+    place();
+  });
+}
 resize(); applyBg(); applyOpts(); renderPanel(); rebuild(); poke();
+initGlassThumbs();
 connect();
 requestAnimationFrame(frame);
 </script>
