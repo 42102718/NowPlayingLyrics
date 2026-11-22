@@ -1018,6 +1018,95 @@ body[data-look="ink"] .line.active::after{content:"";position:absolute;left:8px;
   background:radial-gradient(ellipse,#000,transparent 70%)}
 body[data-look="ink"] .line{position:relative}
 body[data-look="ink"] #timetint{display:none}
+
+/* ═════ 版面：便當格 (每個區塊一格磚，歌詞是最大的一格) ═════ */
+#side,#sheet-handle,#cover-wrap .stk{display:none}
+@media (min-width:861px){
+  body[data-layout="bento"] #app{grid-template-columns:minmax(240px,27%) minmax(200px,21%) 1fr;grid-template-rows:auto auto auto auto 1fr;gap:12px;align-content:start}
+  body[data-layout="bento"] #left{display:contents}
+  body[data-layout="bento"] #left > *{background:linear-gradient(180deg,rgba(var(--ink),.075),rgba(var(--ink),.03));border:1px solid rgba(var(--ink),.09);
+    border-radius:22px;padding:14px 16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+  body[data-layout="bento"] #cover-wrap{grid-column:1;grid-row:1/3;width:100%;padding:0!important;background:none!important;border:0!important;align-self:start}
+  body[data-layout="bento"] #cover{border-radius:22px}
+  body[data-layout="bento"] .meta{grid-column:2;grid-row:1;display:flex;flex-direction:column;justify-content:flex-end}
+  body[data-layout="bento"] #title{font-size:clamp(20px,1.9vw,30px)}
+  body[data-layout="bento"] #transport{grid-column:2;grid-row:2;margin:0;align-self:stretch}
+  body[data-layout="bento"] #progress{grid-column:1/3;grid-row:3;margin:0}
+  body[data-layout="bento"] #controls{grid-column:1/3;grid-row:4;justify-content:space-around}
+  body[data-layout="bento"] #lyr-src{grid-column:1/3;grid-row:5;align-self:start;text-align:center;margin:0;padding:8px 12px!important}
+  body[data-layout="bento"] #lyr-src:empty{display:none}
+  body[data-layout="bento"] #right{grid-column:3;grid-row:1/-1;border-radius:28px;background:linear-gradient(180deg,rgba(var(--ink),.06),rgba(var(--ink),.02));
+    border:1px solid rgba(var(--ink),.09);padding:0 clamp(16px,2.4vw,36px)}
+}
+/* ═════ 版面：雜誌 (超大標題壓在封面上、歌詞像內文) ═════ */
+@media (min-width:861px){
+  body[data-layout="editorial"] #app{grid-template-columns:minmax(320px,46%) 1fr}
+  body[data-layout="editorial"] #cover-wrap{width:clamp(140px,calc(100vh - 480px),min(100%,500px))}
+  body[data-layout="editorial"] #cover{border-radius:4px}
+  body[data-layout="editorial"] .meta{position:relative;z-index:3;margin-top:calc(clamp(40px,min(6vw,9vh),104px) * -1.3)}
+  body[data-layout="editorial"] #title{font-size:clamp(40px,min(6vw,9vh),104px);line-height:.95;letter-spacing:-.045em;-webkit-line-clamp:3;
+    text-shadow:0 6px 40px rgba(0,0,0,.45);margin-top:10px}
+  body[data-layout="editorial"] #artist{text-transform:uppercase;letter-spacing:.22em;font-size:12px;font-weight:700;margin-top:14px}
+  body[data-layout="editorial"] #artist::before{content:"— ";color:var(--accent)}
+  body[data-layout="editorial"] #right{border-left:1px solid rgba(var(--ink),.2);padding-left:clamp(22px,3vw,52px)}
+  body[data-layout="editorial"] .line{font-size:clamp(20px,2vw,30px);font-weight:600;line-height:1.45;padding-top:6px;padding-bottom:6px}
+  body[data-layout="editorial"] .line.active .txt::first-letter{font-size:1.6em;color:var(--accent)}
+  body[data-layout="editorial"] #right::before{content:"LYRICS";position:absolute;z-index:2;top:clamp(8px,2vh,20px);right:0;font:800 11px var(--font);letter-spacing:.4em;color:var(--dim)}
+}
+/* ═════ 版面：卡片堆疊 (之前聽的歌疊在封面後面，換歌時新卡片發下來) ═════ */
+body[data-layout="stack"] #cover-wrap .stk{display:block;position:absolute;inset:0;border-radius:22px;background:linear-gradient(135deg,var(--c1),var(--c2)) center/cover;
+  z-index:-1;box-shadow:0 20px 40px -14px rgba(0,0,0,.6);filter:brightness(.55) saturate(.9);transition:transform .7s cubic-bezier(.2,.8,.2,1),opacity .7s}
+body[data-layout="stack"] #cover-wrap .stk.s1{transform:translate(9%,-6%) rotate(5deg) scale(.92)}
+body[data-layout="stack"] #cover-wrap .stk.s2{transform:translate(17%,-11%) rotate(10deg) scale(.84);z-index:-2;filter:brightness(.4) saturate(.8)}
+body[data-layout="stack"] #cover-wrap .stk.s3{transform:translate(24%,-15%) rotate(15deg) scale(.76);z-index:-3;filter:brightness(.28) saturate(.7)}
+body[data-layout="stack"] #cover-wrap .stk:not([style*="url"]){opacity:0}
+body[data-layout="stack"] #cover-glow{display:none}
+body[data-layout="stack"] #cover-wrap.deal #cover{animation:deal .75s cubic-bezier(.2,.9,.25,1.05)}
+@keyframes deal{from{transform:translate(-70%,30%) rotate(-14deg) scale(.8);opacity:0}}
+body[data-layout="stack"] #cover-wrap.deal .stk{animation:shove .75s ease-out}
+@keyframes shove{from{opacity:.6}}
+/* ═════ 版面：側邊欄 (左邊固定一條最近播放) ═════ */
+@media (min-width:861px){
+  body[data-layout="sidebar"] #app{padding-left:calc(clamp(210px,18vw,260px) + clamp(20px,3vw,48px))}
+  body[data-layout="sidebar"] #side{display:flex;flex-direction:column;gap:4px;position:fixed;z-index:4;left:0;top:0;bottom:0;width:clamp(210px,18vw,260px);
+    padding:54px 12px 16px;overflow:auto;background:linear-gradient(180deg,rgba(var(--ink),.07),rgba(var(--ink),.03));border-right:1px solid rgba(var(--ink),.09);
+    backdrop-filter:blur(30px) saturate(1.4)}
+  body[data-layout="sidebar"] #cover-wrap{width:clamp(96px,calc(100vh - 520px),min(100%,380px))}
+}
+#side h4{font:700 11px var(--font);letter-spacing:.14em;color:var(--dim);margin:6px 8px 6px}
+#side .now{display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;background:rgba(var(--ink),.08);margin-bottom:10px}
+#side button{display:flex;align-items:center;gap:10px;padding:7px 8px;border:0;border-radius:11px;background:none;color:var(--fg);text-align:left;cursor:pointer;
+  transition:background .2s}
+#side button:hover{background:rgba(var(--ink),.08)}
+#side .art{width:36px;height:36px;border-radius:7px;flex:none;background:linear-gradient(135deg,var(--c1),var(--c2)) center/cover}
+#side .t{display:block;font:600 13px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#side .a{display:block;font:500 11.5px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#side :is(button,.now) > span:last-child{min-width:0}
+#side .empty{font:400 12px/1.6 var(--font);color:var(--dim);padding:6px 8px}
+/* ═════ 版面：底部抽屜 (歌詞滿版；控制收在底部，滑鼠移過去或按把手才展開) ═════ */
+body[data-layout="sheet"] #app{grid-template-columns:1fr;padding-bottom:110px}
+body[data-layout="sheet"] #left{position:fixed;z-index:5;left:50%;bottom:0;width:min(760px,calc(100vw - 24px));translate:-50% 0;
+  display:grid;grid-template-columns:52px minmax(0,1fr) auto;grid-template-areas:"h h h" "c m t" "p p p" "k k k" "s s s";align-items:center;gap:8px 14px;
+  padding:6px 20px 16px;border-radius:24px 24px 0 0;border:1px solid rgba(var(--ink),.12);border-bottom:0;
+  background:linear-gradient(180deg,rgba(var(--panel),.78),rgba(var(--panel),.62));backdrop-filter:blur(30px) saturate(1.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 -20px 50px -20px rgba(0,0,0,.6);
+  transform:translateY(calc(100% - 92px));transition:transform .55s cubic-bezier(.2,.9,.25,1.05)}
+body[data-layout="sheet"] #left:hover,body.sheet-open[data-layout="sheet"] #left{transform:none}
+body[data-layout="sheet"] #sheet-handle{display:block;grid-area:h;justify-self:center;width:46px;height:16px;border:0;background:none;cursor:pointer;position:relative}
+body[data-layout="sheet"] #sheet-handle::before{content:"";position:absolute;left:0;right:0;top:6px;height:5px;border-radius:5px;background:rgba(var(--ink),.3)}
+body[data-layout="sheet"] #cover-wrap{grid-area:c;width:52px}
+body[data-layout="sheet"] #cover{border-radius:10px}
+body[data-layout="sheet"] #cover-glow{display:none}
+body[data-layout="sheet"] .meta{grid-area:m}
+body[data-layout="sheet"] #source,body[data-layout="sheet"] #mood{display:none}
+body[data-layout="sheet"] #title{font-size:17px;margin-top:0;-webkit-line-clamp:1}
+body[data-layout="sheet"] #artist{font-size:13px;margin-top:2px}
+body[data-layout="sheet"] #transport{grid-area:t;margin:0;gap:4px}
+body[data-layout="sheet"] #transport button{transform:scale(.8)}
+body[data-layout="sheet"] #progress{grid-area:p;margin-top:6px}
+body[data-layout="sheet"] #controls{grid-area:k;justify-content:space-around}
+body[data-layout="sheet"] #lyr-src{grid-area:s;text-align:center;margin:0}
+body[data-layout="sheet"] .line{font-size:clamp(28px,3.6vw,56px)}
 </style>
 </head>
 <body>
@@ -1036,9 +1125,11 @@ body[data-look="ink"] #timetint{display:none}
     <button id="tb-close" title="關閉（縮到系統匣，浮動歌詞會繼續）"><svg viewBox="0 0 14 14"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9"/></svg></button>
   </div>
 </header>
+<aside id="side"></aside>
 <main id="app">
   <section id="left">
-    <div id="cover-wrap" class="paused"><div id="cover-glow"></div><img id="cover" alt=""></div>
+    <button id="sheet-handle" title="展開 / 收起控制"></button>
+    <div id="cover-wrap" class="paused"><div class="stk s1"></div><div class="stk s2"></div><div class="stk s3"></div><div id="cover-glow"></div><img id="cover" alt=""></div>
     <div class="meta">
       <button id="source" class="paused" title="切換來源"><span class="dot"></span><span id="source-name">等待中</span></button><span id="mood" title="依照音樂的能量和節奏判斷；動畫速度和光暈會跟著調整"></span>
       <h1 id="title">—</h1>
@@ -1129,7 +1220,10 @@ body[data-look="ink"] #timetint{display:none}
       <div class="row col">版面
         <div class="seg five" id="layouts"><button data-layout="classic" title="封面在左、歌詞在右">經典</button><button data-layout="mirror" title="歌詞在左、封面在右">鏡像</button>
           <button data-layout="center" title="封面在上、歌詞在下，全部置中">置中</button><button data-layout="immersive" title="歌詞佔滿畫面，封面和控制縮成左下角的小卡">沉浸</button>
-          <button data-layout="vinyl" title="封面變成黑膠唱片，播放時會轉">唱片</button></div>
+          <button data-layout="vinyl" title="封面變成黑膠唱片，播放時會轉">唱片</button>
+          <button data-layout="bento" title="封面、歌名、播放、控制、歌詞各是一格圓角磚">便當格</button><button data-layout="editorial" title="超大標題壓在封面上，歌詞像雜誌內文">雜誌</button>
+          <button data-layout="stack" title="之前聽的歌疊在封面後面，換歌時新的一張發下來">卡片堆疊</button><button data-layout="sidebar" title="左邊固定一條「正在播放＋最近播放」">側邊欄</button>
+          <button data-layout="sheet" title="歌詞滿版；控制收在底部，滑鼠移過去或按把手才展開">底部抽屜</button></div>
       </div>
       <label class="row" title="整個介面的主題色跟著專輯封面最鮮豔的顏色；封面太灰太暗時用原本風格的顏色">主題色跟著封面 <span class="switch"><input type="checkbox" id="cover-accent"><span></span></span></label>
       <label class="row" title="傍晚開始整個介面慢慢加一層很淡的暖色、稍微調暗，深夜最明顯，白天完全不加">時間感知配色 <span class="switch"><input type="checkbox" id="time-tint"><span></span></span></label>
@@ -1517,7 +1611,7 @@ function onState(m){
     if (performance.now() - offsetEditedAt > 1500 && cfg.offset !== offset) setOffset(cfg.offset, false);
     syncSettings();
   }
-  if (m.recent) recent = m.recent;
+  if (m.recent){ recent = m.recent; setTimeout(renderSide, 0); }
   if (m.config) renderScope();
   const t = m.track;
   setTimeout(renderIdle, 0);
@@ -2405,8 +2499,8 @@ function applyLook(v){
   placeAllThumbs();
 }
 function applyLayout(v){
-  v = ['classic', 'mirror', 'center', 'immersive', 'vinyl'].includes(v) ? v : 'classic';
-  if (document.body.dataset.layout !== v){ document.body.dataset.layout = v; activeIdx = -2; }
+  v = ['classic', 'mirror', 'center', 'immersive', 'vinyl', 'bento', 'editorial', 'stack', 'sidebar', 'sheet'].includes(v) ? v : 'classic';
+  if (document.body.dataset.layout !== v){ document.body.dataset.layout = v; activeIdx = -2; sideKey = ''; stackKey = ''; $('#side').dataset.k = ''; setTimeout(renderSide, 0); }
   document.querySelectorAll('#layouts [data-layout]').forEach(b => b.classList.toggle('on', b.dataset.layout === v));
   try { localStorage.setItem('layout', v); } catch {}
 }
@@ -2500,6 +2594,50 @@ document.body.classList.add('beat');
   });
   w.addEventListener('pointerleave', () => { w.classList.remove('tilting'); w.style.removeProperty('--rx'); w.style.removeProperty('--ry'); });
 })();
+
+// ───── 版面：側邊欄 (最近播放)、卡片堆疊 (之前的封面) ─────
+function artUrl(r){ return r.has_art ? `url("/art?id=${encodeURIComponent(r.track_id)}")` : ''; }
+var sideKey = '', stackKey = '';  // var：applyLayout 在這段之前就會被呼叫
+function renderSide(){
+  const lay = document.body.dataset.layout;
+  const others = recent.filter(r => !track || r.track_id !== track.track_id);
+  if (lay === 'sidebar'){
+    const box = $('#side'), key = JSON.stringify([track?.track_id, others.map(r => r.track_id)]);
+    if (box.dataset.k !== key){
+      box.dataset.k = key; box.innerHTML = '';
+      const add = (tag, cls, r) => {
+        const b = document.createElement(tag); if (cls) b.className = cls;
+        b.innerHTML = '<span class="art"></span><span><span class="t"></span><span class="a"></span></span>';
+        b.querySelector('.t').textContent = r.title || ''; b.querySelector('.a').textContent = r.artist || '';
+        const u = r.track_id ? artUrl(r) : ''; if (u) b.querySelector('.art').style.backgroundImage = u;
+        box.appendChild(b); return b;
+      };
+      if (track){
+        const h = document.createElement('h4'); h.textContent = '正在播放'; box.appendChild(h);
+        const now = add('div', 'now', {title: track.title, artist: track.artist});
+        const c = $('#cover'); if (c?.src) now.querySelector('.art').style.backgroundImage = `url("${c.src}")`;
+      }
+      const h = document.createElement('h4'); h.textContent = '最近播放'; box.appendChild(h);
+      if (!others.length){ const e = document.createElement('div'); e.className = 'empty'; e.textContent = '播過的歌會列在這裡，點一下就在原本的平台搜尋。'; box.appendChild(e); }
+      for (const r of others.slice(0, 12)){
+        const b = add('button', '', r);
+        b.title = '在原本的平台搜尋這首歌';
+        b.onclick = () => send({type: 'search_song', title: r.title, artist: r.artist, source: r.source});
+      }
+    }
+  }
+  if (lay === 'stack'){
+    const key = JSON.stringify(others.slice(0, 3).map(r => r.track_id));
+    if (key !== stackKey){
+      const w = $('#cover-wrap');
+      if (stackKey){ w.classList.remove('deal'); void w.offsetWidth; w.classList.add('deal'); setTimeout(() => w.classList.remove('deal'), 800); }
+      stackKey = key;
+      w.querySelectorAll('.stk').forEach((el, i) => { const r = others[i]; el.style.backgroundImage = r ? artUrl(r) : ''; });
+    }
+  }
+}
+setInterval(renderSide, 2000);
+$('#sheet-handle').onclick = () => document.body.classList.toggle('sheet-open');
 // ───── 沒在播歌：時鐘、日期、最近播放 ─────
 let recent = [];
 function renderIdle(){

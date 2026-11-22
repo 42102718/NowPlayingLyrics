@@ -67,7 +67,7 @@ DEFAULT_CONFIG = {
     "cover_accent": True,  # 主題色跟著封面最鮮豔的顏色
     "time_tint": True,     # 時間感知配色：晚上加一層很淡的暖色、稍微調暗
     "ui_sound": False,     # 操作時很輕的「咔」聲 (預設關：直播時 OBS 會錄到桌面聲音)
-    "layout": "classic",  # 主視窗版面：classic 經典 / mirror 鏡像 / center 置中 / immersive 沉浸 / vinyl 唱片
+    "layout": "classic",  # 主視窗版面：classic 經典 / mirror 鏡像 / center 置中 / immersive 沉浸 / vinyl 唱片 / bento 便當格 / editorial 雜誌 / stack 卡片堆疊 / sidebar 側邊欄 / sheet 底部抽屜
     "lyr_style": "flow",  # 主視窗歌詞呈現：flow 流動 / clear 清晰 / center 置中 / spot 聚光 / karaoke 卡拉OK / type 打字機 / pop 彈跳
     "auto_pause": {"lock": True, "unplug": True, "resume": True},  # 鎖定 / 拔耳機時暫停，回來接著播
     "taskbar_progress": True,  # 工作列圖示上顯示播放進度
@@ -146,7 +146,7 @@ def load_config():
         cfg["time_tint"] = bool(saved.get("time_tint", True))
         cfg["ui_sound"] = bool(saved.get("ui_sound", False))
         cfg["ui_look"] = saved.get("ui_look") if saved.get("ui_look") in LOOKS else "glass"
-        cfg["layout"] = saved.get("layout") if saved.get("layout") in ('classic', 'mirror', 'center', 'immersive', 'vinyl') else "classic"
+        cfg["layout"] = saved.get("layout") if saved.get("layout") in ('classic', 'mirror', 'center', 'immersive', 'vinyl', 'bento', 'editorial', 'stack', 'sidebar', 'sheet') else "classic"
         cfg["lyr_style"] = saved.get("lyr_style") if saved.get("lyr_style") in ('flow', 'clear', 'center', 'spot', 'karaoke', 'type', 'pop', 'space') else "flow"
         if isinstance(saved.get("stage_live"), dict):
             cfg["stage_live"] = saved["stage_live"]
@@ -1868,7 +1868,7 @@ async def ws_handler(request):
             elif d.get("type") == "ui_look" and d.get("value") in LOOKS:
                 config["ui_look"] = d["value"]
                 config_changed()
-            elif d.get("type") == "layout" and d.get("value") in ('classic', 'mirror', 'center', 'immersive', 'vinyl'):
+            elif d.get("type") == "layout" and d.get("value") in ('classic', 'mirror', 'center', 'immersive', 'vinyl', 'bento', 'editorial', 'stack', 'sidebar', 'sheet'):
                 config["layout"] = d["value"]
                 config_changed()
             elif d.get("type") == "net_alert":
