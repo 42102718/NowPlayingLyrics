@@ -778,11 +778,251 @@ body.idle #status{display:none}
 #pv-card .pv-btn i{display:inline-block;height:6px;border-radius:3px;background:var(--accent)}
 #pv-card .pv-btn i + i{background:rgba(var(--ink),.2)}
 #pv-tag{position:absolute;right:10px;top:8px;font:600 11px var(--font);color:var(--dim)}
+
+/* ═════ 觸感捲動：手動捲歌詞時不要用過場動畫 (每幀直接算) ═════ */
+#lyrics.manual{transition:none!important}
+#right.grab{cursor:grabbing}
+/* ═════ 歌詞呈現：空間 (唱過的往後退、下一句從遠處浮過來) ═════ */
+body[data-ls="space"] #right{perspective:900px;perspective-origin:30% 40%}
+body[data-ls="space"] #lyrics{transform-style:preserve-3d}
+body[data-ls="space"] .line{transition:transform .9s cubic-bezier(.2,.8,.2,1),opacity .9s,filter .9s;
+  transform:translateZ(calc(min(var(--d,0),0) * 110px - max(var(--d,0),0) * 38px)) translateY(calc(min(var(--d,0),0) * -6px));
+  opacity:calc(1 - min(abs(var(--d,0)),5) * .16)!important;filter:blur(calc(min(abs(var(--d,0)),4) * 1px))!important}
+body[data-ls="space"] .line.active{transform:translateZ(30px) scale(1.04)}
+/* ═════ 歌曲情緒：抒情慢、激昂快 ═════ */
+.line{transition-duration:calc(.75s - var(--mood,.5) * .3s)}
+body.beat .line.active .txt{text-shadow:0 0 calc(var(--beat,0) * (14px + var(--mood,.5) * 22px)) color-mix(in srgb,var(--accent) 60%,transparent),
+  0 0 calc(var(--beat,0) * 8px) color-mix(in srgb,var(--accent) 45%,transparent)}
+.blob{animation-duration:calc(32s - var(--mood,.5) * 18s)!important}
+#mood{display:none;margin-left:8px;font:600 11px var(--font);letter-spacing:.04em;padding:4px 9px;border-radius:999px;color:var(--dim);
+  background:rgba(var(--ink),.07);border:1px solid rgba(var(--ink),.1);vertical-align:middle}
+#mood.show{display:inline-block;animation:introRise .5s both}
+/* ═════ 時間感知配色：晚上一層很淡的暖色 ═════ */
+#timetint{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:0;transition:opacity 4s;
+  background:radial-gradient(ellipse at 50% 120%,rgba(255,140,60,.9),rgba(255,120,40,.5) 60%,rgba(60,30,10,.6));mix-blend-mode:soft-light}
+
+/* ═════════════ 設計風格 (body[data-look]) ═════════════
+   每個風格只改「形狀、材質、字體」；顏色大多沿用主題，少數風格 (瑞士、粗獷、CRT、水墨) 有自己的配色 */
+#ui-looks.looks{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#ui-looks.looks > button{height:auto;min-height:48px;padding:7px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.2}
+#ui-looks.looks > button small{font:400 10.5px var(--font);color:var(--dim);opacity:.9}
+#ui-looks.looks > button.on small{color:inherit;opacity:.7}
+
+/* — Fluent / Mica：Windows 11 的壓克力材質、方一點的角、選中的左側亮條 — */
+body[data-look="fluent"]{--font:"Segoe UI Variable Text","Segoe UI","Noto Sans TC",system-ui,sans-serif}
+body[data-look="fluent"] :is(.card,#settings,.dialog){border-radius:8px}
+body[data-look="fluent"] #settings,body[data-look="fluent"] .dialog{backdrop-filter:blur(60px) saturate(2.2)}
+body[data-look="fluent"] #settings::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.035;border-radius:inherit;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+body[data-look="fluent"] :is(.seg button,.chip,#set-tabs button,.gthumb){border-radius:5px}
+body[data-look="fluent"] #set-tabs button.on::before{display:block!important;content:"";position:absolute;left:2px;top:30%;bottom:30%;width:3px;border-radius:3px;background:var(--accent2)}
+body[data-look="fluent"] #cover{border-radius:8px}
+body[data-look="fluent"] .line{border-radius:6px}
+
+/* — Material You：大圓角、色調表面 (從主題色調出來)、膠囊按鈕 — */
+body[data-look="material"]{--font:"Roboto Flex","Roboto","Noto Sans TC",system-ui,sans-serif}
+body[data-look="material"] #settings,body[data-look="material"] .dialog{border-radius:28px;border:0;
+  background:color-mix(in srgb,var(--accent2) 14%,rgb(var(--panel)));backdrop-filter:none;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+body[data-look="material"] .card{border-radius:20px;border:0;background:color-mix(in srgb,var(--accent2) 10%,rgba(var(--ink),.05))}
+body[data-look="material"] .seg{gap:0;border-radius:999px;overflow:hidden;border:1px solid color-mix(in srgb,var(--fg) 30%,transparent)}
+body[data-look="material"] .seg button{border-radius:0;border:0;border-left:1px solid color-mix(in srgb,var(--fg) 25%,transparent);background:none}
+body[data-look="material"] .seg button:first-child{border-left:0}
+body[data-look="material"] #ui-looks{border-radius:16px;gap:0}
+body[data-look="material"] #ui-looks > button{border-left:0;border-top:1px solid color-mix(in srgb,var(--fg) 18%,transparent)}
+body[data-look="material"] .seg button.on{background:color-mix(in srgb,var(--accent2) 45%,transparent);color:var(--hi)}
+body[data-look="material"] .chip{border-radius:8px;border:1px solid color-mix(in srgb,var(--fg) 30%,transparent);background:none;backdrop-filter:none}
+body[data-look="material"] #transport #btn-play{border-radius:22px;background:color-mix(in srgb,var(--accent2) 70%,#fff 10%);color:#fff;transition:border-radius .3s,transform .2s}
+body[data-look="material"] #transport #btn-play:hover{border-radius:50%}
+body[data-look="material"] #set-tabs button{border-radius:999px}
+body[data-look="material"] #set-tabs button.on{background:color-mix(in srgb,var(--accent2) 35%,transparent)}
+body[data-look="material"] .switch span{border-radius:999px;background:transparent;border:2px solid color-mix(in srgb,var(--fg) 45%,transparent)}
+body[data-look="material"] .switch input:checked+span{background:var(--accent2);border-color:var(--accent2)}
+body[data-look="material"] #cover{border-radius:32px}
+body[data-look="material"] #bar{height:10px;border-radius:10px}
+body[data-look="material"] .line.active{background:color-mix(in srgb,var(--accent2) 12%,transparent);border-radius:20px}
+
+/* — 新擬物 Neumorphism：同色凸起、按下去是凹的 — */
+body[data-look="neu"]{--neu:color-mix(in srgb,var(--bg0) 94%,rgb(var(--ink)) 6%);--neu-d:rgba(0,0,0,.45);--neu-l:rgba(var(--ink),.07)}
+body[data-look="neu"] #bg .blob,body[data-look="neu"] #grain{display:none}
+body[data-look="neu"] #bg .art.on{opacity:.12}
+body[data-look="neu"] #bg::after{background:var(--neu);opacity:.9}
+body[data-look="neu"] :is(#settings,.dialog){background:var(--neu);backdrop-filter:none;border:0;box-shadow:12px 12px 30px var(--neu-d),-10px -10px 26px var(--neu-l)}
+body[data-look="neu"] .card{background:var(--neu);border:0;border-radius:18px;box-shadow:inset 4px 4px 10px var(--neu-d),inset -4px -4px 10px var(--neu-l)}
+body[data-look="neu"] :is(.seg button,.chip,#set-tabs button,#transport button,.ibtn){background:var(--neu);border:0;
+  box-shadow:5px 5px 12px var(--neu-d),-4px -4px 10px var(--neu-l);transition:box-shadow .2s}
+body[data-look="neu"] .seg{gap:10px}
+body[data-look="neu"] :is(.seg button.on,#set-tabs button.on,.chip:active,#transport button:active,.ibtn.on){background:var(--neu)!important;color:var(--accent)!important;
+  box-shadow:inset 4px 4px 9px var(--neu-d),inset -3px -3px 8px var(--neu-l)!important}
+body[data-look="neu"] #transport #btn-play{color:var(--accent)}
+body[data-look="neu"] .switch span{background:var(--neu);box-shadow:inset 3px 3px 6px var(--neu-d),inset -2px -2px 5px var(--neu-l)}
+body[data-look="neu"] #cover{box-shadow:14px 14px 30px var(--neu-d),-10px -10px 24px var(--neu-l)}
+body[data-look="neu"] #bar{box-shadow:inset 2px 2px 4px var(--neu-d),inset -2px -2px 4px var(--neu-l);background:var(--neu)}
+
+/* — 黏土 Claymorphism：圓鼓鼓、粉彩、像捏出來的 — */
+body[data-look="clay"]{--clay:color-mix(in srgb,var(--accent) 30%,rgb(var(--panel)))}
+body[data-look="clay"] :is(#settings,.dialog){border-radius:34px;border:0;background:var(--clay);backdrop-filter:none;
+  box-shadow:0 26px 50px -12px rgba(0,0,0,.5),inset 0 -10px 22px rgba(0,0,0,.22),inset 0 8px 16px rgba(255,255,255,.22)}
+body[data-look="clay"] .card{border-radius:24px;border:0;background:color-mix(in srgb,#fff 8%,transparent);
+  box-shadow:inset 0 -6px 12px rgba(0,0,0,.16),inset 0 5px 10px rgba(255,255,255,.18),0 8px 16px -6px rgba(0,0,0,.3)}
+body[data-look="clay"] :is(.seg button,.chip,#set-tabs button){border-radius:16px;border:0;background:color-mix(in srgb,#fff 10%,transparent);
+  box-shadow:inset 0 -4px 8px rgba(0,0,0,.18),inset 0 3px 6px rgba(255,255,255,.22),0 4px 10px -4px rgba(0,0,0,.35)}
+body[data-look="clay"] :is(.seg button.on,#set-tabs button.on){background:color-mix(in srgb,var(--accent2) 75%,#fff 10%)!important;color:#fff!important}
+body[data-look="clay"] #transport #btn-play{background:color-mix(in srgb,var(--accent2) 80%,#fff 15%);color:#fff;
+  box-shadow:inset 0 -6px 12px rgba(0,0,0,.25),inset 0 5px 10px rgba(255,255,255,.4),0 14px 24px -8px rgba(0,0,0,.55)}
+body[data-look="clay"] #cover{border-radius:36px;box-shadow:0 30px 50px -16px rgba(0,0,0,.6),inset 0 0 0 4px rgba(255,255,255,.15)}
+body[data-look="clay"] .line.active{border-radius:24px;background:color-mix(in srgb,var(--accent) 14%,transparent)}
+
+/* — 便當格 Bento：每個區塊是一格圓角磚 — */
+body[data-look="bento"] #left > *{background:rgba(var(--ink),.06);border:1px solid rgba(var(--ink),.08);border-radius:24px;padding:14px 16px}
+body[data-look="bento"] #left > #cover-wrap{padding:0;background:none;border:0}
+body[data-look="bento"] #left{gap:10px}
+body[data-look="bento"] #right{background:rgba(var(--ink),.035);border:1px solid rgba(var(--ink),.07);border-radius:28px}
+body[data-look="bento"] #settings .grp{background:rgba(var(--ink),.04);border-radius:22px;padding:14px;margin-bottom:10px}
+body[data-look="bento"] .card{border-radius:16px;background:rgba(var(--ink),.05);border:0}
+body[data-look="bento"] :is(.seg button,.chip){border-radius:12px}
+body[data-look="bento"] #cover{border-radius:24px}
+@media (min-width:861px){
+  body[data-look="bento"] #settings .grp{display:block}
+}
+
+/* — 瑞士 / 國際主義：網格、無圓角、無陰影、大字標題、紅色重點 — */
+body[data-look="swiss"][data-theme]{--font:"Helvetica Neue","Inter","Arial","Noto Sans TC",sans-serif;--accent:#e2231a!important;--accent2:#e2231a!important}
+body[data-look="swiss"] #bg .blob,body[data-look="swiss"] #grain,body[data-look="swiss"] #cover-glow{display:none}
+body[data-look="swiss"] #bg .art.on{opacity:.08;filter:grayscale(1) blur(60px)}
+body[data-look="swiss"] *{border-radius:0!important}
+body[data-look="swiss"] :is(#settings,.dialog,.card,.chip,.seg button,#cover){box-shadow:none!important;backdrop-filter:none!important}
+body[data-look="swiss"] :is(#settings,.dialog){background:rgb(var(--panel));border:0;border-top:6px solid #e2231a}
+body[data-look="swiss"] .card{background:none;border:0;border-top:2px solid var(--fg)}
+body[data-look="swiss"] :is(.seg button,.chip){border:1px solid rgba(var(--ink),.5);background:none}
+body[data-look="swiss"] :is(.seg button.on,#set-tabs button.on){background:#e2231a!important;color:#fff!important;border-color:#e2231a!important}
+body[data-look="swiss"] #title{font-weight:800;letter-spacing:-.045em;font-size:clamp(30px,min(3.8vw,5.6vh),56px);line-height:.98}
+body[data-look="swiss"] #artist{text-transform:uppercase;letter-spacing:.14em;font-size:12px;font-weight:700}
+body[data-look="swiss"] #settings h3{color:#e2231a}
+body[data-look="swiss"] .line{font-weight:700;letter-spacing:-.03em}
+body[data-look="swiss"] .line.active .txt{color:var(--hi)}
+body[data-look="swiss"] .line.active::before{content:"";position:absolute;left:-6px;top:22%;bottom:22%;width:5px;background:#e2231a}
+body[data-look="swiss"] .line{position:relative}
+body[data-look="swiss"] #bar{height:4px}
+body[data-look="swiss"] #transport #btn-play{background:#e2231a;color:#fff}
+
+/* — 雜誌編排 Editorial：襯線字、細線、大標題、斜體副標 — */
+body[data-look="editorial"]{--font:"Noto Serif TC","Source Han Serif TC","Georgia","PMingLiU",serif}
+body[data-look="editorial"] #title{font-weight:900;font-size:clamp(30px,min(3.6vw,5.4vh),54px);letter-spacing:-.01em;line-height:1.05}
+body[data-look="editorial"] #artist{font-style:italic;font-weight:400;border-top:1px solid rgba(var(--ink),.35);padding-top:8px}
+body[data-look="editorial"] .line{font-weight:600;letter-spacing:0}
+body[data-look="editorial"] .line .tr,body[data-look="editorial"] .line .rd{font-style:italic}
+body[data-look="editorial"] :is(.card,.chip,.seg button,#settings,.dialog,#cover,.gthumb){border-radius:2px}
+body[data-look="editorial"] .card{background:none;border:0;border-top:1px solid rgba(var(--ink),.3);border-bottom:1px solid rgba(var(--ink),.12)}
+body[data-look="editorial"] #settings h3{font-family:var(--font);font-style:italic;text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg);
+  border-bottom:3px double rgba(var(--ink),.35);padding-bottom:4px}
+body[data-look="editorial"] :is(.seg button.on,#set-tabs button.on){background:none!important;color:var(--hi)!important;border-color:transparent!important;
+  text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:2px;box-shadow:none!important}
+body[data-look="editorial"] .gthumb{opacity:0!important}
+body[data-look="editorial"] #cover{box-shadow:0 1px 0 rgba(var(--ink),.3),0 24px 40px -24px rgba(0,0,0,.6)}
+
+/* — 粗獷 Brutalism：粗黑框、硬陰影、等寬字、直角 — */
+body[data-look="brutal"]{--font:"JetBrains Mono","Consolas","Noto Sans TC",monospace;--bru:var(--fg)}
+body[data-look="brutal"] #bg .blob,body[data-look="brutal"] #grain,body[data-look="brutal"] #cover-glow{display:none}
+body[data-look="brutal"] #bg .art.on{opacity:.15;filter:grayscale(.6) contrast(1.4) blur(40px)}
+body[data-look="brutal"] *{border-radius:0!important}
+body[data-look="brutal"] :is(#settings,.dialog){background:rgb(var(--panel));backdrop-filter:none;border:3px solid var(--bru);box-shadow:10px 10px 0 var(--bru)}
+body[data-look="brutal"] .card{border:2px solid var(--bru);background:none}
+body[data-look="brutal"] :is(.seg button,.chip,#set-tabs button){border:2px solid var(--bru);background:none;box-shadow:3px 3px 0 var(--bru);font-weight:700;transition:transform .08s,box-shadow .08s}
+body[data-look="brutal"] :is(.seg button,.chip,#set-tabs button):active{transform:translate(3px,3px);box-shadow:none}
+body[data-look="brutal"] :is(.seg button.on,#set-tabs button.on){background:var(--accent)!important;color:#000!important;border-color:var(--bru)!important}
+body[data-look="brutal"] #cover{border:3px solid var(--bru);box-shadow:12px 12px 0 var(--bru)}
+body[data-look="brutal"] #title{text-transform:uppercase;font-weight:900;letter-spacing:-.02em}
+body[data-look="brutal"] .line.active{background:var(--accent);color:#000}
+body[data-look="brutal"] .line.active .txt{color:#000!important;text-shadow:none!important}
+body[data-look="brutal"] #bar{height:10px;border:2px solid var(--bru);background:none}
+body[data-look="brutal"] #transport #btn-play{border:3px solid var(--bru)!important;box-shadow:4px 4px 0 var(--bru)}
+
+/* — 擬物 Skeuomorphism：拉絲金屬按鈕、縫線皮革面板、浮雕字 — */
+body[data-look="skeuo"] :is(#settings,.dialog){border:0;backdrop-filter:none;
+  background:repeating-linear-gradient(45deg,rgba(255,255,255,.012) 0 2px,rgba(0,0,0,.02) 2px 4px),linear-gradient(180deg,#3b2a20,#2a1d16);
+  box-shadow:inset 0 0 0 6px rgba(0,0,0,.18),inset 0 0 0 7px rgba(255,220,180,.22),0 30px 60px rgba(0,0,0,.6);--ink:255,240,225;--fg:#f4e6d6;--hi:#fff8ef}
+body[data-look="skeuo"] #settings .card{background:rgba(0,0,0,.2);border:1px dashed rgba(255,220,180,.35);border-radius:10px;box-shadow:inset 0 2px 6px rgba(0,0,0,.4)}
+body[data-look="skeuo"] :is(.seg button,.chip,#set-tabs button,#transport .side){border:1px solid rgba(0,0,0,.55);color:#2b2b2b;text-shadow:0 1px 0 rgba(255,255,255,.7);
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,0) 0 1px,rgba(255,255,255,.08) 1px 2px),linear-gradient(180deg,#f2f2f2,#bdbdbd 55%,#a9a9a9);
+  box-shadow:inset 0 1px 0 #fff,0 2px 3px rgba(0,0,0,.5)}
+body[data-look="skeuo"] :is(.seg button.on,#set-tabs button.on){color:#fff!important;text-shadow:0 -1px 0 rgba(0,0,0,.5)!important;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent2) 70%,#000),var(--accent2))!important;box-shadow:inset 0 2px 5px rgba(0,0,0,.55)!important}
+body[data-look="skeuo"] #transport #btn-play{background:radial-gradient(circle at 50% 30%,#fff,#d9d9d9 45%,#9b9b9b);color:#333;
+  box-shadow:inset 0 -3px 6px rgba(0,0,0,.25),0 0 0 4px #555,0 0 0 5px #999,0 10px 20px rgba(0,0,0,.6)}
+body[data-look="skeuo"] #cover{border-radius:4px;box-shadow:0 0 0 1px #000,0 2px 0 3px rgba(255,255,255,.12),0 30px 50px rgba(0,0,0,.7)}
+body[data-look="skeuo"] #cover-wrap::after{content:"";position:absolute;inset:0;border-radius:4px;pointer-events:none;
+  background:linear-gradient(160deg,rgba(255,255,255,.35),rgba(255,255,255,0) 45%)}
+body[data-look="skeuo"] #title{text-shadow:0 -1px 0 rgba(0,0,0,.6),0 1px 0 rgba(255,255,255,.18)}
+body[data-look="skeuo"] #bar{height:9px;background:linear-gradient(180deg,#111,#333);box-shadow:inset 0 1px 3px #000,0 1px 0 rgba(255,255,255,.15)}
+body[data-look="skeuo"] .switch span{background:linear-gradient(180deg,#666,#999);box-shadow:inset 0 2px 4px rgba(0,0,0,.6)}
+
+/* — Y2K：鉻金屬、彩虹全像、泡泡亮面 — */
+body[data-look="y2k"]{--holo:linear-gradient(115deg,#ff9de6,#a0e9ff 25%,#c9b6ff 45%,#fffaa8 65%,#9dffd2 85%,#ff9de6)}
+body[data-look="y2k"] :is(#settings,.dialog){border-radius:26px;border:2px solid transparent;
+  background:linear-gradient(rgba(var(--panel),.86),rgba(var(--panel),.86)) padding-box,var(--holo) border-box}
+body[data-look="y2k"] :is(.seg button,.chip,#set-tabs button){border-radius:999px}
+body[data-look="y2k"] :is(.seg button.on,#set-tabs button.on){background:var(--holo)!important;background-size:200% 100%!important;color:#222!important;
+  animation:holo 4s linear infinite;box-shadow:inset 0 2px 0 rgba(255,255,255,.8),0 0 12px rgba(200,180,255,.6)!important}
+@keyframes holo{to{background-position:200% 0}}
+body[data-look="y2k"] #title{background:linear-gradient(180deg,#fff 0%,#cfd6e6 45%,#6f7a90 50%,#e9edf5 75%,#fff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;font-style:italic;filter:drop-shadow(0 2px 0 rgba(0,0,0,.35))}
+body[data-look="y2k"] #transport #btn-play{background:radial-gradient(circle at 35% 25%,#fff 0 12%,transparent 30%),var(--holo);color:#222;
+  box-shadow:inset 0 -6px 12px rgba(0,0,0,.15),0 0 0 2px rgba(255,255,255,.7),0 10px 26px rgba(160,140,255,.55)}
+body[data-look="y2k"] #cover{border-radius:26px;box-shadow:0 0 0 3px rgba(255,255,255,.8),0 0 0 6px rgba(190,170,255,.6),0 30px 60px -20px rgba(0,0,0,.6)}
+body[data-look="y2k"] .line.active .txt{background:var(--holo);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:holo 6s linear infinite}
+body[data-look="y2k"] #bar > *{background:var(--holo)!important}
+
+/* — 復古 CRT：綠色磷光、掃描線、輕微閃爍 — */
+body[data-look="crt"][data-theme]{--ink:120,255,150;--fg:#7dff9a;--hi:#b8ffca;--dim:rgba(120,255,150,.4);--bg0:#020a04;--panel:4,18,8;
+  --accent:#7dff9a!important;--accent2:#33d16a!important;--pill:#7dff9a;--pill-fg:#021a08;--glass:rgba(120,255,150,.06);--glass-b:rgba(120,255,150,.25);
+  --font:"VT323","Consolas","Cascadia Mono","MingLiU",monospace}
+body[data-look="crt"] #bg .art.on{opacity:.12;filter:grayscale(1) sepia(1) hue-rotate(70deg) saturate(3) blur(50px)}
+body[data-look="crt"] #bg .blob{opacity:.08!important;filter:blur(120px) grayscale(1) sepia(1) hue-rotate(70deg)}
+body[data-look="crt"] #cover{filter:grayscale(1) sepia(1) hue-rotate(70deg) saturate(2.2) contrast(1.15);border-radius:6px}
+body[data-look="crt"] :is(#title,#artist,.line,.chip,.seg button,#settings){text-shadow:0 0 6px rgba(125,255,154,.55)}
+body[data-look="crt"] :is(#settings,.dialog){background:rgba(2,14,6,.94);border:1px solid rgba(120,255,150,.35);border-radius:6px}
+body[data-look="crt"] :is(.card,.seg button,.chip,#set-tabs button){border-radius:3px}
+body[data-look="crt"]::after{content:"";position:fixed;inset:0;z-index:60;pointer-events:none;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.55));
+  animation:crtflick 4s steps(1) infinite}
+@keyframes crtflick{0%,100%{opacity:1}47%{opacity:.92}48%{opacity:1}72%{opacity:.96}}
+body[data-look="crt"] .line.active .txt::after{content:"▌";animation:blink 1s steps(1) infinite;margin-left:4px}
+@keyframes blink{50%{opacity:0}}
+
+/* — 極光 Aurora：流動的極光色帶 + 玻璃 — */
+body[data-look="aurora"] .blob{filter:blur(90px) saturate(1.6);opacity:.7!important;mix-blend-mode:screen}
+body[data-look="aurora"] .b1{background:#22e6a8!important}
+body[data-look="aurora"] .b2{background:#7b4dff!important}
+body[data-look="aurora"] .b3{background:#1fb8ff!important}
+body[data-look="aurora"] #bg::before{content:"";position:absolute;inset:-30%;z-index:1;opacity:.55;mix-blend-mode:screen;filter:blur(60px);
+  background:conic-gradient(from 0deg at 50% 60%,transparent,#24ffb0 12%,transparent 25%,#8f5cff 45%,transparent 60%,#29c4ff 78%,transparent);
+  animation:aurora calc(40s - var(--mood,.5) * 20s) linear infinite}
+@keyframes aurora{to{transform:rotate(1turn)}}
+body[data-look="aurora"] #bg .art.on{opacity:.35}
+body[data-look="aurora"] .line.active .txt{text-shadow:0 0 24px rgba(80,255,200,.35)}
+
+/* — 水墨 Monochrome Ink：只有黑白灰、宣紙、襯線字 — */
+body[data-look="ink"][data-theme]{--ink:20,20,20;--fg:#1a1a1a;--hi:#000;--dim:rgba(20,20,20,.42);--bg0:#f3efe6;--panel:246,242,233;--dialog:#f6f2e9;
+  --accent:#1a1a1a!important;--accent2:#1a1a1a!important;--pill:#111;--pill-fg:#f3efe6;--glass:rgba(20,20,20,.04);--glass-b:rgba(20,20,20,.16);--shade:243,239,230;
+  --font:"Noto Serif TC","Source Han Serif TC","PMingLiU",serif}
+body[data-look="ink"] #bg .blob{display:none}
+body[data-look="ink"] #bg .art.on{opacity:.18;filter:grayscale(1) contrast(1.3) blur(70px) brightness(1.4)}
+body[data-look="ink"] #bg::after{background:radial-gradient(ellipse at 70% 30%,rgba(0,0,0,.06),transparent 60%),rgba(243,239,230,.82)}
+body[data-look="ink"] #grain{opacity:.09;mix-blend-mode:multiply}
+body[data-look="ink"] #cover{filter:grayscale(1) contrast(1.1);border-radius:3px;box-shadow:0 20px 40px -20px rgba(0,0,0,.35)}
+body[data-look="ink"] #cover-glow{display:none}
+body[data-look="ink"] :is(#settings,.dialog){background:rgb(var(--panel));backdrop-filter:none;border:1px solid rgba(0,0,0,.18);border-radius:4px}
+body[data-look="ink"] :is(.card,.seg button,.chip){border-radius:3px}
+body[data-look="ink"] .line.active .txt{text-shadow:none!important}
+body[data-look="ink"] .line.active::after{content:"";position:absolute;left:8px;right:30%;bottom:6px;height:10px;z-index:-1;opacity:.12;border-radius:50%;
+  background:radial-gradient(ellipse,#000,transparent 70%)}
+body[data-look="ink"] .line{position:relative}
+body[data-look="ink"] #timetint{display:none}
 </style>
 </head>
 <body>
 <div id="bg" data-mode="album"><div class="art" id="bg-art"></div><div id="bg-custom"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
-<div id="grain"></div>
+<div id="grain"></div><div id="timetint"></div>
 
 <header id="set-bar"><div class="drag" data-drag><img src="/icon.png" alt="">Hummi 設定</div>
   <button id="set-expand" class="fi" title="打開完整視窗">&#xE740;</button><button id="set-close" class="fi" title="關閉">&#xE8BB;</button></header>
@@ -800,7 +1040,7 @@ body.idle #status{display:none}
   <section id="left">
     <div id="cover-wrap" class="paused"><div id="cover-glow"></div><img id="cover" alt=""></div>
     <div class="meta">
-      <button id="source" class="paused" title="切換來源"><span class="dot"></span><span id="source-name">等待中</span></button>
+      <button id="source" class="paused" title="切換來源"><span class="dot"></span><span id="source-name">等待中</span></button><span id="mood" title="依照音樂的能量和節奏判斷；動畫速度和光暈會跟著調整"></span>
       <h1 id="title">—</h1>
       <div id="artist"></div>
     </div>
@@ -884,7 +1124,7 @@ body.idle #status{display:none}
   <section class="grp"><h3>介面質感與版面</h3>
     <div class="card">
       <div class="row col">質感
-        <div class="seg two" id="ui-looks"><button data-look="glass">✨ 玻璃</button><button data-look="flat">簡潔</button></div>
+        <div class="seg looks" id="ui-looks"><button data-look="glass"><b>✨ 玻璃</b><small>Liquid Glass</small></button><button data-look="flat"><b>簡潔</b><small>純色、少裝飾</small></button><button data-look="fluent"><b>Fluent</b><small>Win11 壓克力</small></button><button data-look="material"><b>Material</b><small>大圓角色調</small></button><button data-look="neu"><b>新擬物</b><small>同色凸起凹下</small></button><button data-look="clay"><b>黏土</b><small>圓鼓鼓粉彩</small></button><button data-look="bento"><b>便當格</b><small>一格一格磚</small></button><button data-look="swiss"><b>瑞士</b><small>網格・紅・直角</small></button><button data-look="editorial"><b>雜誌</b><small>襯線・細線</small></button><button data-look="brutal"><b>粗獷</b><small>粗框硬陰影</small></button><button data-look="skeuo"><b>擬物</b><small>金屬・皮革</small></button><button data-look="y2k"><b>Y2K</b><small>鉻・彩虹全像</small></button><button data-look="crt"><b>復古 CRT</b><small>綠磷光掃描線</small></button><button data-look="aurora"><b>極光</b><small>流動色帶</small></button><button data-look="ink"><b>水墨</b><small>黑白・宣紙</small></button></div>
       </div>
       <div class="row col">版面
         <div class="seg five" id="layouts"><button data-layout="classic" title="封面在左、歌詞在右">經典</button><button data-layout="mirror" title="歌詞在左、封面在右">鏡像</button>
@@ -892,6 +1132,7 @@ body.idle #status{display:none}
           <button data-layout="vinyl" title="封面變成黑膠唱片，播放時會轉">唱片</button></div>
       </div>
       <label class="row" title="整個介面的主題色跟著專輯封面最鮮豔的顏色；封面太灰太暗時用原本風格的顏色">主題色跟著封面 <span class="switch"><input type="checkbox" id="cover-accent"><span></span></span></label>
+      <label class="row" title="傍晚開始整個介面慢慢加一層很淡的暖色、稍微調暗，深夜最明顯，白天完全不加">時間感知配色 <span class="switch"><input type="checkbox" id="time-tint"><span></span></span></label>
       <label class="row" title="切換選項、按按鈕、展開膠囊時很輕的「咔」聲。直播時 OBS 通常會錄到桌面聲音，所以預設關">操作音效 <span class="switch"><input type="checkbox" id="ui-sound"><span></span></span></label>
       <p class="hint">玻璃：選中時一片玻璃滑過去、按下去會彈一下。沉浸：歌詞佔滿畫面；唱片：封面變成會轉的黑膠。</p>
     </div>
@@ -906,6 +1147,7 @@ body.idle #status{display:none}
         <button data-ls="karaoke"><b>卡拉 OK</b><span>兩行一左一右</span></button>
         <button data-ls="type"><b>打字機</b><span>字一個個浮現</span></button>
         <button data-ls="pop"><b>彈跳</b><span>換句時彈一下、發光</span></button>
+        <button data-ls="space"><b>空間</b><span>唱過的往後退，下一句從遠處浮來</span></button>
       </div>
     </div>
   </section>
@@ -1255,9 +1497,10 @@ function onState(m){
     renderShare();
     applyTheme(cfg.theme);
     if (performance.now() - lsEdit > 1500) applyLyrStyle(cfg.lyr_style);
-    if (performance.now() - lookEdit > 1500) applyLook(cfg.ui_look);
+    if (performance.now() - lookEdit > 1500 && !window.lookHover) applyLook(cfg.ui_look);
     if (performance.now() - accentEdit > 1500){ coverAccent = cfg.cover_accent !== false; $('#cover-accent').checked = coverAccent; applyAccent(); }
     if (performance.now() - accentEdit > 1500){ uiSound = !!cfg.ui_sound; $('#ui-sound').checked = uiSound; }
+    if (performance.now() - accentEdit > 1500){ timeTint = cfg.time_tint !== false; $('#time-tint').checked = timeTint; applyTimeTint(); }
     if (performance.now() - layoutEdit > 1500) applyLayout(cfg.layout);
     { const z = cfg.ui_zoom || 100, near = [90, 100, 115, 130, 150].reduce((a, b) => Math.abs(b - z) < Math.abs(a - z) ? b : a);
       document.querySelectorAll('#zooms [data-z]').forEach(b => b.classList.toggle('on', +b.dataset.z === near)); }
@@ -1457,11 +1700,14 @@ function findIdx(t){
 
 function scrollTo(el){
   const target = el.offsetTop - els.right.clientHeight * 0.38 + el.offsetHeight / 2;
-  els.lyrics.style.transform = `translateY(${-Math.max(0, target) | 0}px)`;
+  lastBase = Math.max(0, target);
+  if (els.lyrics.classList.contains('manual')) return;  // 使用者正在自己捲：先不要拉回去
+  els.lyrics.style.transform = `translateY(${-lastBase | 0}px)`;
 }
 
 function frame(){
   requestAnimationFrame(frame);
+  stepManual();
   if (!track) return;
   let pos = now(); if (duration) pos = Math.min(pos, duration);
   $('#fill').style.width = duration ? `${pos / duration * 100}%` : '0';
@@ -1484,6 +1730,7 @@ function frame(){
       el.classList.toggle('past', i < idx);
       el.style.filter = dist === 0 ? '' : `blur(${Math.min(dist * .6, 3)}px)`;
       el.style.opacity = Math.max(.25, 1 - dist * .12);
+      el.style.setProperty('--d', i - idx);
     });
     scrollTo(idx < 0 ? lineEls.intro : lineEls[idx]);
   }
@@ -2142,9 +2389,17 @@ document.addEventListener('pointermove', e => {
   el.style.setProperty('--mx', (e.clientX - r.left) + 'px'); el.style.setProperty('--my', (e.clientY - r.top) + 'px');
 }, {passive: true});
 let lookEdit = 0, layoutEdit = 0, accentEdit = 0;
+const LOOKS = ['glass', 'flat', 'fluent', 'material', 'neu', 'clay', 'bento', 'swiss', 'editorial', 'brutal', 'skeuo', 'y2k', 'crt', 'aurora', 'ink'];
+const GLASSY = ['glass', 'fluent', 'aurora', 'y2k'];  // 這幾個風格沿用玻璃的滑動選取效果
+let curLook = 'glass';
+function setLookClass(v){
+  document.body.dataset.look = v;
+  document.body.classList.toggle('glass', GLASSY.includes(v));
+}
 function applyLook(v){
-  v = v === 'flat' ? 'flat' : 'glass';
-  document.body.classList.toggle('glass', v === 'glass');
+  v = LOOKS.includes(v) ? v : 'glass';
+  curLook = v;
+  setLookClass(v);
   document.querySelectorAll('#ui-looks [data-look]').forEach(b => b.classList.toggle('on', b.dataset.look === v));
   try { localStorage.setItem('look', v); } catch {}
   placeAllThumbs();
@@ -2157,8 +2412,14 @@ function applyLayout(v){
 }
 try { applyLook(localStorage.getItem('look') || 'glass'); applyLayout(localStorage.getItem('layout') || 'classic'); } catch { applyLook('glass'); }
 $('#cover-accent').onchange = e => { accentEdit = performance.now(); coverAccent = e.target.checked; applyAccent(); send({type: 'cover_accent', value: coverAccent}); };
+$('#time-tint').onchange = e => { accentEdit = performance.now(); timeTint = e.target.checked; applyTimeTint(); send({type: 'time_tint', value: timeTint}); };
 $('#ui-sound').onchange = e => { accentEdit = performance.now(); uiSound = e.target.checked; if (uiSound) tick(true); send({type: 'ui_sound', value: uiSound}); };
-document.querySelectorAll('#ui-looks [data-look]').forEach(b => b.onclick = () => { lookEdit = performance.now(); applyLook(b.dataset.look); send({type: 'ui_look', value: b.dataset.look}); });
+document.querySelectorAll('#ui-looks [data-look]').forEach(b => {
+  b.onclick = () => { window.lookHover = false; lookEdit = performance.now(); applyLook(b.dataset.look); send({type: 'ui_look', value: b.dataset.look}); };
+  // 滑過去就先套用看看 (預覽)，離開就換回來
+  b.onmouseenter = () => { window.lookHover = true; setLookClass(b.dataset.look); placeAllThumbs(); };
+  b.onmouseleave = () => { window.lookHover = false; setLookClass(curLook); placeAllThumbs(); };
+});
 document.querySelectorAll('#layouts [data-layout]').forEach(b => b.onclick = () => { layoutEdit = performance.now(); applyLayout(b.dataset.layout); send({type: 'layout', value: b.dataset.layout}); });
 initGlassThumbs();
 
@@ -2223,6 +2484,7 @@ function onViz(m){
   beatAvg = beatAvg * .93 + e * .07;
   const hit = e > beatAvg * 1.3 + .03 ? 1 : 0;   // 比平均大很多 = 重拍
   beatV = Math.max(beatV * .86, Math.min(1, e * 1.2) * .35 + hit * .6);
+  updateMood(e, hit);
   document.documentElement.style.setProperty('--beat', beatV.toFixed(3));
 }
 document.body.classList.add('beat');
@@ -2265,11 +2527,11 @@ setInterval(renderIdle, 1000 * 15);
 // ───── 設定的即時預覽：滑鼠移到風格 / 字體上先看看 ─────
 let pvTheme = null, pvFontTimer = 0;
 document.querySelectorAll('#themes [data-theme]').forEach(b => {
-  b.addEventListener('mouseenter', () => { pvTheme = pvTheme ?? document.body.dataset.theme; document.body.dataset.theme = b.dataset.theme; applyAccent();
+  b.addEventListener('mouseenter', () => { window.pvHovering = true; pvTheme = pvTheme ?? document.body.dataset.theme; document.body.dataset.theme = b.dataset.theme; applyAccent();
     $('#pv-tag').textContent = '預覽：' + b.textContent.trim(); });
-  b.addEventListener('mouseleave', () => { if (pvTheme != null && !b.classList.contains('on')) document.body.dataset.theme = pvTheme; pvTheme = null; applyAccent();
+  b.addEventListener('mouseleave', () => { window.pvHovering = false; if (pvTheme != null && !b.classList.contains('on')) document.body.dataset.theme = pvTheme; pvTheme = null; applyAccent();
     $('#pv-tag').textContent = '目前的樣子'; });
-  b.addEventListener('click', () => { pvTheme = null; });
+  b.addEventListener('click', () => { pvTheme = null; window.pvHovering = false; });
 });
 $('#font-list').addEventListener('mouseover', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -2279,8 +2541,78 @@ $('#font-list').addEventListener('mouseover', e => {
 });
 $('#font-list').addEventListener('mouseleave', () => { pvFontTimer = setTimeout(() => { $('#pv-card').style.removeProperty('--font'); $('#pv-tag').textContent = '目前的樣子'; }, 150); });
 
+
+// ───── 觸感捲動：滾輪 / 拖曳有慣性，捲過頭會回彈，停手後滑回正在唱的那句 ─────
+let userOff = 0, userV = 0, lastBase = 0, manualAt = 0, dragging = false, dragY = 0, dragMoved = 0;
+const manualOn = () => performance.now() - manualAt < 2500 || dragging;
+function maxScroll(){ return Math.max(0, els.lyrics.scrollHeight - els.right.clientHeight * .5); }
+function applyManual(){
+  const S = lastBase + userOff, mx = maxScroll();
+  let shown = S;
+  if (S < 0) shown = S * .35; else if (S > mx) shown = mx + (S - mx) * .35;  // 捲過頭：阻力 (像橡皮筋)
+  els.lyrics.style.transform = `translateY(${-shown | 0}px)`;
+}
+els.right.addEventListener('wheel', e => {
+  if (!lyr?.synced || els.right.classList.contains('scroll')) return;
+  e.preventDefault();
+  manualAt = performance.now(); els.lyrics.classList.add('manual');
+  userV += e.deltaY * .18;
+}, {passive: false});
+els.right.addEventListener('pointerdown', e => {
+  if (!lyr?.synced || e.button !== 0 || els.right.classList.contains('scroll')) return;
+  dragging = true; dragY = e.clientY; dragMoved = 0; userV = 0;
+});
+addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const dy = e.clientY - dragY; dragY = e.clientY; dragMoved += Math.abs(dy);
+  if (dragMoved > 6){ els.right.classList.add('grab'); els.lyrics.classList.add('manual'); manualAt = performance.now(); }
+  userOff -= dy; userV = -dy;
+});
+addEventListener('pointerup', () => { if (!dragging) return; dragging = false; els.right.classList.remove('grab'); manualAt = performance.now(); });
+els.right.addEventListener('click', e => { if (dragMoved > 6){ e.stopPropagation(); e.preventDefault(); dragMoved = 0; } }, true);  // 拖完不要當成點歌詞
+function stepManual(){
+  if (!els.lyrics.classList.contains('manual')) return;
+  if (manualOn()){
+    if (!dragging){
+      userOff += userV; userV *= .9;  // 慣性
+      const S = lastBase + userOff, mx = maxScroll();
+      if (S < 0) userOff -= S * .18; else if (S > mx) userOff -= (S - mx) * .18;  // 回彈
+    }
+    applyManual();
+  } else {  // 停手了：滑回正在唱的那句
+    userOff = 0; userV = 0; els.lyrics.classList.remove('manual'); activeIdx = -2;
+  }
+}
+// ───── 歌曲情緒：能量 + 重拍頻率 → 抒情 / 中板 / 激昂 ─────
+let moodE = -1, beatTimes = [], moodV = .5, moodShown = '';
+function updateMood(e, hit){
+  const t = performance.now();
+  moodE = moodE < 0 ? e : moodE * .985 + e * .015;      // 大約 15 秒的平均能量
+  if (hit) beatTimes.push(t);
+  beatTimes = beatTimes.filter(x => t - x < 12000);
+  const bpmish = beatTimes.length / 12 * 60;               // 每分鐘重拍數 (粗估)
+  const target = Math.max(0, Math.min(1, (moodE - .08) * 2.2 * .6 + (bpmish - 50) / 90 * .4));
+  moodV += (target - moodV) * .02;
+  document.documentElement.style.setProperty('--mood', moodV.toFixed(3));
+  const label = moodV < .33 ? '🌙 抒情' : moodV < .66 ? '🎵 中板' : '🔥 激昂';
+  if (label !== moodShown && beatTimes.length + (moodE > .02 ? 4 : 0) > 4){
+    moodShown = label; const el = $('#mood'); if (el){ el.textContent = label; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+  }
+}
+// ───── 時間感知配色 ─────
+let timeTint = true;
+function applyTimeTint(){
+  const el = $('#timetint'); if (!el) return;
+  const h = new Date().getHours() + new Date().getMinutes() / 60;
+  // 白天 0；傍晚 18 點開始慢慢變暖，23～4 點最暖，早上 7 點前退掉
+  const w = h >= 18 ? Math.min(1, (h - 18) / 5) : h < 4 ? 1 : h < 7 ? 1 - (h - 4) / 3 : 0;
+  el.style.opacity = timeTint ? (w * .16).toFixed(3) : 0;
+  document.documentElement.style.setProperty('--night', timeTint ? w.toFixed(2) : 0);
+}
+setInterval(applyTimeTint, 5 * 60 * 1000);
+
 function applyLyrStyle(v){
-  v = v || 'flow';
+  v = ['flow', 'clear', 'center', 'spot', 'karaoke', 'type', 'pop', 'space'].includes(v) ? v : 'flow';
   if (document.body.dataset.ls !== v){ document.body.dataset.ls = v; activeIdx = -2; try { localStorage.setItem('ls', v); } catch {} }
   document.querySelectorAll('#lyr-styles [data-ls]').forEach(b => b.classList.toggle('on', b.dataset.ls === v));
 }
@@ -2291,6 +2623,7 @@ document.querySelectorAll('#lyr-styles [data-ls]').forEach(b => b.onclick = () =
 
 function applyTheme(t){
   if (performance.now() - themeEdit < 1500) return;
+  if (window.pvHovering) return;  // 滑鼠正在預覽別的風格：先不要改回去
   t = t || 'night';
   if (document.body.dataset.theme !== t){
     // 換風格時先關掉所有過場動畫：幾百行歌詞一起慢慢變色會卡住，直接換掉比較乾淨
