@@ -807,6 +807,11 @@ body.beat .line.active .txt{text-shadow:0 0 calc(var(--beat,0) * (14px + var(--m
 #ui-looks.looks > button{height:auto;min-height:48px;padding:7px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.2}
 #ui-looks.looks > button small{font:400 10.5px var(--font);color:var(--dim);opacity:.9}
 #ui-looks.looks > button.on small{color:inherit;opacity:.7}
+/* 風格格子在每個風格下都一樣大 (預覽時才不會跑掉) */
+#ui-looks.looks{gap:6px!important;padding:3px!important;border:1px solid rgba(var(--ink),.08)!important}
+#ui-looks.looks > button{height:52px!important;min-height:0!important;margin:0!important;padding:0 6px!important;border-width:1px!important;border-style:solid!important;
+  font:600 13px/1.2 "Inter","Noto Sans TC",system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important;transform:none!important}
+#ui-looks.looks > button small{font:400 10.5px/1.2 "Inter","Noto Sans TC",system-ui,sans-serif!important;letter-spacing:0!important}
 
 /* — Fluent / Mica：Windows 11 的壓克力材質、方一點的角、選中的左側亮條 — */
 body[data-look="fluent"]{--font:"Segoe UI Variable Text","Segoe UI","Noto Sans TC",system-ui,sans-serif}
@@ -2514,18 +2519,29 @@ document.querySelectorAll('#ui-looks [data-look]').forEach(b => {
 // 滑鼠移過去就先套用看看 (預覽)，移開就換回來。
 // 只看「滑鼠真的有移動」：換風格時按鈕大小會變、會從游標底下滑走，
 // 如果照 mouseenter / mouseleave 來切，會一直換來換去 (畫面抖動)。
-var lookPx = -1, lookPy = -1, lookTimer = 0, lookShown = '';
+// 另外兩件事避免「滑鼠沒動、格子自己跑到別的風格上」：
+//  1. 換風格後把設定頁捲回去，讓風格格子停在螢幕上同一個位置 (格子本身的大小也固定，見 CSS)
+//  2. 預覽開始後，手要移超過 14px 才算換到別的格子 (手微微晃不算)
+var lookPx = -1, lookPy = -1, lookTimer = 0, lookShown = '', lookAx = 0, lookAy = 0;
+function setLookAnchored(v){
+  const grid = $('#ui-looks'), top0 = grid.getBoundingClientRect().top;
+  setLookClass(v); placeAllThumbs();
+  let sc = grid.parentElement;
+  while (sc && !(sc.scrollHeight > sc.clientHeight && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+  if (sc) sc.scrollTop += grid.getBoundingClientRect().top - top0;
+}
 addEventListener('pointermove', e => {
   if (e.screenX === lookPx && e.screenY === lookPy) return;  // 版面變動造成的假事件
   lookPx = e.screenX; lookPy = e.screenY;
+  if (lookShown && Math.hypot(e.screenX - lookAx, e.screenY - lookAy) < 14) return;
   const b = e.target.closest?.('#ui-looks [data-look]');
   clearTimeout(lookTimer);
   if (b){
     const v = b.dataset.look;
     if (v === (lookShown || curLook)) return;
-    lookTimer = setTimeout(() => { window.lookHover = true; lookShown = v; setLookClass(v); placeAllThumbs(); }, 140);
+    lookTimer = setTimeout(() => { window.lookHover = true; lookShown = v; lookAx = lookPx; lookAy = lookPy; setLookAnchored(v); }, 160);
   } else if (window.lookHover && !e.target.closest?.('#ui-looks')){
-    window.lookHover = false; lookShown = ''; setLookClass(curLook); placeAllThumbs();
+    window.lookHover = false; lookShown = ''; setLookAnchored(curLook);
   }
 }, {passive: true});
 document.querySelectorAll('#layouts [data-layout]').forEach(b => b.onclick = () => { layoutEdit = performance.now(); applyLayout(b.dataset.layout); send({type: 'layout', value: b.dataset.layout}); });
