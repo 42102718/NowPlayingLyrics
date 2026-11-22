@@ -2509,11 +2509,25 @@ $('#cover-accent').onchange = e => { accentEdit = performance.now(); coverAccent
 $('#time-tint').onchange = e => { accentEdit = performance.now(); timeTint = e.target.checked; applyTimeTint(); send({type: 'time_tint', value: timeTint}); };
 $('#ui-sound').onchange = e => { accentEdit = performance.now(); uiSound = e.target.checked; if (uiSound) tick(true); send({type: 'ui_sound', value: uiSound}); };
 document.querySelectorAll('#ui-looks [data-look]').forEach(b => {
-  b.onclick = () => { window.lookHover = false; lookEdit = performance.now(); applyLook(b.dataset.look); send({type: 'ui_look', value: b.dataset.look}); };
-  // 滑過去就先套用看看 (預覽)，離開就換回來
-  b.onmouseenter = () => { window.lookHover = true; setLookClass(b.dataset.look); placeAllThumbs(); };
-  b.onmouseleave = () => { window.lookHover = false; setLookClass(curLook); placeAllThumbs(); };
+  b.onclick = () => { clearTimeout(lookTimer); window.lookHover = false; lookShown = ''; lookEdit = performance.now(); applyLook(b.dataset.look); send({type: 'ui_look', value: b.dataset.look}); };
 });
+// 滑鼠移過去就先套用看看 (預覽)，移開就換回來。
+// 只看「滑鼠真的有移動」：換風格時按鈕大小會變、會從游標底下滑走，
+// 如果照 mouseenter / mouseleave 來切，會一直換來換去 (畫面抖動)。
+var lookPx = -1, lookPy = -1, lookTimer = 0, lookShown = '';
+addEventListener('pointermove', e => {
+  if (e.screenX === lookPx && e.screenY === lookPy) return;  // 版面變動造成的假事件
+  lookPx = e.screenX; lookPy = e.screenY;
+  const b = e.target.closest?.('#ui-looks [data-look]');
+  clearTimeout(lookTimer);
+  if (b){
+    const v = b.dataset.look;
+    if (v === (lookShown || curLook)) return;
+    lookTimer = setTimeout(() => { window.lookHover = true; lookShown = v; setLookClass(v); placeAllThumbs(); }, 140);
+  } else if (window.lookHover && !e.target.closest?.('#ui-looks')){
+    window.lookHover = false; lookShown = ''; setLookClass(curLook); placeAllThumbs();
+  }
+}, {passive: true});
 document.querySelectorAll('#layouts [data-layout]').forEach(b => b.onclick = () => { layoutEdit = performance.now(); applyLayout(b.dataset.layout); send({type: 'layout', value: b.dataset.layout}); });
 initGlassThumbs();
 
