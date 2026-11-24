@@ -46,7 +46,7 @@ ASSETS = ROOT / "assets"  # 圖示
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.8.4"
+VERSION = "1.8.5"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -200,6 +200,7 @@ def save_config():
 config = load_config()
 # 給浮動視窗的執行期旗標 (不存檔)
 runtime = {"unlocked": False, "cfg_version": 0}
+runtime["on_volume"] = lambda lv: volume_changed(lv)  # 膠囊滾輪、浮動歌詞滾輪調了音量
 
 
 def config_changed():
@@ -1696,7 +1697,15 @@ async def poll_loop():
             else:
                 state["track"] = None
                 last_id = None
+            if state["track"] and time.monotonic() - VOL["at"] > 2:  # 每 2 秒重讀一次 (音量混音程式改過也會跟上)
+                VOL["at"] = time.monotonic()
+                try:
+                    import audio_ctl
+                    VOL["level"] = await asyncio.to_thread(audio_ctl.get_volume, state["track"].get("app", ""))
+                except Exception:
+                    pass
             await broadcast({"type": "state", "track": state["track"], "sessions": state["sessions"],
+                             "volume": volume_info(),
                              "recent": runtime.get("recent", []),
                              "pinned": media.pinned, "config": public_config(), "unlocked": runtime["unlocked"],
                              "chat": CHAT.status if CHAT else "off",
@@ -1900,8 +1909,12 @@ async def ws_handler(request):
                 config["hotkeys"] = bool(d.get("value"))
                 save_config()
                 start_hotkeys()
-            elif d.get("type") == "volume":  # 主視窗 ↑ / ↓
-                await asyncio.to_thread(music_volume, float(d.get("delta") or 0))
+            elif d.get("type") == "volume":  # 主視窗 ↑ / ↓、音量滑桿、小抄、舞台
+                lv = d.get("level")
+                await asyncio.to_thread(music_volume, float(d.get("delta") or 0),
+                                        None if lv is None else min(1.0, max(0.0, float(lv))))
+            elif d.get("type") == "duck":
+                await asyncio.to_thread(music_duck)
             elif d.get("type") == "browser_music":
                 config["browser_music"] = bool(d.get("value"))
                 save_config()
@@ -2753,21 +2766,76 @@ def start_notch():
     threading.Thread(target=notch.run, args=(state, config, runtime), daemon=True).start()
 
 
-def music_volume(delta):
-    """只調播放器自己的音量 (快捷鍵 / 主視窗 ↑↓)，膠囊會跳出音量條。"""
+# 音樂音量：level 是最後讀到 / 設定的音量；ducked 是「一鍵壓低」之前的音量 (None = 沒有壓低)
+VOL = {"level": None, "ducked": None, "at": 0.0}
+
+
+def volume_info():
+    return {"level": VOL["level"], "ducked": VOL["ducked"] is not None}
+
+
+def volume_changed(lv, manual=True):
+    """音量變了 (任何地方調的)：記下來、通知所有畫面跳出「🔊 45%」。手動調整就取消「壓低」狀態。"""
+    VOL["level"] = lv
+    VOL["at"] = time.monotonic()
+    if manual:
+        VOL["ducked"] = None
+    if LOOP is not None:
+        msg = {"type": "volume", **volume_info()}
+        LOOP.call_soon_threadsafe(lambda: asyncio.ensure_future(broadcast(msg)))
+
+
+def _set_music_volume(lv, manual=True):
     t = state.get("track")
     if not t:
         return None
     import audio_ctl
     app = t.get("app", "")
-    cur = audio_ctl.get_volume(app)
-    if cur is None:
+    lv = audio_ctl.set_volume(app, round(min(1.0, max(0.0, lv)), 2))
+    if lv is None:
         return None
-    lv = audio_ctl.set_volume(app, round(min(1.0, max(0.0, cur + delta)), 2))
     n = runtime.get("notch_obj")
-    if n is not None and lv is not None:
+    if n is not None:
         n.volume = (app, lv, n.last_frame)
         n.push("volume", 1.4, level=lv, app=t.get("source") or "")
+    volume_changed(lv, manual)
+    return lv
+
+
+def music_volume(delta=0.0, level=None):
+    """只調播放器自己的音量 (快捷鍵 / 主視窗 / 小抄 / 舞台)，膠囊會跳出音量條。level 是直接設成多少 (0~1)。"""
+    t = state.get("track")
+    if not t:
+        return None
+    import audio_ctl
+    cur = audio_ctl.get_volume(t.get("app", ""))
+    if cur is None:
+        return None
+    return _set_music_volume(level if level is not None else cur + delta)
+
+
+runtime["music_volume"] = lambda delta: music_volume(delta)  # 浮動歌詞滾輪用
+
+
+def music_duck():
+    """一鍵壓低音樂 (直播講話時)：降到 20% (本來就比 20% 小就再減半)；再按一次恢復原本的音量。"""
+    t = state.get("track")
+    if not t:
+        return None
+    import audio_ctl
+    cur = audio_ctl.get_volume(t.get("app", ""))
+    if cur is None:
+        return None
+    if VOL["ducked"] is None:
+        before = cur
+        lv = _set_music_volume(0.2 if cur > 0.2 else cur * 0.5, manual=False)
+        if lv is not None:
+            VOL["ducked"] = before
+    else:
+        before, VOL["ducked"] = VOL["ducked"], None
+        lv = _set_music_volume(before, manual=False)
+    if lv is not None:
+        volume_changed(lv, manual=False)
     return lv
 
 
@@ -2800,6 +2868,7 @@ def start_hotkeys():
             "prev": lambda: media_cmd("prev"),
             "vol_up": lambda: music_volume(0.05),
             "vol_down": lambda: music_volume(-0.05),
+            "duck": music_duck,
             "window": toggle_main_window,
             "stage": open_stage,
         }).start()

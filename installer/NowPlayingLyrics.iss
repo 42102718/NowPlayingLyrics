@@ -3,7 +3,7 @@
 ; 輸出：release\Hummi-Setup-<版本>.exe
 
 #define MyAppName "Hummi 哼哼"
-#define MyAppVersion "1.8.4"
+#define MyAppVersion "1.8.5"
 #define MyAppExe "Hummi.exe"
 #define OldExe "Now Playing Lyrics.exe"
 #define OldName "Now Playing Lyrics"

@@ -12,6 +12,7 @@ import math
 import ctypes.wintypes as wt
 import os
 import time
+import threading
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
@@ -378,6 +379,19 @@ class Overlay:
     def wndproc(self, hwnd, msg, wp, lp):
         if msg == WM_NCHITTEST and self.unlocked:
             return HTCAPTION
+        if msg == 0x020A and self.unlocked:  # WM_MOUSEWHEEL：解鎖 (可以拖曳) 時，滾輪調音樂音量
+            delta = ctypes.c_short((int(wp) >> 16) & 0xFFFF).value / 120
+            fn = self.runtime.get("music_volume")
+            if fn and delta:
+                def go():
+                    try:
+                        lv = fn(0.04 * delta)
+                        if lv is not None:
+                            self.vol_note = (f"音量 {round(lv * 100)}%", time.perf_counter())
+                    except Exception as e:
+                        print("[overlay-volume]", repr(e), flush=True)
+                threading.Thread(target=go, daemon=True).start()
+            return 0
         if msg == WM_EXITSIZEMOVE:
             self.moved = True
         return user32.DefWindowProcW(hwnd, msg, wp, lp)
@@ -545,7 +559,10 @@ class Overlay:
             d = ImageDraw.Draw(img)
             d.rounded_rectangle((1, 1, self.W - 2, self.H - 2), radius=int(14 * self.scale),
                                 fill=(20, 20, 30, 140), outline=(255, 255, 255, 160), width=max(1, int(2 * self.scale)))
-            hint = "拖曳移動位置　·　Ctrl+Alt+L 鎖定"
+            hint = "拖曳移動位置　·　滾輪：音樂音量　·　Ctrl+Alt+L 鎖定"
+            vn = getattr(self, "vol_note", None)
+            if vn and time.perf_counter() - vn[1] < 1.6:
+                hint = vn[0] + "　·　" + hint
             draw_text(d, (self.pad, int(8 * self.scale)), hint, pick_font(hint, int(13 * self.scale)),
                    fill=(255, 255, 255, 200))
         if t is None:

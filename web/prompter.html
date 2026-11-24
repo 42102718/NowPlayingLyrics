@@ -50,10 +50,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-
 #pin.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 0 12px rgba(255,213,74,.45)}
 #help{position:fixed;right:12px;bottom:12px;font:500 11px var(--font);color:var(--dim);opacity:0;transition:opacity .3s}
 body.ui #help{opacity:1}
+#vol{display:flex;align-items:center;gap:2px;height:24px;padding:0 2px;border-radius:12px;background:rgba(127,127,127,.15)}
+#vol button{width:22px;height:22px;border:0;border-radius:50%;background:none;color:var(--dim);font:700 14px var(--font);cursor:pointer;line-height:1}
+#vol button:hover{background:rgba(127,127,127,.25);color:var(--fg)}
+#v-pct{min-width:52px;text-align:center;font:600 12px var(--font);font-variant-numeric:tabular-nums;color:var(--dim);transition:color .3s}
+#v-pct.flash{color:var(--fg)}
+@media (max-width:420px){#vol{display:none}}
 </style>
 </head>
 <body>
-<div id="top"><span class="t" id="song">Hummi 小抄</span><span class="k" id="clock"></span><button id="pin" title="讓小抄浮在所有視窗上面 (玩遊戲、開 OBS 時也看得到)">📌 置頂</button></div>
+<div id="top"><span class="t" id="song">Hummi 小抄</span><span class="k" id="clock"></span><span id="vol"><button id="v-down" title="音樂音量 −">−</button><span id="v-pct" title="音樂音量">🔊 —</span><button id="v-up" title="音樂音量 ＋">＋</button></span><button id="pin" title="讓小抄浮在所有視窗上面 (玩遊戲、開 OBS 時也看得到)">📌 置頂</button></div>
 <div id="wrap">
   <div class="l" id="prev"></div>
   <div id="cd"><span id="cd-txt">間奏</span><span class="n" id="cd-n"></span><span class="gbar"><i id="cd-bar"></i></span></div>
@@ -212,7 +218,8 @@ function connect(){
   ws.onclose = () => setTimeout(connect, 1000);
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.type === 'state') onState(m);
+    if (m.type === 'state'){ onState(m); if (m.volume) showVol(m.volume, false); }
+    else if (m.type === 'volume') showVol(m, true);
     else if (m.type === 'lyrics') onLyrics(m);
   };
 }
@@ -241,6 +248,16 @@ function applyPin(){
 function togglePin(){ pinned = !pinned; try { localStorage.setItem('prompter.pin', pinned ? '1' : '0'); } catch {} applyPin(); }
 $('#pin').onclick = togglePin;
 addEventListener('keydown', e => { if (e.key === 't' || e.key === 'T') togglePin(); });
+// 音樂音量 (只調播放器自己)
+let vFlashT = 0;
+function showVol(v, flash){
+  const el = $('#v-pct');
+  el.textContent = v.level == null ? '🔊 —' : (v.ducked ? '🔉 ' : '🔊 ') + Math.round(v.level * 100) + '%';
+  el.title = v.ducked ? '音樂已壓低 (Ctrl + Alt + M 恢復)' : '音樂音量';
+  if (flash){ el.classList.add('flash'); clearTimeout(vFlashT); vFlashT = setTimeout(() => el.classList.remove('flash'), 1200); }
+}
+$('#v-up').onclick = e => { e.stopPropagation(); send({type: 'volume', delta: .05}); };
+$('#v-down').onclick = e => { e.stopPropagation(); send({type: 'volume', delta: -.05}); };
 addEventListener('pywebviewready', applyPin);
 applyPin();
 connect();

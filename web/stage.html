@@ -316,6 +316,9 @@ body.ui.ctl #ctl{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 #ctl .track{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.18);cursor:pointer;position:relative}
 #ctl .track i{position:absolute;inset:0 auto 0 0;border-radius:3px;background:#fff;width:0}
 #ctl .vol{display:flex;align-items:center;gap:2px}
+#c-vpct{min-width:40px;text-align:center;font:600 12px system-ui,sans-serif;font-variant-numeric:tabular-nums;opacity:.75;transition:opacity .3s,color .3s}
+#c-vpct.flash{opacity:1}
+#c-vpct.ducked{color:#ffd54a}
 body.obs #ctl{display:none!important}
 @media (prefers-reduced-motion:reduce){.ln,.w{transition:none!important;animation:none!important}}
 
@@ -378,7 +381,7 @@ body.glass #ctl #c-play{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 20px
   <button id="c-play" title="播放 / 暫停 (空白鍵)">&#xF5B0;</button>
   <button id="c-next" title="下一首 (Ctrl + →)">&#xF8AD;</button>
   <div class="bar"><span id="c-cur">0:00</span><div class="track" id="c-track"><i></i></div><span id="c-dur">0:00</span></div>
-  <div class="vol"><button id="c-vdown" title="音樂音量 − (↓)">&#xE993;</button><button id="c-vup" title="音樂音量 + (↑)">&#xE995;</button></div>
+  <div class="vol"><button id="c-vdown" title="音樂音量 − (↓)">&#xE993;</button><span id="c-vpct" title="音樂音量 (Ctrl + Alt + M 一鍵壓低)">—</span><button id="c-vup" title="音樂音量 + (↑)">&#xE995;</button></div>
 </div>
 <button id="gear" title="舞台設定">⚙</button>
 <aside id="panel">
@@ -480,7 +483,8 @@ function connect(){
   ws.onclose = () => setTimeout(connect, 1000);
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.type === 'state') onState(m);
+    if (m.type === 'state'){ onState(m); if (m.volume) showVol(m.volume, false); }
+    else if (m.type === 'volume') showVol(m, true);
     else if (m.type === 'lyrics') onLyrics(m);
     else if (m.type === 'viz') onViz(m);
     else if (m.type === 'chat_song') showAsk(m);
@@ -531,6 +535,13 @@ const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60
 $('#c-play').onclick = e => { e.stopPropagation(); sendWs({type: 'toggle'}); };
 $('#c-prev').onclick = e => { e.stopPropagation(); sendWs({type: 'prev'}); };
 $('#c-next').onclick = e => { e.stopPropagation(); sendWs({type: 'next'}); };
+let vFlashT = 0;
+function showVol(v, flash){
+  const el = $('#c-vpct'); if (!el) return;
+  el.textContent = v.level == null ? '—' : Math.round(v.level * 100) + '%';
+  el.classList.toggle('ducked', !!v.ducked);
+  if (flash){ el.classList.add('flash'); clearTimeout(vFlashT); vFlashT = setTimeout(() => el.classList.remove('flash'), 1200); }
+}
 $('#c-vup').onclick = e => { e.stopPropagation(); sendWs({type: 'volume', delta: .05}); };
 $('#c-vdown').onclick = e => { e.stopPropagation(); sendWs({type: 'volume', delta: -.05}); };
 $('#ctl').addEventListener('click', e => e.stopPropagation());

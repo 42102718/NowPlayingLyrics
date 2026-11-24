@@ -1575,6 +1575,9 @@ class Notch:
                             self.volume = (app, lv, now)
                             self.expanded = False
                             self.push("volume", 1.4, level=lv, app=t.get("source") or "")
+                            cb = self.runtime.get("on_volume")
+                            if cb:
+                                cb(lv)
                 except Exception as e:
                     print("[notch-volume]", repr(e), flush=True)
         if self.hwheel and now - self.hwheel_at > 0.25:
