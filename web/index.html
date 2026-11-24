@@ -1423,13 +1423,17 @@ body[data-layout="vinyl"] #cover,body[data-layout="vinyl"] #cover-wrap,body[data
       <p class="hint">外文歌每一句下面多一行中文翻譯 (有翻譯的歌才有)，所有畫面一起套用。</p>
     </div>
   </section>
-  <section class="grp"><h3>日文讀音</h3>
+  <section class="grp"><h3>日文、韓文讀音</h3>
     <div class="card">
       <div class="seg four" id="jp-reading" title="日文歌的讀音 (主視窗、舞台的 Hummi 效果)">
         <button data-jp="off">關</button><button data-jp="furigana">漢字標平假名</button><button data-jp="hiragana">整句平假名</button><button data-jp="romaji">羅馬拼音</button>
       </div>
       <p class="hint">只有日文歌會顯示。「漢字標平假名」在漢字上方標小字讀音；另外兩種在每句下面多一行。讀音是自動轉的，少數字可能讀錯。</p>
-      <label class="row" title="浮動歌詞的主句下面多一行讀音 (選羅馬拼音就是羅馬拼音，其他都是平假名)">浮動歌詞也顯示讀音 <span class="switch"><input type="checkbox" data-k="show_reading"><span></span></span></label>
+      <div class="row col" style="border-top:1px solid rgba(var(--ink),.07)">韓文讀音
+        <div class="seg two" id="ko-reading" title="韓文歌每句下面多一行羅馬拼音"><button data-ko="off">關</button><button data-ko="romaji">羅馬拼音</button></div>
+      </div>
+      <p class="hint">韓文歌每句下面多一行羅馬拼音 (例如 사랑해 → saranghae)，照實際發音轉，看不懂韓文也能跟著唱。</p>
+      <label class="row" title="浮動歌詞的主句下面多一行讀音 (日文、韓文)">浮動歌詞也顯示讀音 <span class="switch"><input type="checkbox" data-k="show_reading"><span></span></span></label>
     </div>
   </section>
   <section class="grp"><h3>AI 歌詞</h3>
@@ -1756,6 +1760,7 @@ function onState(m){
     if (performance.now() - apEdit > 1500){ $('#tb-progress').checked = cfg.taskbar_progress !== false; $('#notch-on').checked = cfg.notch !== false;
       $('#net-alert').checked = cfg.net_alert !== false;
       document.querySelectorAll('#jp-reading [data-jp]').forEach(b => b.classList.toggle('on', b.dataset.jp === (cfg.jp_reading || 'off')));
+      document.querySelectorAll('#ko-reading [data-ko]').forEach(b => b.classList.toggle('on', b.dataset.ko === (cfg.ko_reading || 'off')));
       const ns = cfg.notch_style || {};
       document.querySelectorAll('#notch-shape [data-shape]').forEach(b => b.classList.toggle('on', b.dataset.shape === (ns.shape || 'island')));
       document.querySelectorAll('#notch-color [data-color]').forEach(b => b.classList.toggle('on', b.dataset.color === (ns.color || 'black')));
@@ -3181,6 +3186,9 @@ function renderChat(m){
 // ───── 快捷鍵 ─────
 let hotkeysEdit = 0, apEdit = 0, monitors = [];
 $('#wp-on').onchange = e => { apEdit = performance.now(); send({type: 'wallpaper', enabled: e.target.checked}); };
+document.querySelectorAll('#ko-reading [data-ko]').forEach(b => b.onclick = () => { apEdit = performance.now();
+  send({type: 'ko_reading', value: b.dataset.ko});
+  document.querySelectorAll('#ko-reading [data-ko]').forEach(x => x.classList.toggle('on', x === b)); });
 document.querySelectorAll('#jp-reading [data-jp]').forEach(b => b.onclick = () => { apEdit = performance.now();
   send({type: 'jp_reading', value: b.dataset.jp});
   document.querySelectorAll('#jp-reading [data-jp]').forEach(x => x.classList.toggle('on', x === b)); });

@@ -502,8 +502,13 @@ class Overlay:
         return ("line", t["track_id"], idx), cur["text"], cur.get("tr") or "", nxt, (cur["t"], dur, tt)
 
     def reading(self, text):
-        """日文歌這一句的讀音 (只有日文歌才有；跟著「日文讀音」設定，羅馬拼音以外都用平假名)。"""
+        """這一句的讀音：韓文歌 (有開韓文讀音) 是羅馬拼音；日文歌跟著「日文讀音」設定，羅馬拼音以外都用平假名。"""
         try:
+            if self.config.get("ko_reading") == "romaji":  # 韓文歌：羅馬拼音
+                import ko_reading
+                if ko_reading.HANGUL.search(text):
+                    r = ko_reading.romanize(text)
+                    return r if r != text else ""
             import jp_reading
             lyr = self.state.get("lyrics") or {}
             tid = lyr.get("track_id")

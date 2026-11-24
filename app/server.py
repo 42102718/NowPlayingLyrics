@@ -116,6 +116,7 @@ DEFAULT_CONFIG = {
     "game": {"enabled": True, "notch": "alerts"},  # 遊戲模式：全螢幕時；膠囊 alerts 只彈重要提醒 / hide 藏起來
     "net_alert": True,             # 網路斷線 / 恢復時膠囊提醒
     "jp_reading": "off",           # 日文讀音：off / furigana (漢字標平假名) / hiragana (整句平假名) / romaji
+    "ko_reading": "off",           # 韓文讀音：off / romaji (每句下面一行羅馬拼音)
     "notch_style": {"shape": "island", "color": "black", "hover": "smart"},  # 形狀 island/float/bar、顏色 black/album/theme、展開 smart/fast/click
     "wallpaper": {"enabled": False, "monitor": "primary"},
     "share": {"folder": "", "name": ""},
@@ -174,6 +175,7 @@ def load_config():
         if isinstance(saved.get("stage_live"), dict):
             cfg["stage_live"] = saved["stage_live"]
         cfg["jp_reading"] = saved.get("jp_reading") if saved.get("jp_reading") in ("off", "furigana", "hiragana", "romaji") else "off"
+        cfg["ko_reading"] = "romaji" if saved.get("ko_reading") == "romaji" else "off"
         ns = saved.get("notch_style") if isinstance(saved.get("notch_style"), dict) else {}
         cfg["notch_style"] = {"shape": ns.get("shape") if ns.get("shape") in ("island", "float", "bar") else "island",
                               "color": ns.get("color") if ns.get("color") in ("black", "album", "theme") else "black",
@@ -251,7 +253,8 @@ def lyr_view(lyr):
     lines = lyr.get("lines") or []
     tr_off = not show_tr() and any(l.get("tr") for l in lines)
     mode = config.get("jp_reading", "off")
-    if not tr_off and mode == "off":
+    ko = config.get("ko_reading", "off") == "romaji"
+    if not tr_off and mode == "off" and not ko:
         return lyr
     if tr_off:
         lines = [{k: v for k, v in l.items() if k != "tr"} for l in lines]
@@ -261,6 +264,12 @@ def lyr_view(lyr):
             lines = jp_reading.apply(lines, mode)
         except Exception as e:
             print("[jp]", repr(e), flush=True)
+    if ko:  # 韓文歌：每句下面一行羅馬拼音
+        try:
+            import ko_reading
+            lines = ko_reading.apply(lines)
+        except Exception as e:
+            print("[ko]", repr(e), flush=True)
     return {**lyr, "lines": lines}
 
 
@@ -1952,6 +1961,11 @@ async def ws_handler(request):
                 save_config()
             elif d.get("type") == "jp_reading" and d.get("value") in ("off", "furigana", "hiragana", "romaji"):
                 config["jp_reading"] = d["value"]
+                save_config()
+                if state["lyrics"]:
+                    await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
+            elif d.get("type") == "ko_reading" and d.get("value") in ("off", "romaji"):
+                config["ko_reading"] = d["value"]
                 save_config()
                 if state["lyrics"]:
                     await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
