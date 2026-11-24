@@ -46,7 +46,7 @@ ASSETS = ROOT / "assets"  # 圖示
 DATA = Path(DATA_DIR)
 PORT = int(os.environ.get("PORT", 8765))
 POLL_INTERVAL = 0.2  # 秒
-VERSION = "1.8.5"
+VERSION = "1.8.6"
 APP_NAME = "Hummi 哼哼"
 UA = f"Hummi/{VERSION} (https://github.com/42102718/NowPlayingLyrics)"
 
@@ -760,6 +760,32 @@ def mark_gaps(lines):
     return out
 
 
+def _alias_tokens(s):
+    """歌名裡比較有辨識度的片段：連續數字 (2 位以上)、英文單字 (3 個字母以上)。
+    韓文 / 日文歌在 Spotify 常常用英文歌名 (例如「I 234U!」= 「1234랑해!」)，靠這些片段對得上。"""
+    s = (s or "").lower()
+    return set(re.findall(r"\d{2,}", s)) | set(re.findall(r"[a-z]{3,}", s))
+
+
+def _pick_alias(title, duration, hits):
+    """同歌手、長度差不多的歌不只一首時，試著分出是哪一首：
+    1. 只有一首跟播放器的歌名有共同的數字 / 英文片段 (互相包含也算)
+    2. 或是長度明顯最接近 (差不到 1 秒，其他都差 1.5 秒以上)"""
+    q = _alias_tokens(title)
+
+    def shares(t):
+        tt = _alias_tokens(t)
+        return any(a == b or (len(a) >= 2 and (a in b or b in a)) for a in q for b in tt)
+    if q:
+        sharing = [k for k, cs in hits.items() if shares(cs[0].get("title"))]
+        if len(sharing) == 1:
+            return sharing[0]
+    diffs = sorted((min(abs((c.get("duration") or 0) - duration) for c in cs), k) for k, cs in hits.items())
+    if diffs and diffs[0][0] <= 1.0 and all(d >= 1.5 for d, _ in diffs[1:]):
+        return diffs[0][1]
+    return None
+
+
 class Lyrics:
     def __init__(self, override_path):
         self.cache: dict[str, dict] = {}
@@ -844,8 +870,13 @@ class Lyrics:
             for c in cands:
                 if artist_matches(a, c.get("artist")) and c.get("duration") and abs(c["duration"] - duration) <= 2:
                     hits.setdefault(_fnorm(c.get("title") or ""), []).append(c)
+            if len(hits) > 1:
+                pick = _pick_alias(title, duration, hits)
+                if pick is None:
+                    continue  # 不只一首長度一樣、又分不出來：不猜
+                hits = {pick: hits[pick]}
             if len(hits) != 1:
-                continue  # 沒有、或不只一首長度一樣：不猜
+                continue  # 沒有符合的
             for c in next(iter(hits.values()))[:3]:
                 r = await self.fetch(c)
                 if r and r["synced"] and r["lines"]:
