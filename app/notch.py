@@ -624,6 +624,8 @@ class Notch:
         if self.activity and self.activity["kind"] == kind == "volume":
             self.activity.update(data, until=now + seconds)  # 一直滾就一直延長，不重新彈
             return
+        if kind == "volume":
+            self.vol_disp = data.get("level")  # 新跳出來的音量條從現在的音量開始，不要從上次的位置滑過來
         self.act_prev = self.activity
         self.activity = {"kind": kind, "start": now, "until": now + seconds, **data}
 
@@ -818,8 +820,14 @@ class Notch:
             txt = "網路斷線了" if k == "net_off" else "網路恢復了"
             dr.text((cx + r + d(12), h / 2), txt, font=ui_font(txt, d(13), 600), fill=(255, 255, 255, 240), anchor="lm")
         elif k == "volume":
-            lv = act["level"]
-            g = "vol0" if lv <= 0.001 else "vol1" if lv < 0.34 else "vol2" if lv < 0.67 else "vol3"
+            tgt = act["level"]
+            # 音量條滑過去 (不是瞬間跳)：每一幀追上目標的一大半，滾很快也看得出在跟
+            lv = getattr(self, "vol_disp", tgt)
+            lv += (tgt - lv) * 0.45
+            if abs(tgt - lv) < 0.004:
+                lv = tgt
+            self.vol_disp = lv
+            g = "vol0" if tgt <= 0.001 else "vol1" if tgt < 0.34 else "vol2" if tgt < 0.67 else "vol3"
             self.glyph(dr, g, d(30), h / 2, 15)
             bx0, bx1 = d(54), w - d(64)
             bh = d(6)
@@ -828,7 +836,7 @@ class Notch:
             if fx > bx0 + 1:
                 dr.rounded_rectangle((bx0, h / 2 - bh / 2, max(bx0 + bh, fx), h / 2 + bh / 2), radius=bh / 2,
                                      fill=(255, 255, 255, 240))
-            txt = f"{round(lv * 100)}%"
+            txt = f"{round(tgt * 100)}%"
             dr.text((w - d(18), h / 2), txt, font=ui_font(txt, d(13), 600), fill=(255, 255, 255, 220), anchor="rm")
             app = act.get("app") or ""
             if app:
@@ -1566,18 +1574,9 @@ class Notch:
             steps, self.wheel = self.wheel / 120, 0
             if t and self.opt("gestures"):
                 try:
-                    import audio_ctl
-                    app = t.get("app", "")
-                    cur = audio_ctl.get_volume(app)  # 每次重讀：別的地方 (音量混音程式) 改過也會跟上
-                    if cur is not None:
-                        lv = audio_ctl.set_volume(app, round(clamp(cur + steps * 0.04, 0, 1), 2))
-                        if lv is not None:
-                            self.volume = (app, lv, now)
-                            self.expanded = False
-                            self.push("volume", 1.4, level=lv, app=t.get("source") or "")
-                            cb = self.runtime.get("on_volume")
-                            if cb:
-                                cb(lv)
+                    fn = self.runtime.get("music_volume")  # 背景引擎套用，畫面馬上更新 (滾很快也跟得上)
+                    if fn and fn(steps * 0.04) is not None:
+                        self.expanded = False
                 except Exception as e:
                     print("[notch-volume]", repr(e), flush=True)
         if self.hwheel and now - self.hwheel_at > 0.25:

@@ -228,3 +228,63 @@ def device_active(dev_id):
 if __name__ == "__main__":
     app = sys.argv[1] if len(sys.argv) > 1 else "Spotify.exe"
     print(app, hints_for(app), "volume", get_volume(app), "pid", session_pid(app))
+
+
+class VolumeEngine:
+    """音樂音量的背景引擎 (一條執行緒)：
+    - 調音量不用每次重新列舉所有 App 的音訊工作階段 (很慢，膠囊滾輪滾快了會跟不上)：工作階段 3 秒內重用
+    - 連續調很多次只套用最後一次 (拖拉條、滾很快都不會塞車)
+    - 每 0.3 秒讀一次播放器自己的音量：在 Spotify / 音量混音程式改的也會跟上 (on_change(level, external=True))"""
+
+    def __init__(self, get_app, on_change):
+        import threading
+        self.get_app = get_app
+        self.on_change = on_change
+        self.level = None
+        self.want = None
+        self.set_at = 0.0
+        self.lock = threading.Lock()
+        self.ev = threading.Event()
+        threading.Thread(target=self._run, daemon=True, name="volume").start()
+
+    def set(self, level):
+        level = round(max(0.0, min(1.0, float(level))), 2)
+        with self.lock:
+            self.want = level
+            self.level = level
+        self.ev.set()
+        return level
+
+    def _run(self):
+        import time
+        ctypes.windll.ole32.CoInitializeEx(None, 0)
+        app, vols, at = None, [], 0.0
+        while True:
+            self.ev.wait(0.3)
+            self.ev.clear()
+            try:
+                a = self.get_app() or None
+                now = time.monotonic()
+                if a != app or now - at > 3:
+                    if a != app and self.want is None:
+                        self.level = None  # 換了播放器：第一次讀到的音量不算「被別人改了」(不跳膠囊)
+                    app, at = a, now
+                    vols = _sessions(a) if a else []
+                if not vols:
+                    continue
+                with self.lock:
+                    want, self.want = self.want, None
+                if want is not None:
+                    for v in vols:
+                        v.SetMasterVolume(want, None)
+                    self.set_at = now
+                    continue
+                cur = round(max(v.GetMasterVolume() for v in vols), 2)
+                if self.level is None or abs(cur - self.level) > 0.005:
+                    first = self.level is None
+                    self.level = cur
+                    if now - self.set_at > 0.8:  # 不是剛剛自己設的：別的地方改了音量
+                        self.on_change(cur, external=not first)
+            except Exception as e:
+                vols, at = [], 0.0  # 工作階段失效 (播放器重開)：下次重新找
+                print("[volume]", repr(e), flush=True)

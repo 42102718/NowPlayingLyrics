@@ -1687,6 +1687,7 @@ async def poll_loop():
     await media.init()
     LOOP = asyncio.get_running_loop()
     init_queue()
+    volume_engine()
     start_chat()
     try:
         import ai_lyrics
@@ -1734,13 +1735,8 @@ async def poll_loop():
                     QUEUE.on_track(state["track"], singing=bool(singing_clients))
                 except Exception as e:
                     print("[queue]", repr(e), flush=True)
-            if state["track"] and time.monotonic() - VOL["at"] > 2:  # 每 2 秒重讀一次 (音量混音程式改過也會跟上)
-                VOL["at"] = time.monotonic()
-                try:
-                    import audio_ctl
-                    VOL["level"] = await asyncio.to_thread(audio_ctl.get_volume, state["track"].get("app", ""))
-                except Exception:
-                    pass
+            if VOL_ENGINE is not None and VOL_ENGINE.level is not None:
+                VOL["level"] = VOL_ENGINE.level
             await broadcast({"type": "state", "track": state["track"], "sessions": state["sessions"],
                              "volume": volume_info(), "queue": QUEUE.snapshot() if QUEUE else None,
                              "recent": runtime.get("recent", []),
@@ -2844,6 +2840,31 @@ def start_notch():
 
 # 音樂音量：level 是最後讀到 / 設定的音量；ducked 是「一鍵壓低」之前的音量 (None = 沒有壓低)
 VOL = {"level": None, "ducked": None, "at": 0.0}
+VOL_ENGINE = None  # audio_ctl.VolumeEngine：背景套用音量、跟上別的地方改的音量
+
+
+def volume_engine():
+    global VOL_ENGINE
+    if VOL_ENGINE is None:
+        try:
+            import audio_ctl
+            VOL_ENGINE = audio_ctl.VolumeEngine(lambda: (state.get("track") or {}).get("app"), _volume_external)
+        except Exception as e:
+            print("[volume] engine:", repr(e), flush=True)
+    return VOL_ENGINE
+
+
+def _volume_external(lv, external=True):
+    """音量在別的地方被改了 (Spotify 自己的拉條、音量混音程式)：膠囊、各畫面都跟上。"""
+    VOL["level"] = lv
+    if not external:
+        return
+    t = state.get("track") or {}
+    n = runtime.get("notch_obj")
+    if n is not None:
+        n.volume = (t.get("app", ""), lv, n.last_frame)
+        n.push("volume", 1.4, level=lv, app=t.get("source") or "")
+    volume_changed(lv, manual=True)
 
 
 def volume_info():
@@ -2861,45 +2882,52 @@ def volume_changed(lv, manual=True):
         LOOP.call_soon_threadsafe(lambda: asyncio.ensure_future(broadcast(msg)))
 
 
-def _set_music_volume(lv, manual=True):
+def _current_volume():
+    eng = volume_engine()
+    if eng is not None and eng.level is not None:
+        return eng.level
     t = state.get("track")
     if not t:
         return None
     import audio_ctl
-    app = t.get("app", "")
-    lv = audio_ctl.set_volume(app, round(min(1.0, max(0.0, lv)), 2))
-    if lv is None:
+    return audio_ctl.get_volume(t.get("app", ""))
+
+
+def _set_music_volume(lv, manual=True):
+    """馬上更新畫面 (膠囊、各頁面)，真正套用交給背景引擎 (不會卡住、連續調只套用最後一次)。"""
+    t = state.get("track")
+    eng = volume_engine()
+    if not t or eng is None:
         return None
+    lv = eng.set(lv)
     n = runtime.get("notch_obj")
     if n is not None:
-        n.volume = (app, lv, n.last_frame)
+        n.volume = (t.get("app", ""), lv, n.last_frame)
         n.push("volume", 1.4, level=lv, app=t.get("source") or "")
     volume_changed(lv, manual)
     return lv
 
 
 def music_volume(delta=0.0, level=None):
-    """只調播放器自己的音量 (快捷鍵 / 主視窗 / 小抄 / 舞台)，膠囊會跳出音量條。level 是直接設成多少 (0~1)。"""
-    t = state.get("track")
-    if not t:
+    """只調播放器自己的音量 (快捷鍵 / 主視窗 / 小抄 / 舞台 / 膠囊滾輪)，膠囊會跳出音量條。level 是直接設成多少 (0~1)。"""
+    if not state.get("track"):
         return None
-    import audio_ctl
-    cur = audio_ctl.get_volume(t.get("app", ""))
-    if cur is None:
-        return None
-    return _set_music_volume(level if level is not None else cur + delta)
+    if level is None:
+        cur = _current_volume()
+        if cur is None:
+            return None
+        level = cur + delta
+    return _set_music_volume(level)
 
 
-runtime["music_volume"] = lambda delta: music_volume(delta)  # 浮動歌詞滾輪用
+runtime["music_volume"] = lambda delta: music_volume(delta)  # 浮動歌詞、膠囊滾輪用
 
 
 def music_duck():
     """一鍵壓低音樂 (直播講話時)：降到 20% (本來就比 20% 小就再減半)；再按一次恢復原本的音量。"""
-    t = state.get("track")
-    if not t:
+    if not state.get("track"):
         return None
-    import audio_ctl
-    cur = audio_ctl.get_volume(t.get("app", ""))
+    cur = _current_volume()
     if cur is None:
         return None
     if VOL["ducked"] is None:
