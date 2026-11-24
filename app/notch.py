@@ -1610,11 +1610,18 @@ class Notch:
         top = self.px(FLOAT_GAP) if shape == "float" else 0
         left = self.x + (self.W - w) / 2
         inside = (left - m <= px <= left + w + m) and (self.y <= py <= self.y + top + h + mv)
-        # 膠囊變寬 (顯示歌詞) 時，只有中間那段是膠囊的「按鈕」；兩側讓開給下面的東西 (瀏覽器分頁、視窗按鈕)
-        wide = w > self.px(200)
-        core = abs(px - (left + w / 2)) <= max(self.px(70), w * 0.2)
+        # 膠囊變寬 (顯示歌詞) 時，只有左邊的封面圓圈是膠囊的「把手」(停在上面才展開)；
+        # 其他地方讓開：變透明、點擊穿過去，點得到下面的瀏覽器分頁 ×、視窗按鈕
+        wide = w > self.px(165)
+        core = left - m <= px <= left + top + h + self.px(6)
         mode = (self.config.get("notch_style") or {}).get("hover", "smart")
-        self.set_ghost(inside and wide and not core and not self.expanded and mode != "click", now)
+        # 讓開的範圍包含膠囊外圍的陰影 (視窗比畫出來的膠囊大一圈，陰影那圈也會擋到點擊)
+        near = False
+        if self.hwnd:
+            wr = wt.RECT()
+            if user32.GetWindowRect(self.hwnd, ctypes.byref(wr)):
+                near = wr.left <= px < wr.right and wr.top <= py < wr.bottom
+        self.set_ghost(near and wide and not core and not self.expanded and mode != "click", now)
         if inside:
             self.leave_since = None
             if self.hover_since is None:
