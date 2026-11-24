@@ -533,6 +533,19 @@ def clean_title(title: str) -> str:
     return t
 
 
+def _split_artists(a: str):
+    """「Pritam, Arijit Singh & Amitabh」→ 每一位歌手。"""
+    a = FEAT.sub("", a or "")
+    return [x.strip() for x in re.split(r"\s*(?:/|、|&|,|，|\bx\b|×|\band\b)\s*", a) if x.strip()]
+
+
+_LATIN_NAME = re.compile(r"^[\sA-Za-z0-9.,'’&!?()\-À-ɏ]+$")
+
+
+def _name_tokens(s):
+    return frozenset(re.findall(r"[a-z0-9]+", (s or "").lower()))
+
+
 def _primary_artist(a: str) -> str:
     a = FEAT.sub("", a or "")
     return re.split(r"\s*(?:/|、|&|,|，|\bx\b|×)\s*", a, maxsplit=1)[0].strip() or a.strip()
@@ -619,13 +632,18 @@ def title_variants(title: str, artist: str):
         if m:  # 每一組都拆，拆出來的排在原本那組後面
             split += [(tt, m.group(1).strip()), (tt, m.group(2).strip())]
     out = split
+    # 好幾位歌手「Pritam, Arijit Singh, Amitabh Bhattacharya」：整串搜不到，每一位各試一次
+    for tt, aa in list(out):
+        parts = [p for p in _split_artists(aa) if p]
+        if len(parts) > 1:
+            out += [(tt, p) for p in parts[:3]]
     seen, res = set(), []
     for x in out:
         x = (x[0].strip(" -–—/*"), x[1].strip(" -–—/*"))
         if x[0] and x not in seen:
             seen.add(x)
             res.append(x)
-    return res[:10]
+    return res[:12]
 
 
 def title_matches(query: str, cand: str) -> int:
@@ -778,8 +796,12 @@ def _alias_tokens(s):
 
 def _pick_alias(title, duration, hits):
     """同歌手、長度差不多的歌不只一首時，試著分出是哪一首：
-    1. 只有一首跟播放器的歌名有共同的數字 / 英文片段 (互相包含也算)
-    2. 或是長度明顯最接近 (差不到 1 秒，其他都差 1.5 秒以上)"""
+    1. 好幾個來源都是同一個歌名，其他只零星出現 (原曲 vs 中文版、英文版、翻唱)：取多數
+    2. 只有一首跟播放器的歌名有共同的數字 / 英文片段 (互相包含也算)
+    3. 或是長度明顯最接近 (差不到 1 秒，其他都差 1.5 秒以上)"""
+    counts = sorted(((len(cs), k) for k, cs in hits.items()), reverse=True)
+    if len(counts) > 1 and counts[0][0] >= 3 and counts[0][0] >= 2 * counts[1][0]:
+        return counts[0][1]
     q = _alias_tokens(title)
 
     def shares(t):
@@ -869,7 +891,9 @@ class Lyrics:
         for t, a in title_variants(title, artist):
             if a and not CHANNEL_NAME.search(a) and a not in names:
                 names.append(a)
-        for a in names[:2]:
+        # 原文名字排前面：英文名字常常只搜得到英文版 / 翻唱 (Dry Flower 用 Yuuri 搜到的是英文版，用 優里 才是原曲)
+        names = [n for n in await self.native_artists(artist) if n not in names] + names[:2]
+        for a in names[:4]:
             try:
                 cands = await self.search("", a, limit=30)  # 只靠歌手找：多拿一些 (這位歌手的歌可能很多)
             except Exception as e:
@@ -878,7 +902,7 @@ class Lyrics:
             hits = {}
             for c in cands:
                 if artist_matches(a, c.get("artist")) and c.get("duration") and abs(c["duration"] - duration) <= 2:
-                    hits.setdefault(_fnorm(c.get("title") or ""), []).append(c)
+                    hits.setdefault(_fnorm(PAREN.sub("", c.get("title") or "") or c.get("title") or ""), []).append(c)
             if len(hits) > 1:
                 pick = _pick_alias(title, duration, hits)
                 if pick is None:
@@ -891,6 +915,56 @@ class Lyrics:
                 if r and r["synced"] and r["lines"]:
                     print(f"[artist-length] {title} → {c.get('title')} / {c.get('artist')} (同歌手、同長度)", flush=True)
                     return {**r, "guessed": True, "guessed_title": c.get("title")}
+        return None
+
+    async def native_artists(self, artist):
+        """播放器給的是英文 / 羅馬拼音的歌手名 (Li Ronghao、Kay Tse、Yuuri)，歌詞網站卻用原文 (李荣浩、謝安琪、優里)：
+        用網易雲的歌手搜尋找原文名字 (它有別名 / 英文名)。回傳最多兩個原文名字。"""
+        names = []
+        for a in _split_artists(artist)[:3]:
+            if not a or not _LATIN_NAME.match(a) or CHANNEL_NAME.search(a):
+                continue
+            key = ("native", a.lower())
+            if key not in self.lp_cache:
+                found = []
+                try:
+                    http = await self.session()
+                    async with http.get("https://music.163.com/api/search/get", headers=NETEASE_HEADERS,
+                                        params={"s": a, "type": 100, "limit": 6},
+                                        timeout=aiohttp.ClientTimeout(total=3)) as r:
+                        d = json.loads(await r.text())
+                    arts = (d.get("result") or {}).get("artists") or []
+                    want = _name_tokens(a)
+                    for ar in arts:
+                        n = ar.get("name") or ""
+                        if _LATIN_NAME.match(n):
+                            continue  # 本來就是英文名字的歌手，用原本的名字搜就好
+                        aliases = [n] + list(ar.get("alias") or []) + [ar.get("trans") or ""]
+                        if any(_name_tokens(x) == want for x in aliases if x):  # 別名跟播放器的名字一樣 (順序不拘)
+                            found.append(n)
+                    # 第一個結果是原文名字、又沒有別名：多半就是本人 (Yuuri → 優里；別名剛好也叫 Yuuri 的是別人)
+                    if arts and not _LATIN_NAME.match(arts[0].get("name") or "")                             and not (arts[0].get("alias") or arts[0].get("trans")) and arts[0]["name"] not in found:
+                        found.insert(0, arts[0]["name"])
+                except Exception as e:
+                    print("[native-artist]", a, repr(e), flush=True)
+                self.lp_cache[key] = found[:2]
+            for n in self.lp_cache[key]:
+                if n not in names:
+                    names.append(n)
+        return names[:2]
+
+    async def _with_native(self, title, artist, duration):
+        """用原文歌手名再找一次 (歌名不變)。"""
+        for n in await self.native_artists(artist):
+            for t in dict.fromkeys([clean_title(title), PAREN.sub("", clean_title(title)).strip()]):
+                if not t:
+                    continue
+                cands = self.rank(await self.search(t, n, duration=duration), t, n, duration, need_artist=True)
+                for c in cands[:4]:
+                    r = await self.fetch(c)
+                    if r and r["synced"] and r["lines"]:
+                        print(f"[native-artist] {title} / {artist} → 用「{n}」找到", flush=True)
+                        return r
         return None
 
     async def find(self, title, artist, album, duration, need_artist=False):
@@ -912,10 +986,16 @@ class Lyrics:
                             break
                 if result and result["synced"]:
                     break
+        if not (result and result["synced"]) and artist:  # 英文歌手名對不上原文：用原文名字再找
+            r = await self._with_native(title, artist, duration)
+            if r:
+                result = r
         if not result and duration and artist:
             result = await self._other_length(title, artist, duration)
-        if not result and duration:
-            result = await self._artist_length(title, artist, duration)
+        if not (result and result["synced"]) and duration:
+            r = await self._artist_length(title, artist, duration)
+            if r:
+                result = r
         result = result or {"source": None, "synced": False, "lines": []}
         if result["lines"]:
             result["lines"] = clean_lines(result["lines"], title, artist)
