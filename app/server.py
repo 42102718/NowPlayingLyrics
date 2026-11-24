@@ -1438,6 +1438,7 @@ SHARE = None  # share.Share：和朋友共享歌詞
 LOOP = None
 clients: set[web.WebSocketResponse] = set()
 stage_clients: set[web.WebSocketResponse] = set()  # 舞台頁面 (要即時音量)
+singing_clients: set[web.WebSocketResponse] = set()  # 舞台 / OBS 歌詞畫面 (開著才算「今天唱了幾首」)
 state = {"track": None, "lyrics": None, "sessions": []}
 
 
@@ -1705,7 +1706,7 @@ async def poll_loop():
                 last_id = None
             if QUEUE is not None:
                 try:
-                    QUEUE.on_track(state["track"])
+                    QUEUE.on_track(state["track"], singing=bool(singing_clients))
                 except Exception as e:
                     print("[queue]", repr(e), flush=True)
             if state["track"] and time.monotonic() - VOL["at"] > 2:  # 每 2 秒重讀一次 (音量混音程式改過也會跟上)
@@ -1758,6 +1759,8 @@ async def ws_handler(request):
                     asyncio.create_task(check_update(min_gap=600))
                 if d.get("stage") or d.get("viz"):  # 舞台頁面、主視窗 (歌詞跟著節拍呼吸)：要即時音量
                     stage_clients.add(ws)
+                if d.get("stage"):
+                    singing_clients.add(ws)
             elif d.get("type") == "pin":
                 media.pinned = d.get("app") or None
             elif d.get("type") == "offset":
@@ -1989,6 +1992,7 @@ async def ws_handler(request):
             pass
     clients.discard(ws)
     stage_clients.discard(ws)
+    singing_clients.discard(ws)
     return ws
 
 
@@ -3115,16 +3119,64 @@ class WindowApi:
         return r[0] if r else ""
 
     def fullscreen(self):
-        """F：主視窗全螢幕 (網頁的全螢幕在 App 視窗裡沒有作用)。"""
-        window.toggle_fullscreen()
-        self._restyle()
+        """F：主視窗全螢幕 / 還原 (網頁的全螢幕在 App 視窗裡沒有作用)。
+        不用 pywebview 的 toggle_fullscreen：它還原時一律變成「一般大小」、外框樣式也會被蓋掉，
+        原本是放大的視窗回不去。這裡自己記住視窗位置 (含放大狀態)，還原時原封不動放回去。"""
+        if getattr(window.native, "is_fullscreen", False):
+            self.exit_fullscreen()
+        else:
+            self._enter_fullscreen()
+
+    def _hwnd(self):
+        import ctypes, ctypes.wintypes as wt
+        u = ctypes.windll.user32
+        u.FindWindowW.restype = wt.HWND
+        return u.FindWindowW(None, APP_NAME)
+
+    def _enter_fullscreen(self):
+        import ctypes, ctypes.wintypes as wt
+        u = ctypes.windll.user32
+        hwnd = self._hwnd()
+        if not hwnd:
+            return
+
+        class WINDOWPLACEMENT(ctypes.Structure):
+            _fields_ = [("length", wt.UINT), ("flags", wt.UINT), ("showCmd", wt.UINT), ("ptMinPosition", wt.POINT),
+                        ("ptMaxPosition", wt.POINT), ("rcNormalPosition", wt.RECT)]
+
+        class MONITORINFO(ctypes.Structure):
+            _fields_ = [("cbSize", wt.DWORD), ("rcMonitor", wt.RECT), ("rcWork", wt.RECT), ("dwFlags", wt.DWORD)]
+        wp = WINDOWPLACEMENT()
+        wp.length = ctypes.sizeof(WINDOWPLACEMENT)
+        u.GetWindowPlacement(hwnd, ctypes.byref(wp))
+        style = u.GetWindowLongW(hwnd, -16)
+        self._fs_saved = (wp, style)
+        mi = MONITORINFO()
+        mi.cbSize = ctypes.sizeof(MONITORINFO)
+        u.GetMonitorInfoW(u.MonitorFromWindow(hwnd, 2), ctypes.byref(mi))
+        r = mi.rcMonitor
+        if style & 0x01000000:  # 放大中：先還原成一般視窗 (不然 Windows 會留著放大的外框)
+            u.ShowWindow(hwnd, 1)
+        # 拿掉標題列 / 外框 (CAPTION | THICKFRAME)，蓋滿整個螢幕
+        u.SetWindowLongW(hwnd, -16, style & ~(0x00C00000 | 0x00040000) & ~0x01000000)
+        u.SetWindowPos(hwnd, None, r.left, r.top, r.right - r.left, r.bottom - r.top, 0x0020 | 0x0004 | 0x0040)  # FRAMECHANGED|NOZORDER|SHOWWINDOW
+        window.native.is_fullscreen = True
 
     def exit_fullscreen(self):
-        if getattr(window.native, "is_fullscreen", False):
-            window.toggle_fullscreen()
-            self._restyle()
-            return True
-        return False
+        if not getattr(window.native, "is_fullscreen", False):
+            return False
+        import ctypes
+        u = ctypes.windll.user32
+        hwnd = self._hwnd()
+        saved = getattr(self, "_fs_saved", None)
+        window.native.is_fullscreen = False
+        if hwnd and saved:
+            wp, style = saved
+            u.SetWindowLongW(hwnd, -16, style & ~0x01000000)
+            u.SetWindowPos(hwnd, None, 0, 0, 0, 0, 0x0020 | 0x0001 | 0x0002 | 0x0004)  # FRAMECHANGED，位置交給下面
+            u.SetWindowPlacement(hwnd, ctypes.byref(wp))  # 原本的位置、大小、是不是放大，一起放回去
+        self._restyle()
+        return True
 
     def _restyle(self):
         """離開全螢幕後 WinForms 會把外框樣式蓋掉，要加回來 (四邊可拉、貼齊)。"""

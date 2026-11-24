@@ -1114,24 +1114,30 @@ body[data-layout="sheet"] #lyr-src{grid-area:s;text-align:center;margin:0}
 body[data-layout="sheet"] .line{font-size:clamp(28px,3.6vw,56px)}
 
 /* ═════ 音量：滑桿、一鍵壓低、浮出的百分比 ═════ */
-/* 平常只有一個小喇叭 (很淡)；滑鼠移過去，旁邊才滑出一條短短的音量條和百分比 */
-#volume{position:relative;display:flex;align-items:center;height:22px;width:22px;margin:-8px auto -4px;opacity:.45;transition:opacity .3s}
-/* 喇叭固定在中間不動，音量條和百分比從右邊滑出來 */
-#volume::after{content:"";position:absolute;left:100%;top:-6px;bottom:-6px;width:0}
-#volume:hover::after{width:120px}
+/* 音量：跟播放鍵排在同一列的右邊 (像 YouTube / YouTube Music)，左邊放一樣寬的空白讓播放鍵維持在正中間 */
+#transport::before{content:"";flex:none;width:96px}
+#volume{display:flex;align-items:center;gap:6px;flex:none;width:96px;opacity:.7;transition:opacity .2s}
 #volume:hover,#volume:focus-within,#volume:has(#vol-btn.ducked){opacity:1}
-#vol-btn{flex:none;width:22px;height:22px;border:0;border-radius:50%;background:none;color:rgba(var(--ink),.8);cursor:pointer;display:grid;place-items:center;
-  font:12px "Segoe Fluent Icons","Segoe MDL2 Assets";transition:background .2s,color .2s}
-#vol-btn:hover{background:rgba(var(--ink),.1);color:var(--hi)}
-#vol-btn.ducked{color:var(--accent)}
-#vol-range{position:absolute;left:26px;top:2px;width:0;opacity:0;height:18px;z-index:1;-webkit-appearance:none;appearance:none;background:none;cursor:pointer;--v:50%;
-  transition:width .3s cubic-bezier(.2,.8,.2,1),opacity .25s}
-#volume:hover #vol-range,#volume:focus-within #vol-range{width:76px;opacity:1}
-#vol-range::-webkit-slider-runnable-track{height:3px;border-radius:3px;background:linear-gradient(90deg,rgba(var(--ink),.7) var(--v),rgba(var(--ink),.16) var(--v))}
-#vol-range::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;margin-top:-3px;border-radius:50%;background:var(--hi);box-shadow:0 1px 3px rgba(0,0,0,.35)}
-#vol-range:disabled{opacity:.4;cursor:default}
-#vol-pct{position:absolute;left:108px;top:4px;width:0;overflow:hidden;opacity:0;white-space:nowrap;font:500 10.5px var(--font);color:var(--dim);font-variant-numeric:tabular-nums;transition:width .3s,opacity .25s}
-#volume:hover #vol-pct,#volume:focus-within #vol-pct,#volume:has(#vol-btn.ducked) #vol-pct{width:30px;opacity:1}
+#transport #vol-btn{flex:none;width:28px;height:28px;font-size:16px;color:var(--hi);background:none}
+#transport #vol-btn:hover{background:rgba(var(--ink),.1)}
+#transport #vol-btn.ducked{color:var(--accent)}
+#vol-range{flex:none;width:62px;height:20px;margin:0;-webkit-appearance:none;appearance:none;background:none;cursor:pointer;--v:50%;transition:width .25s,opacity .2s}
+#vol-range::-webkit-slider-runnable-track{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--hi) var(--v),rgba(var(--ink),.22) var(--v))}
+#vol-range::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;margin-top:-4px;border-radius:50%;background:var(--hi);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+#vol-range:hover::-webkit-slider-thumb{transform:scale(1.2)}
+#vol-range:disabled{opacity:.35;cursor:default}
+#vol-pct{display:none}
+/* 空間比較小的版面 / 視窗：只留喇叭，滑鼠移過去才展開音量條 */
+body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #transport::before{display:none}
+body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #volume{width:auto}
+body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #vol-range{width:0;opacity:0}
+body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #volume:hover #vol-range{width:56px;opacity:1}
+@media (max-width:1000px){
+  #transport::before{display:none}
+  #volume{width:auto}
+  #vol-range{width:0;opacity:0}
+  #volume:hover #vol-range{width:56px;opacity:1}
+}
 /* 調音量時浮出的小提示 (小小一顆，不擋畫面) */
 #vol-osd{position:fixed;z-index:50;left:50%;top:14px;translate:-50% 0;display:flex;align-items:center;gap:7px;padding:5px 11px 5px 9px;border-radius:999px;
   pointer-events:none;opacity:0;transform:translateY(-6px);transition:opacity .25s,transform .3s;
@@ -1144,48 +1150,67 @@ body[data-layout="sheet"] .line{font-size:clamp(28px,3.6vw,56px)}
 #vol-osd small{font:500 11px var(--font);color:var(--accent)}
 /* 各版面裡的位置 */
 @media (min-width:861px){
-  body[data-layout="bento"] #app{grid-template-rows:auto auto auto auto auto 1fr}
-  body[data-layout="bento"] #volume{grid-column:1/3;grid-row:5;margin:0 auto}
-  body[data-layout="bento"] #lyr-src{grid-row:6}
 }
-body[data-layout="sheet"] #left{grid-template-areas:"h h h" "c m t" "p p p" "v v v" "k k k" "s s s"}
-body[data-layout="sheet"] #volume{grid-area:v;margin:0 auto}
 
-/* ═════ 點歌單 ═════ */
-#q-dialog .dialog{width:min(560px,calc(100vw - 32px))}
-#q-dialog .body{gap:14px}
-.q-top{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(var(--ink),.05);border:1px solid rgba(var(--ink),.08)}
-.q-top .n{font:800 30px/1 var(--font);color:var(--hi);font-variant-numeric:tabular-nums;min-width:38px;text-align:center}
-.q-top .lbl{flex:1;font:500 13px/1.4 var(--font);color:var(--dim)}
-.q-top .lbl b{display:block;font:700 14px var(--font);color:var(--fg)}
-.q-top button{width:28px;height:28px;border-radius:50%;border:1px solid rgba(var(--ink),.12);background:none;color:var(--fg);font:700 14px var(--font);cursor:pointer}
-.q-top button:hover{background:rgba(var(--ink),.1)}
-.q-opts{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
-.q-opts .row{font-size:13px}
-.q-sec h4{font:700 12px var(--font);letter-spacing:.06em;color:var(--dim);margin:0 2px 6px;display:flex;align-items:center;gap:8px}
-.q-sec h4 .c{font-weight:600;padding:1px 7px;border-radius:9px;background:rgba(var(--ink),.1);color:var(--fg)}
+/* ═════ 點歌 ═════ */
+#q-dialog .dialog{width:min(600px,calc(100vw - 32px))}
+#q-dialog header{align-items:center}
+#q-dialog header h2{flex:1}
+#q-dialog .body{gap:18px;padding:16px 20px 20px}
+.q-openpill{display:flex;align-items:center;gap:10px;font:600 13px var(--font);color:var(--dim);margin-right:6px}
+.q-openpill b{font-weight:700;color:var(--fg)}
+/* 三格數字 */
+.q-stats{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:10px}
+.q-stat{position:relative;padding:14px 16px;border-radius:16px;background:rgba(var(--ink),.05);border:1px solid rgba(var(--ink),.07)}
+.q-stat .v{font:800 28px/1 var(--font);color:var(--hi);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.q-stat .k{margin-top:6px;font:600 12.5px var(--font);color:var(--fg)}
+.q-stat .s{margin-top:2px;font:400 11.5px/1.4 var(--font);color:var(--dim)}
+.q-stat .fix{position:absolute;right:10px;top:10px;display:flex;gap:4px;opacity:0;transition:opacity .2s}
+.q-stat:hover .fix{opacity:1}
+.q-stat .fix button{width:22px;height:22px;border-radius:50%;border:0;background:rgba(var(--ink),.1);color:var(--fg);font:600 13px/1 var(--font);cursor:pointer}
+.q-stat .fix button:hover{background:rgba(var(--ink),.2)}
+.q-stat.alert{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 10%,rgba(var(--ink),.04))}
+/* 區塊 */
+.q-sec > h4{display:flex;align-items:baseline;gap:8px;margin:0 2px 8px;font:700 13px var(--font);color:var(--fg)}
+.q-sec > h4 small{font:500 12px var(--font);color:var(--dim)}
 .q-list{display:flex;flex-direction:column;gap:6px}
-.q-item{display:flex;align-items:center;gap:10px;padding:9px 10px 9px 12px;border-radius:12px;background:rgba(var(--ink),.05);border:1px solid rgba(var(--ink),.07)}
-.q-item .q{flex:1;min-width:0;display:flex!important;flex-direction:column;align-items:flex-start;gap:1px}
-.q-item .q b,.q-item .q small{max-width:100%}
-#q-dialog header h2 .fi{margin-right:8px}
-.q-item .q b{display:block;font:700 14px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.q-item .q small{display:block;font:500 12px var(--font);color:var(--dim)}
-.q-item button{flex:none;height:30px;min-width:30px;padding:0 10px;border-radius:9px;border:1px solid rgba(var(--ink),.12);background:rgba(var(--ink),.06);
-  color:var(--fg);font:600 12.5px var(--font);cursor:pointer;transition:background .2s,transform .15s}
-.q-item button:hover{background:rgba(var(--ink),.14)}
-.q-item button:active{transform:scale(.94)}
-.q-item button.yes{background:color-mix(in srgb,var(--accent2) 75%,transparent);border-color:transparent;color:#fff}
-.q-item button.ic{padding:0;width:30px;font:13px "Segoe Fluent Icons","Segoe MDL2 Assets"}
-.q-now{background:linear-gradient(135deg,color-mix(in srgb,var(--accent2) 26%,transparent),rgba(var(--ink),.04));border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
-.q-now .q b{font-size:16px}
-.q-empty{font:400 12.5px/1.6 var(--font);color:var(--dim);padding:4px 2px}
-.q-add{display:flex;gap:8px}
-.q-add input{flex:1;width:auto}
-#q-dialog .obs{font:400 12px/1.6 var(--font);color:var(--dim)}
-#q-dialog .obs code{user-select:all;padding:1px 6px;border-radius:6px;background:rgba(var(--ink),.08);color:var(--fg)}
+.q-card{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(var(--ink),.045);border:1px solid rgba(var(--ink),.06);transition:background .2s}
+.q-card:hover{background:rgba(var(--ink),.075)}
+.q-av{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:700 14px var(--font);color:#fff;background:hsl(var(--h,260) 55% 52%)}
+.q-num{flex:none;width:22px;text-align:center;font:700 13px var(--font);color:var(--dim);font-variant-numeric:tabular-nums}
+.q-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.q-txt b{font:700 14.5px var(--font);color:var(--hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-txt span{font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-acts{display:flex;gap:6px;flex:none}
+.q-btn{height:32px;padding:0 14px;border-radius:999px;border:1px solid rgba(var(--ink),.14);background:none;color:var(--fg);font:600 13px var(--font);cursor:pointer;
+  transition:background .2s,transform .15s,border-color .2s}
+.q-btn:hover{background:rgba(var(--ink),.08)}
+.q-btn:active{transform:scale(.95)}
+.q-btn.pri{background:var(--hi);color:var(--bg0);border-color:transparent}
+.q-btn.pri:hover{background:color-mix(in srgb,var(--hi) 88%,transparent)}
+.q-ic{width:30px;height:30px;border-radius:50%;border:0;background:none;color:var(--dim);cursor:pointer;font:13px "Segoe Fluent Icons","Segoe MDL2 Assets";opacity:0;transition:opacity .2s,background .2s,color .2s}
+.q-card:hover .q-ic{opacity:1}
+.q-ic:hover{background:rgba(var(--ink),.1);color:var(--hi)}
+.q-now{padding:14px 14px 14px 16px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent2) 22%,transparent),rgba(var(--ink),.03));
+  border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+.q-now .q-txt b{font-size:17px}
+.q-eq{flex:none;display:flex;align-items:flex-end;gap:2px;width:16px;height:16px}
+.q-eq i{flex:1;height:60%;background:var(--accent);border-radius:1px;animation:qeq 1s ease-in-out infinite}
+.q-eq i:nth-child(2){animation-delay:-.4s}.q-eq i:nth-child(3){animation-delay:-.7s}
+@keyframes qeq{0%,100%{height:30%}50%{height:100%}}
+.q-empty{padding:14px 16px;border-radius:14px;border:1px dashed rgba(var(--ink),.14);font:400 12.5px/1.6 var(--font);color:var(--dim)}
+/* 設定 (收起來) */
+.q-more{border-top:1px solid rgba(var(--ink),.08);padding-top:12px}
+.q-more summary{cursor:pointer;list-style:none;font:600 13px var(--font);color:var(--dim);display:flex;align-items:center;gap:6px}
+.q-more summary::-webkit-details-marker{display:none}
+.q-more summary::before{content:"\E76C";font:10px "Segoe Fluent Icons","Segoe MDL2 Assets";transition:transform .2s}
+.q-more[open] summary::before{transform:rotate(90deg)}
+.q-more .row{font-size:13px}
+.q-more .row small{display:block;font:400 11.5px/1.4 var(--font);color:var(--dim);margin-top:2px}
+.q-more .obs{font:400 12px/1.6 var(--font);color:var(--dim);margin-top:10px}
+.q-more .obs code{user-select:all;padding:1px 6px;border-radius:6px;background:rgba(var(--ink),.08);color:var(--fg)}
 #btn-queue{position:relative}
-#btn-queue .badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#ff5a6e;color:#fff;font:700 10px/16px var(--font);display:none}
+#btn-queue .badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent2);color:#fff;font:700 10px/16px var(--font);display:none}
 #btn-queue .badge.on{display:block;animation:pop .3s}
 </style>
 </head>
@@ -1223,9 +1248,8 @@ body[data-layout="sheet"] #volume{grid-area:v;margin:0 auto}
       <button class="side" id="btn-prev" title="上一首">&#xF8AC;</button>
       <button id="btn-play" title="播放 / 暫停 (空白鍵)">&#xF5B0;</button>
       <button class="side" id="btn-next" title="下一首">&#xF8AD;</button>
+      <div id="volume"><button id="vol-btn" title="音樂音量：按一下壓低 / 恢復 (Ctrl + Alt + M)">&#xE995;</button><input type="range" id="vol-range" min="0" max="100" step="1" value="50" title="音樂音量 (只調播放器自己，不動遊戲和系統)"><span id="vol-pct"></span></div>
     </div>
-    <div id="volume"><button id="vol-btn" title="一鍵壓低音樂 / 恢復 (Ctrl + Alt + M)。在封面或控制這一區滾滾輪也能調音量">&#xE995;</button>
-      <input type="range" id="vol-range" min="0" max="100" step="1" value="50" title="音樂音量 (只調播放器自己，不動遊戲和系統)"><span id="vol-pct">—</span></div>
     <div id="controls">
       <button class="ibtn" id="btn-lyrmenu" title="重新找歌詞、手動搜尋、調整歌詞時間"><span class="fi">&#xE8D6;</span>歌詞</button>
       <button class="ibtn" id="btn-stage" title="全螢幕歌詞演出 (唱歌台、OBS)"><span class="fi">&#xE7F4;</span>舞台</button>
@@ -1549,26 +1573,31 @@ body[data-layout="sheet"] #volume{grid-area:v;margin:0 auto}
 
 <div id="upd-bar"><span class="dot"></span><span id="upd-text"></span><span class="prog" id="upd-prog" hidden><i></i></span>
   <button class="ghost" id="upd-notes">看更新內容</button><button class="go" id="upd-go">立即更新</button><button class="x" id="upd-x" aria-label="稍後">×</button></div>
-<div class="modal" id="q-dialog" role="dialog" aria-label="點歌單">
+<div class="modal" id="q-dialog" role="dialog" aria-label="點歌">
   <div class="dialog">
-    <header><h2><span class="fi">&#xE90B;</span>點歌單</h2><button class="x" id="q-close" aria-label="關閉">×</button></header>
+    <header><h2>點歌</h2>
+      <label class="q-openpill" title="關掉時，觀眾點歌會收到「現在沒有開放點歌」"><span id="q-open-lbl">開放點歌</span><span class="switch"><input type="checkbox" id="q-open"><span></span></span></label>
+      <button class="x" id="q-close" aria-label="關閉">×</button></header>
     <div class="body">
-      <div class="q-top"><span class="n" id="q-count">0</span><span class="lbl"><b>今天唱了幾首</b>每首歌播超過 6 成就算一首，早上 6 點換日</span>
-        <button id="q-minus" title="少算一首">−</button><button id="q-plus" title="多算一首">＋</button><button id="q-reset" title="重新從 0 開始" style="width:auto;padding:0 10px;border-radius:14px;font-size:12px">歸零</button></div>
-      <div class="q-opts">
-        <label class="row" title="關掉時，觀眾點歌會收到「現在沒有開放點歌」">開放點歌 <span class="switch"><input type="checkbox" id="q-open"><span></span></span></label>
-        <label class="row" title="現在唱的這首播完，自動換待唱清單的下一首，並打開搜尋">唱完自動下一首 <span class="switch"><input type="checkbox" id="q-auto"><span></span></span></label>
-        <label class="row" title="同一個觀眾同時最多有幾首在排隊 (等你決定＋待唱)">每人最多 <select id="q-per"><option value="1">1 首</option><option value="2">2 首</option><option value="3">3 首</option><option value="5">5 首</option><option value="0">不限</option></select></label>
-        <label class="row" title="換到下一首時，在哪裡打開搜尋讓你挑版本 (Hummi 沒辦法直接幫播放器按播放)">換歌時打開 <select id="q-plat"><option value="auto">跟著播放器</option><option value="spotify">Spotify</option><option value="ytmusic">YouTube Music</option><option value="youtube">YouTube</option><option value="none">不要打開</option></select></label>
-        <label class="row" title="搜尋時加在歌名後面的字，例如「伴奏」「KTV」「Instrumental」">搜尋加上 <input type="text" class="cfg-in" id="q-suffix" placeholder="例如：伴奏" maxlength="30" style="width:110px"></label>
-        <label class="row" title="觀眾在聊天室打這些指令＋歌名就能點歌 (用空白分開)">點歌指令 <input type="text" class="cfg-in" id="q-cmds" placeholder="!點歌 !sr" maxlength="60" style="width:110px"></label>
+      <div class="q-stats">
+        <div class="q-stat" title="舞台 (或 OBS 歌詞畫面) 開著的時候，每播完一首歌自動加一；早上 6 點重新算">
+          <div class="fix"><button id="q-minus" title="算多了，減一首">−</button><button id="q-plus" title="漏算了，加一首">＋</button></div>
+          <div class="v" id="q-count">0</div><div class="k">今天唱了</div><div class="s">開著舞台時自動計算</div></div>
+        <div class="q-stat" id="q-stat-pend"><div class="v" id="q-pend-n">0</div><div class="k">等你決定</div><div class="s">觀眾剛點的歌</div></div>
+        <div class="q-stat"><div class="v" id="q-queue-n">0</div><div class="k">待唱</div><div class="s">你答應要唱的</div></div>
       </div>
-      <div class="q-sec"><h4>🎤 現在唱</h4><div class="q-list" id="q-now"></div></div>
-      <div class="q-sec"><h4>🙋 等你決定 <span class="c" id="q-pend-n">0</span></h4><div class="q-list" id="q-pend"></div></div>
-      <div class="q-sec"><h4>📋 待唱清單 <span class="c" id="q-queue-n">0</span></h4><div class="q-list" id="q-queue"></div>
-        <div class="q-add" style="margin-top:8px"><input type="text" class="cfg-in" id="q-add-in" placeholder="自己加一首 (按 Enter)" maxlength="80"><button class="chip" id="q-add-btn">加入</button></div></div>
-      <p class="obs" id="q-obs-hint">OBS：新增「瀏覽器」來源，網址填 <code>http://127.0.0.1:8765/queue</code>，畫面上就會顯示現在唱、接下來和今天唱了幾首 (透明背景)。
-        聊天室點歌要先在 設定 → 舞台與直播 → 聊天室點歌指令 填好 Twitch 頻道；有填權杖時，接受 / 不唱都會在聊天室告訴觀眾。</p>
+      <div class="q-sec"><h4>正在唱</h4><div class="q-list" id="q-now"></div></div>
+      <div class="q-sec"><h4>等你決定 <small>接受後排進待唱；婉拒會在聊天室禮貌地告訴他</small></h4><div class="q-list" id="q-pend"></div></div>
+      <div class="q-sec"><h4>待唱 <small>你自己在播放器放這些歌時，會自動對上「正在唱」</small></h4><div class="q-list" id="q-queue"></div></div>
+      <details class="q-more"><summary>點歌設定</summary>
+        <label class="row"><span>唱完自動準備下一首<small>正在唱的這首播完，自動在播放器搜尋待唱的下一首，你挑好版本按播放就好</small></span><span class="switch"><input type="checkbox" id="q-auto"><span></span></span></label>
+        <label class="row"><span>搜尋時打開<small>Hummi 沒辦法直接幫播放器按播放，所以打開搜尋</small></span><select id="q-plat"><option value="auto">跟著現在的播放器</option><option value="spotify">Spotify</option><option value="ytmusic">YouTube Music</option><option value="youtube">YouTube</option><option value="none">不要打開</option></select></label>
+        <label class="row"><span>搜尋時加上<small>例如「伴奏」「KTV」</small></span><input type="text" class="cfg-in" id="q-suffix" placeholder="不加" maxlength="30" style="width:120px"></label>
+        <label class="row"><span>每人同時最多<small>等你決定＋待唱，加起來</small></span><select id="q-per"><option value="1">1 首</option><option value="2">2 首</option><option value="3">3 首</option><option value="5">5 首</option><option value="0">不限</option></select></label>
+        <label class="row"><span>點歌指令<small>觀眾打指令＋歌名，用空白分開多個</small></span><input type="text" class="cfg-in" id="q-cmds" placeholder="!點歌 !sr" maxlength="60" style="width:120px"></label>
+        <p class="obs">聊天室要先在 設定 → 舞台與直播 → 聊天室點歌指令 填好 Twitch 頻道；有填權杖時，接受、婉拒、開始唱都會在聊天室說一聲。<br>
+          想把點歌清單放上直播畫面：OBS 新增「瀏覽器」來源，網址 <code>http://127.0.0.1:8765/queue</code>。</p>
+      </details>
     </div>
   </div>
 </div>
@@ -2785,7 +2814,9 @@ function renderVol(){
   const b = $('#vol-btn');
   b.classList.toggle('ducked', volDucked);
   b.innerHTML = volDucked ? '&#xE993;' : !has || volLevel > .5 ? '&#xE995;' : volLevel > .15 ? '&#xE994;' : volLevel > 0 ? '&#xE993;' : '&#xE992;';
-  b.title = volDucked ? '音樂已壓低：按一下恢復 (Ctrl + Alt + M)' : '一鍵壓低音樂 / 恢復 (Ctrl + Alt + M)。在封面或控制這一區滾滾輪也能調音量';
+  const pct = has ? Math.round(volLevel * 100) + '%' : '';
+  b.title = volDucked ? `音樂已壓低到 ${pct}：按一下恢復 (Ctrl + Alt + M)` : `音樂音量 ${pct}：按一下暫時壓低 (Ctrl + Alt + M)`;
+  r.title = `音樂音量 ${pct} (只調播放器自己，不動遊戲和系統)`;
 }
 function showVolOsd(){
   const o = $('#vol-osd'); if (volLevel == null) return;
@@ -2816,26 +2847,31 @@ $('#left').addEventListener('wheel', e => {  // 在封面 / 控制這一區滾�
   volDrag = 0; send({type: 'volume', delta: step});
 }, {passive: false});
 
-// ───── 點歌單 ─────
+// ───── 點歌 ─────
 let qState = null, qEdit = -1e9;
-function qBtn(label, cls, title, fn){ const b = document.createElement('button'); b.className = cls || ''; b.innerHTML = label; if (title) b.title = title; b.onclick = fn; return b; }
-function qRow(it, extra){
-  const d = document.createElement('div'); d.className = 'q-item' + (it.status === 'now' ? ' q-now' : '');
-  const q = document.createElement('span'); q.className = 'q';
-  q.innerHTML = '<b></b><small></small>';
-  q.querySelector('b').textContent = it.query;
-  q.querySelector('small').textContent = it.user ? `點歌：${it.user}` : '自己加的';
-  d.appendChild(q); extra.forEach(b => d.appendChild(b));
+const qAct = (action, id, value) => send({type: 'queue', action, id, value});
+const qHue = s => [...(s || '?')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+function qAgo(t){
+  const m = Math.max(0, Math.round((Date.now() / 1000 - t) / 60));
+  return m < 1 ? '剛剛' : m < 60 ? `${m} 分鐘前` : `${Math.round(m / 60)} 小時前`;
+}
+function qEl(html){ const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; }
+function qCard(it, lead, sub, acts){
+  const d = qEl(`<div class="q-card">${lead}<span class="q-txt"><b></b><span></span></span><span class="q-acts"></span></div>`);
+  d.querySelector('b').textContent = it.query;
+  d.querySelector('.q-txt span').textContent = sub;
+  acts.forEach(([label, cls, title, fn]) => { const b = qEl(`<button class="${cls}" title="${title}">${label}</button>`); b.onclick = fn; d.querySelector('.q-acts').appendChild(b); });
   return d;
 }
-const qAct = (action, id, value) => send({type: 'queue', action, id, value});
+const qAvatar = it => `<span class="q-av" style="--h:${qHue(it.user)}">${(it.user || '我').slice(0, 1).toUpperCase().replace(/[<&]/g, '')}</span>`;
 function renderQueue(){
   const s = qState; if (!s) return;
   const pend = s.items.filter(i => i.status === 'pending'), queued = s.items.filter(i => i.status === 'queued'), now = s.items.find(i => i.status === 'now');
   const badge = $('#btn-queue .badge');
   badge.textContent = pend.length; badge.classList.toggle('on', pend.length > 0);
   if (!$('#q-dialog').classList.contains('open')) return;
-  $('#q-count').textContent = s.count;
+  $('#q-count').textContent = s.count; $('#q-pend-n').textContent = pend.length; $('#q-queue-n').textContent = queued.length;
+  $('#q-stat-pend').classList.toggle('alert', pend.length > 0);
   if (performance.now() - qEdit > 1500){
     $('#q-open').checked = s.open; $('#q-auto').checked = s.auto_next;
     const qc = cfg?.queue || {};
@@ -2843,22 +2879,22 @@ function renderQueue(){
     if (document.activeElement !== $('#q-suffix')) $('#q-suffix').value = qc.suffix || '';
     if (document.activeElement !== $('#q-cmds')) $('#q-cmds').value = qc.cmds || '';
   }
-  const nowBox = $('#q-now'); nowBox.innerHTML = '';
-  if (now) nowBox.appendChild(qRow(now, [qBtn('唱完了，下一首 ▶', 'yes', '換待唱清單的下一首，並打開搜尋', () => qAct('next'))]));
-  else nowBox.appendChild(Object.assign(document.createElement('div'), {className: 'q-empty',
-    textContent: queued.length ? '按「下一首」開始唱待唱清單的第一首。' : '還沒有。接受觀眾點的歌，或自己加一首。'}));
-  if (!now && queued.length) nowBox.appendChild(qBtn('▶ 開始唱第一首', 'chip', '', () => qAct('next')));
-  const pb = $('#q-pend'); pb.innerHTML = ''; $('#q-pend-n').textContent = pend.length;
-  if (!pend.length) pb.appendChild(Object.assign(document.createElement('div'), {className: 'q-empty', textContent: s.open ? '觀眾點的歌會先出現在這裡，由你決定唱不唱。' : '點歌目前關閉。'}));
-  pend.forEach(it => pb.appendChild(qRow(it, [qBtn('唱', 'yes', '排進待唱清單 (聊天室會告訴他)', () => qAct('accept', it.id)),
-    qBtn('不唱', '', '這次先不唱 (聊天室會禮貌地告訴他)', () => qAct('reject', it.id))])));
-  const qb = $('#q-queue'); qb.innerHTML = ''; $('#q-queue-n').textContent = queued.length;
-  if (!queued.length) qb.appendChild(Object.assign(document.createElement('div'), {className: 'q-empty', textContent: '空的。'}));
-  queued.forEach((it, k) => qb.appendChild(qRow(it, [
-    qBtn('&#xE768;', 'ic', '現在就唱這首', () => qAct('sing', it.id)),
-    qBtn('&#xE70E;', 'ic', '往前', () => qAct('up', it.id)),
-    qBtn('&#xE70D;', 'ic', '往後', () => qAct('down', it.id)),
-    qBtn('&#xE711;', 'ic', '移除', () => qAct('remove', it.id))])));
+  $('#q-open-lbl').textContent = s.open ? '開放點歌中' : '點歌已關閉';
+  const empty = t => qEl(`<div class="q-empty"></div>`), fill = (box, list, mk, txt) => {
+    box.innerHTML = '';
+    if (!list.length){ const e = empty(); e.textContent = txt; box.appendChild(e); } else list.forEach((it, k) => box.appendChild(mk(it, k)));
+  };
+  fill($('#q-now'), now ? [now] : [], it => {
+    const d = qCard(it, '<span class="q-eq"><i></i><i></i><i></i></span>', it.user ? `${it.user} 點的歌` : '待唱清單', [['唱完了', 'q-btn', '從清單拿掉' + (s.auto_next ? '，並準備下一首' : ''), () => qAct('next')]]);
+    d.classList.add('q-now'); return d;
+  }, queued.length ? '放一首待唱的歌，就會自動對上；或在待唱清單按 ▶ 搜尋。' : '目前沒有。');
+  fill($('#q-pend'), pend, it => qCard(it, qAvatar(it), `${it.user} · ${qAgo(it.at)}`, [
+    ['接受', 'q-btn pri', '排進待唱', () => qAct('accept', it.id)], ['婉拒', 'q-btn', '這次先不唱', () => qAct('reject', it.id)]]),
+    s.open ? '還沒有新的點歌。' : '點歌目前關閉，打開右上角的開關觀眾才能點。');
+  fill($('#q-queue'), queued, (it, k) => qCard(it, `<span class="q-num">${k + 1}</span>`, it.user ? `${it.user} 點的` : '', [
+    ['&#xE721;', 'q-ic', '在播放器搜尋這首 (變成正在唱)', () => qAct('sing', it.id)],
+    ['&#xE74A;', 'q-ic', '往前', () => qAct('up', it.id)],
+    ['&#xE711;', 'q-ic', '從待唱拿掉', () => qAct('remove', it.id)]]), '接受觀眾的點歌後會排在這裡。');
 }
 function onQueue(m){ qState = m; renderQueue(); }
 function openQueue(){ $('#q-dialog').classList.add('open'); renderQueue(); }
@@ -2866,7 +2902,7 @@ $('#btn-queue').onclick = openQueue;
 $('#q-close').onclick = () => $('#q-dialog').classList.remove('open');
 $('#q-dialog').onclick = e => { if (e.target.id === 'q-dialog') $('#q-dialog').classList.remove('open'); };
 const qCfg = patch => { qEdit = performance.now(); if (cfg) cfg.queue = {...(cfg.queue || {}), ...patch}; send({type: 'queue_cfg', patch}); };
-$('#q-open').onchange = e => qCfg({open: e.target.checked});
+$('#q-open').onchange = e => { qCfg({open: e.target.checked}); if (qState){ qState.open = e.target.checked; renderQueue(); } };
 $('#q-auto').onchange = e => qCfg({auto_next: e.target.checked});
 $('#q-per').onchange = e => qCfg({per_user: +e.target.value});
 $('#q-plat').onchange = e => qCfg({platform: e.target.value});
@@ -2874,10 +2910,7 @@ $('#q-suffix').onchange = e => qCfg({suffix: e.target.value});
 $('#q-cmds').onchange = e => qCfg({cmds: e.target.value});
 $('#q-plus').onclick = () => qAct('count', null, 1);
 $('#q-minus').onclick = () => qAct('count', null, -1);
-$('#q-reset').onclick = () => { if (confirm('今天唱了幾首要從 0 重新算嗎？')) qAct('reset_count'); };
-const qAdd = () => { const v = $('#q-add-in').value.trim(); if (v){ qAct('add', null, v); $('#q-add-in').value = ''; } };
-$('#q-add-btn').onclick = qAdd;
-$('#q-add-in').onkeydown = e => { if (e.key === 'Enter') qAdd(); };
+setInterval(() => { if ($('#q-dialog').classList.contains('open')) renderQueue(); }, 30000);  // 「幾分鐘前」
 // ───── 沒在播歌：時鐘、日期、最近播放 ─────
 let recent = [];
 function renderIdle(){

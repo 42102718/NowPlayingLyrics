@@ -7,7 +7,8 @@
   (Hummi 沒辦法直接幫播放器按播放，所以打開搜尋讓實況主挑版本，例如伴奏版)
 - 「自動下一首」開著：現在唱的那首播完，就自動換下一首、打開搜尋
 
-「今天唱了幾首」：任何一首歌播超過 60% 就算一首 (早上 6 點換日，半夜的直播不會被切成兩天)。
+「今天唱了幾首」：舞台 (或 OBS 歌詞畫面) 開著的時候，每播完一首歌自動 +1 (早上 6 點換日，半夜的直播不會被切成兩天)。
+實況主自己在播放器放了點歌單裡的歌 (歌名對得上)，那首就自動變成「正在唱」，播完就從清單拿掉。
 """
 import datetime
 import json
@@ -176,7 +177,26 @@ class SongQueue:
             print("[queue] open", repr(e), flush=True)
 
     # ───── 每秒看一次正在播的歌 ─────
-    def on_track(self, track):
+    @staticmethod
+    def _norm(s):
+        import re
+        s = re.sub(r"[\(\[（【].*?[\)\]）】]", " ", (s or "").lower())
+        return re.sub(r"[\s\-_.,，。、!！?？'\"「」『』~～:：/／&]+", "", s)
+
+    def _match(self, track):
+        """正在播的歌是不是點歌單裡的某一首 (歌名對得上)。"""
+        title, artist = self._norm(track.get("title")), self._norm(track.get("artist"))
+        if len(title) < 2:
+            return None
+        for it in self.items:
+            if it["status"] not in ("queued", "pending"):
+                continue
+            q = self._norm(it["query"])
+            if len(q) >= 2 and (title in q or q in title + artist or q.startswith(title)):
+                return it
+        return None
+
+    def on_track(self, track, singing=True):
         with self.lock:
             self.roll_day()
             dirty = False
@@ -184,10 +204,20 @@ class SongQueue:
             dur = float((track or {}).get("duration") or 0)
             pos = float((track or {}).get("position") or 0)
             frac = pos / dur if dur > 20 else 0.0
-            # 今天唱了幾首：同一首播超過 60% 算一次
+            # 今天唱了幾首：舞台開著時，同一首播到 9 成以上算一次
             if tid != self.cur_tid:
                 self.cur_tid, self.cur_counted = tid, False
-            if tid and not self.cur_counted and frac >= 0.6:
+                # 自己放了點歌單裡的歌：那首變成「正在唱」
+                hit = self._match(track) if tid else None
+                if hit is not None:
+                    self._finish_now(count=False)
+                    hit["status"] = "now"
+                    self.now_since = time.time()
+                    self.bound, self.bound_peak = tid, frac
+                    if hit.get("user"):
+                        self.say(f"🎤 正在唱 @{hit['user']} 點的「{hit['query']}」")
+                    dirty = True
+            if tid and singing and not self.cur_counted and frac >= 0.9:
                 self.cur_counted = True
                 self.count += 1
                 self.sung.insert(0, {"title": track.get("title"), "artist": track.get("artist"), "at": time.time()})

@@ -23,8 +23,8 @@ html,body{background:transparent;overflow:hidden;color:#fff;font-family:var(--fo
 body.right #card{left:auto;right:24px;transform-origin:top right}
 body.nobg #card{background:none;border:0;box-shadow:none;backdrop-filter:none}
 body.nobg *{text-shadow:0 2px 8px rgba(0,0,0,.8),0 0 2px rgba(0,0,0,.9)}
-.lbl{font:800 11px var(--font);letter-spacing:.16em;color:var(--accent);display:flex;align-items:center;gap:8px}
-.lbl .dot{width:8px;height:8px;border-radius:50%;background:#ff5a6e;box-shadow:0 0 10px #ff5a6e;animation:blink 1.6s ease-in-out infinite}
+.lbl{font:700 12px var(--font);letter-spacing:.12em;color:var(--accent);display:flex;align-items:center;gap:8px}
+.lbl .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:blink 1.8s ease-in-out infinite}
 @keyframes blink{50%{opacity:.35}}
 #now{margin:6px 0 2px}
 #now .t{font:800 26px/1.2 var(--font);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -43,7 +43,7 @@ body.nobg *{text-shadow:0 2px 8px rgba(0,0,0,.8),0 0 2px rgba(0,0,0,.9)}
 #count b{font:800 20px var(--font);color:#fff;font-variant-numeric:tabular-nums}
 #count b.bump{animation:bump .6s cubic-bezier(.3,1.6,.5,1)}
 @keyframes bump{40%{transform:scale(1.5);color:var(--accent)}}
-#hint{margin-left:auto;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.1)}
+#hint{margin-left:auto;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.65)}
 #hint code{font:700 12.5px var(--font);color:var(--accent)}
 .empty{font:600 15px var(--font);color:rgba(255,255,255,.6);margin-top:6px}
 [hidden]{display:none!important}
@@ -51,10 +51,10 @@ body.nobg *{text-shadow:0 2px 8px rgba(0,0,0,.8),0 0 2px rgba(0,0,0,.9)}
 </head>
 <body>
 <div id="card" hidden>
-  <div class="lbl"><span class="dot"></span>NOW SINGING · 現在唱</div>
+  <div class="lbl"><span class="dot"></span>正在唱</div>
   <div id="now"><div class="t"></div><div class="u"></div></div>
   <div class="empty" id="empty" hidden>等待下一首…</div>
-  <div id="next" hidden><div class="lbl" style="color:rgba(255,255,255,.55)">UP NEXT · 接下來</div><ol></ol></div>
+  <div id="next" hidden><div class="lbl" style="color:rgba(255,255,255,.5)">接下來</div><ol></ol></div>
   <div id="foot"><span id="count">今天唱了 <b>0</b> 首</span><span id="hint" hidden></span></div>
 </div>
 <script>
@@ -76,7 +76,7 @@ function render(q){
   $('#empty').textContent = queued.length ? '準備下一首…' : (q.open ? '還沒有人點歌，快來點！' : '等待下一首…');
   if (now){
     $('#now .t').textContent = now.query;
-    $('#now .u').textContent = now.user ? `🙋 ${now.user} 點的歌` : '🎤 實況主自選';
+    $('#now .u').textContent = now.user ? `${now.user} 點播` : '實況主選歌';
     if (key !== lastNow){ const n = $('#now'); n.classList.remove('enter'); void n.offsetWidth; n.classList.add('enter'); }
   }
   lastNow = key;

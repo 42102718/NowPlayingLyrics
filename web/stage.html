@@ -344,37 +344,65 @@ body.glass button{transition:transform .22s cubic-bezier(.3,1.5,.5,1),background
 body.glass button:active:not(:disabled){transform:scale(.95)}
 body.glass #ctl #c-play{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 20px -6px rgba(0,0,0,.5)}
 
-/* ═════ 點歌 (舞台上也能處理；OBS 畫面不會出現) ═════ */
+/* ═════ 點歌 (舞台上的側邊抽屜；OBS 畫面不會出現) ═════ */
 #c-req{position:relative;font:17px "Segoe Fluent Icons","Segoe MDL2 Assets"!important}
-#c-req .badge{position:absolute;top:3px;right:3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#ff5a6e;color:#fff;
-  font:700 10px/16px "Noto Sans TC",sans-serif;display:none}
+#c-req .badge{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:#a78bff;box-shadow:0 0 0 2px rgba(20,18,30,.9);display:none}
 #c-req .badge.on{display:block}
-.rq-top{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.06);margin-bottom:6px}
-.rq-top .n{font:800 26px/1 "Noto Sans TC";min-width:32px;text-align:center}
-.rq-top .l{flex:1;font:600 12px "Noto Sans TC";color:rgba(255,255,255,.65)}
-.rq-top button{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:none;color:#fff;cursor:pointer;font:700 13px "Noto Sans TC"}
-.rq-list{display:flex;flex-direction:column;gap:6px}
-.rq{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 11px;border-radius:12px;background:rgba(255,255,255,.06)}
-.rq .q{flex:1;min-width:0}
-.rq .q b{display:block;font:700 13.5px "Noto Sans TC";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rq .q small{display:block;font:500 11.5px "Noto Sans TC";color:rgba(255,255,255,.55)}
-.rq button{flex:none;height:28px;min-width:28px;padding:0 9px;border-radius:9px;border:0;background:rgba(255,255,255,.12);color:#fff;font:700 12px "Noto Sans TC";cursor:pointer}
-.rq button:hover{background:rgba(255,255,255,.22)}
-.rq button.yes{background:#8b6cff}
-.rq.now{background:linear-gradient(135deg,rgba(139,108,255,.35),rgba(255,255,255,.05))}
-.rq-empty{font:500 12px/1.6 "Noto Sans TC";color:rgba(255,255,255,.45);padding:2px}
-.rq-add{display:flex;gap:6px;margin-top:8px}
-.rq-add input{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:9px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font:500 13px "Noto Sans TC";outline:none}
-.rq-add button{height:32px;padding:0 12px;border-radius:9px;border:0;background:rgba(255,255,255,.12);color:#fff;font:700 12px "Noto Sans TC";cursor:pointer}
-/* 有人點歌時右上角跳出的小卡片：直接按「唱 / 不唱」，不用打開面板 */
-#rq-toasts{position:fixed;right:20px;top:76px;z-index:25;display:flex;flex-direction:column;gap:8px;width:300px;pointer-events:none}
-#rq-toasts .rq{pointer-events:auto;background:rgba(20,18,30,.86);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);
-  box-shadow:0 14px 36px -12px rgba(0,0,0,.6);animation:rqIn .45s cubic-bezier(.2,.9,.25,1.1)}
-#rq-toasts .rq.out{animation:rqOut .3s ease-in forwards}
-@keyframes rqIn{from{opacity:0;transform:translateX(30px)}}
-@keyframes rqOut{to{opacity:0;transform:translateX(30px)}}
-body.obs #rq-toasts,body.obs #c-req{display:none!important}
-#panel.open ~ #rq-toasts{display:none}
+#rq{position:fixed;top:16px;right:16px;bottom:16px;width:360px;z-index:22;display:flex;flex-direction:column;border-radius:22px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(24,22,36,.86),rgba(14,13,22,.82));backdrop-filter:blur(30px) saturate(1.5);
+  border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 80px -20px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08);
+  font-family:"Noto Sans TC","Inter",sans-serif;color:#fff;transform:translateX(calc(100% + 24px));transition:transform .45s cubic-bezier(.2,.9,.25,1)}
+#rq.open{transform:none}
+#rq .hd{display:flex;align-items:center;gap:10px;padding:18px 18px 12px}
+#rq .hd h2{flex:1;font:800 18px "Noto Sans TC"}
+#rq .x{width:30px;height:30px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);font-size:18px;cursor:pointer}
+#rq .x:hover{background:rgba(255,255,255,.16);color:#fff}
+.rq-sw{display:flex;align-items:center;gap:8px;font:600 12px "Noto Sans TC";color:rgba(255,255,255,.6);cursor:pointer}
+.rq-sw input{display:none}
+.rq-sw i{position:relative;width:34px;height:20px;border-radius:10px;background:rgba(255,255,255,.18);transition:background .2s}
+.rq-sw i::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.rq-sw input:checked + i{background:#8b6cff}
+.rq-sw input:checked + i::after{transform:translateX(14px)}
+#rq .stat{display:flex;align-items:baseline;gap:8px;margin:0 18px 6px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.05)}
+#rq .stat b{font:800 26px/1 "Noto Sans TC";font-variant-numeric:tabular-nums}
+#rq .stat span{font:600 12.5px "Noto Sans TC";color:rgba(255,255,255,.7)}
+#rq .stat small{margin-left:auto;font:500 11px "Noto Sans TC";color:rgba(255,255,255,.4)}
+#rq .bd{flex:1;overflow:auto;padding:8px 18px 18px}
+#rq h4{display:flex;align-items:center;gap:8px;margin:14px 2px 8px;font:700 12px "Noto Sans TC";letter-spacing:.06em;color:rgba(255,255,255,.5)}
+#rq h4 em{font-style:normal;padding:0 7px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font-size:11px;line-height:18px}
+.rq-c{display:flex;align-items:center;gap:11px;padding:10px 10px 10px 12px;border-radius:14px;background:rgba(255,255,255,.05);margin-bottom:6px;transition:background .2s}
+.rq-c:hover{background:rgba(255,255,255,.08)}
+.rq-av{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:700 13px "Noto Sans TC";background:hsl(var(--h,260) 55% 52%)}
+.rq-n{flex:none;width:18px;text-align:center;font:700 12px "Noto Sans TC";color:rgba(255,255,255,.4)}
+.rq-t{flex:1;min-width:0}
+.rq-t b{display:block;font:700 14px "Noto Sans TC";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rq-t span{display:block;font:500 11.5px "Noto Sans TC";color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rq-b{flex:none;height:30px;padding:0 13px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:none;color:#fff;font:600 12.5px "Noto Sans TC";cursor:pointer;transition:background .2s,transform .15s}
+.rq-b:hover{background:rgba(255,255,255,.1)}
+.rq-b:active{transform:scale(.95)}
+.rq-b.pri{background:#fff;color:#16141f;border-color:transparent}
+.rq-i{flex:none;width:28px;height:28px;border-radius:50%;border:0;background:none;color:rgba(255,255,255,.55);cursor:pointer;font:12px "Segoe Fluent Icons","Segoe MDL2 Assets";opacity:0;transition:opacity .2s}
+.rq-c:hover .rq-i{opacity:1}
+.rq-i:hover{background:rgba(255,255,255,.1);color:#fff}
+.rq-c.now{padding:14px 12px 14px 14px;background:linear-gradient(120deg,rgba(139,108,255,.32),rgba(255,255,255,.04));border:1px solid rgba(167,139,255,.3)}
+.rq-c.now .rq-t b{font-size:16px}
+.rq-eq{flex:none;display:flex;align-items:flex-end;gap:2px;width:16px;height:16px}
+.rq-eq i{flex:1;height:60%;background:#b9a6ff;border-radius:1px;animation:rqeq 1s ease-in-out infinite}
+.rq-eq i:nth-child(2){animation-delay:-.4s}.rq-eq i:nth-child(3){animation-delay:-.7s}
+@keyframes rqeq{0%,100%{height:30%}50%{height:100%}}
+.rq-e{padding:12px 14px;border-radius:14px;border:1px dashed rgba(255,255,255,.14);font:400 12px/1.6 "Noto Sans TC";color:rgba(255,255,255,.45)}
+#rq .ft{padding:12px 18px 16px;border-top:1px solid rgba(255,255,255,.07);font:400 11.5px/1.6 "Noto Sans TC";color:rgba(255,255,255,.4)}
+/* 新點歌的提示：右上角一張乾淨的小卡片，直接接受 / 婉拒 */
+#rq-toasts{position:fixed;right:20px;top:20px;z-index:25;display:flex;flex-direction:column;gap:8px;width:320px;pointer-events:none}
+#rq-toasts .rq-c{position:relative;overflow:hidden;pointer-events:auto;margin:0;padding:12px;background:rgba(22,20,34,.9);border:1px solid rgba(255,255,255,.1);
+  backdrop-filter:blur(20px);box-shadow:0 18px 40px -14px rgba(0,0,0,.7);font-family:"Noto Sans TC","Inter",sans-serif;color:#fff;animation:rqIn .5s cubic-bezier(.2,.9,.25,1.05)}
+#rq-toasts .rq-c::after{content:"";position:absolute;left:0;bottom:0;height:2px;width:100%;background:rgba(167,139,255,.7);transform-origin:left;animation:rqLife 15s linear forwards}
+#rq-toasts .rq-c.out{animation:rqOut .3s ease-in forwards}
+@keyframes rqIn{from{opacity:0;transform:translateY(-10px) scale(.97)}}
+@keyframes rqOut{to{opacity:0;transform:translateY(-6px) scale(.97)}}
+@keyframes rqLife{to{transform:scaleX(0)}}
+#rq.open ~ #rq-toasts{display:none}
+body.obs #rq,body.obs #rq-toasts,body.obs #c-req{display:none!important}
 </style>
 </head>
 <body class="ui">
@@ -413,13 +441,13 @@ body.obs #rq-toasts,body.obs #c-req{display:none!important}
   <button id="c-play" title="播放 / 暫停 (空白鍵)">&#xF5B0;</button>
   <button id="c-next" title="下一首 (Ctrl + →)">&#xF8AD;</button>
   <div class="bar"><span id="c-cur">0:00</span><div class="track" id="c-track"><i></i></div><span id="c-dur">0:00</span></div>
-  <button id="c-req" title="點歌單 (觀眾點的歌、待唱清單)">&#xE90B;<span class="badge"></span></button>
+  <button id="c-req" title="點歌 (觀眾點的歌、待唱)">&#xE90B;<span class="badge"></span></button>
   <div class="vol"><button id="c-vdown" title="音樂音量 − (↓)">&#xE993;</button><span id="c-vpct" title="音樂音量 (Ctrl + Alt + M 一鍵壓低)">—</span><button id="c-vup" title="音樂音量 + (↑)">&#xE995;</button></div>
 </div>
 <button id="gear" title="舞台設定">⚙</button>
 <aside id="panel">
   <h2>舞台設定 <button id="p-close" aria-label="關閉">×</button></h2>
-  <nav id="p-tabs"><button data-t="fx" class="on">效果</button><button data-t="look">外觀</button><button data-t="live">直播</button><button data-t="req">點歌</button></nav>
+  <nav id="p-tabs"><button data-t="fx" class="on">效果</button><button data-t="look">外觀</button><button data-t="live">直播</button></nav>
   <div class="ppane on" data-p="fx">
     <div class="seg2" id="engine"><button data-e="folia">Folia 效果</button><button data-e="hummi">Hummi 效果</button></div>
     <div class="grid folia" id="fmodes"></div>
@@ -461,18 +489,18 @@ body.obs #rq-toasts,body.obs #c-req{display:none!important}
     <div class="src-note">在 OBS 新增「瀏覽器」來源，貼上網址，寬高設 1920×1080。Hummi 要開著，OBS 才拿得到歌詞。</div>
     <div id="msg"></div>
   </div>
-  <div class="ppane" data-p="req">
-    <div class="rq-top"><span class="n" id="rq-count">0</span><span class="l">今天唱了幾首<br>(播超過 6 成算一首)</span>
-      <button id="rq-minus" title="少算一首">−</button><button id="rq-plus" title="多算一首">＋</button></div>
-    <label class="row">開放點歌 <input type="checkbox" id="rq-open"></label>
-    <label class="row" title="現在唱的這首播完，自動換下一首並打開搜尋">唱完自動下一首 <input type="checkbox" id="rq-auto"></label>
-    <h3>🎤 現在唱</h3><div class="rq-list" id="rq-now"></div>
-    <h3>🙋 等你決定</h3><div class="rq-list" id="rq-pend"></div>
-    <h3>📋 待唱清單</h3><div class="rq-list" id="rq-queue"></div>
-    <div class="rq-add"><input id="rq-add-in" placeholder="自己加一首 (Enter)" maxlength="80"><button id="rq-add-btn">加入</button></div>
-    <div class="src-note">觀眾在 Twitch 聊天室打「!點歌 歌名」。指令、每人上限、換歌時打開哪裡，在主視窗的「點歌」裡設定。</div>
-  </div>
 </aside>
+<aside id="rq" aria-label="點歌">
+  <div class="hd"><h2>點歌</h2><label class="rq-sw" title="關掉時，觀眾點歌會收到「現在沒有開放點歌」"><span id="rq-open-lbl">開放中</span><input type="checkbox" id="rq-open"><i></i></label><button class="x" id="rq-close" aria-label="關閉">×</button></div>
+  <div class="stat" title="舞台開著的時候，每播完一首歌自動加一；早上 6 點重新算"><span>今天唱了</span><b id="rq-count">0</b><span>首</span><small>自動計算</small></div>
+  <div class="bd">
+    <h4>正在唱</h4><div id="rq-now"></div>
+    <h4>等你決定 <em id="rq-pend-n">0</em></h4><div id="rq-pend"></div>
+    <h4>待唱 <em id="rq-queue-n">0</em></h4><div id="rq-queue"></div>
+  </div>
+  <div class="ft">自己在播放器放待唱的歌，會自動對上「正在唱」。更多設定在主視窗的「點歌」。</div>
+</aside>
+<div id="rq-toasts"></div></aside>
 <div id="rq-toasts"></div>
 <script>
 const $ = s => document.querySelector(s);
@@ -1296,67 +1324,65 @@ document.querySelectorAll('#p-tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.ppane').forEach(x => x.classList.toggle('on', x.dataset.p === b.dataset.t));
 });
 $('#p-close').onclick = () => $('#panel').classList.remove('open');
-// ───── 點歌 (舞台上直接處理) ─────
+// ───── 點歌 (舞台上的側邊抽屜) ─────
 let rqState = null, rqSeen = null;
 const rqAct = (action, id, value) => sendWs({type: 'queue', action, id, value});
-function rqRow(it, btns){
-  const d = document.createElement('div'); d.className = 'rq' + (it.status === 'now' ? ' now' : '');
-  d.innerHTML = '<span class="q"><b></b><small></small></span>';
+const rqHue = s => [...(s || '?')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+const rqAgo = t => { const m = Math.max(0, Math.round((Date.now() / 1000 - t) / 60)); return m < 1 ? '剛剛' : m < 60 ? `${m} 分鐘前` : `${Math.round(m / 60)} 小時前`; };
+function rqEl(html){ const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; }
+function rqCard(it, lead, sub, acts){
+  const d = rqEl(`<div class="rq-c">${lead}<span class="rq-t"><b></b><span></span></span></div>`);
   d.querySelector('b').textContent = it.query;
-  d.querySelector('small').textContent = it.user ? `🙋 ${it.user}` : '自己加的';
-  btns.forEach(([label, cls, title, fn]) => { const b = document.createElement('button'); b.innerHTML = label; b.className = cls; b.title = title; b.onclick = e => { e.stopPropagation(); fn(); }; d.appendChild(b); });
+  d.querySelector('.rq-t span').textContent = sub;
+  acts.forEach(([label, cls, title, fn]) => { const b = rqEl(`<button class="${cls}" title="${title}">${label}</button>`); b.onclick = e => { e.stopPropagation(); fn(); }; d.appendChild(b); });
   return d;
 }
-const rqEmpty = t => Object.assign(document.createElement('div'), {className: 'rq-empty', textContent: t});
+const rqAv = it => `<span class="rq-av" style="--h:${rqHue(it.user)}">${(it.user || '我').slice(0, 1).toUpperCase().replace(/[<&]/g, '')}</span>`;
+function rqFill(box, list, mk, txt){
+  box.innerHTML = '';
+  if (!list.length){ const e = rqEl('<div class="rq-e"></div>'); e.textContent = txt; box.appendChild(e); }
+  else list.forEach((it, k) => box.appendChild(mk(it, k)));
+}
 function onQueue(q){
   rqState = q;
   const pend = q.items.filter(i => i.status === 'pending'), queued = q.items.filter(i => i.status === 'queued'), now = q.items.find(i => i.status === 'now');
-  const badge = $('#c-req .badge'); badge.textContent = pend.length; badge.classList.toggle('on', pend.length > 0);
+  $('#c-req .badge').classList.toggle('on', pend.length > 0);
   $('#rq-count').textContent = q.count;
-  if (document.activeElement !== $('#rq-open')) $('#rq-open').checked = q.open;
-  if (document.activeElement !== $('#rq-auto')) $('#rq-auto').checked = q.auto_next;
-  const nb = $('#rq-now'); nb.innerHTML = '';
-  nb.appendChild(now ? rqRow(now, [['下一首 ▶', 'yes', '唱完了，換下一首', () => rqAct('next')]])
-                     : (queued.length ? rqRow({query: `待唱還有 ${queued.length} 首`, user: '', status: ''}, [['開始 ▶', 'yes', '開始唱第一首', () => rqAct('next')]]) : rqEmpty('還沒有。')));
-  const pb = $('#rq-pend'); pb.innerHTML = '';
-  if (!pend.length) pb.appendChild(rqEmpty(q.open ? '觀眾點的歌會先出現在這裡。' : '點歌目前關閉。'));
-  pend.forEach(it => pb.appendChild(rqRow(it, [['唱', 'yes', '排進待唱清單', () => rqAct('accept', it.id)], ['不唱', '', '這次先不唱', () => rqAct('reject', it.id)]])));
-  const qb = $('#rq-queue'); qb.innerHTML = '';
-  if (!queued.length) qb.appendChild(rqEmpty('空的。'));
-  queued.forEach(it => qb.appendChild(rqRow(it, [['&#xE768;', '', '現在就唱這首', () => rqAct('sing', it.id)], ['&#xE711;', '', '移除', () => rqAct('remove', it.id)]])));
-  qb.querySelectorAll('button').forEach(b => { if (b.innerHTML.length < 3) b.style.font = '12px "Segoe Fluent Icons","Segoe MDL2 Assets"'; });
-  // 新的點歌：右上角跳小卡片 (第一次載入的不跳)
+  $('#rq-open').checked = q.open; $('#rq-open-lbl').textContent = q.open ? '開放中' : '已關閉';
+  $('#rq-pend-n').textContent = pend.length; $('#rq-queue-n').textContent = queued.length;
+  rqFill($('#rq-now'), now ? [now] : [], it => {
+    const d = rqCard(it, '<span class="rq-eq"><i></i><i></i><i></i></span>', it.user ? `${it.user} 點的歌` : '待唱清單', [['唱完了', 'rq-b', '從清單拿掉', () => rqAct('next')]]);
+    d.classList.add('now'); return d;
+  }, queued.length ? '放一首待唱的歌就會自動對上。' : '目前沒有。');
+  rqFill($('#rq-pend'), pend, it => rqCard(it, rqAv(it), `${it.user} · ${rqAgo(it.at)}`,
+    [['接受', 'rq-b pri', '排進待唱', () => rqAct('accept', it.id)], ['婉拒', 'rq-b', '這次先不唱', () => rqAct('reject', it.id)]]),
+    q.open ? '還沒有新的點歌。' : '點歌目前關閉。');
+  rqFill($('#rq-queue'), queued, (it, k) => rqCard(it, `<span class="rq-n">${k + 1}</span>`, it.user ? `${it.user} 點的` : '',
+    [['&#xE721;', 'rq-i', '在播放器搜尋這首', () => rqAct('sing', it.id)], ['&#xE711;', 'rq-i', '從待唱拿掉', () => rqAct('remove', it.id)]]),
+    '接受的點歌會排在這裡。');
+  // 新的點歌：右上角跳一張小卡片 (第一次載入的不跳)
   const ids = new Set(pend.map(i => i.id));
-  if (rqSeen && !OBS){
-    pend.filter(i => !rqSeen.has(i.id)).forEach(showReqToast);
-  }
+  if (rqSeen && !OBS) pend.filter(i => !rqSeen.has(i.id)).forEach(showReqToast);
   rqSeen = ids;
-  // 已經處理掉的卡片收起來
-  document.querySelectorAll('#rq-toasts .rq').forEach(el => { if (!ids.has(+el.dataset.id)) dropToast(el); });
+  document.querySelectorAll('#rq-toasts .rq-c').forEach(el => { if (!ids.has(+el.dataset.id)) dropToast(el); });
 }
 function dropToast(el){ if (el.classList.contains('out')) return; el.classList.add('out'); setTimeout(() => el.remove(), 320); }
 function showReqToast(it){
   const box = $('#rq-toasts');
   while (box.children.length >= 3) box.firstChild.remove();
-  const el = rqRow(it, [['唱', 'yes', '排進待唱清單', () => { rqAct('accept', it.id); dropToast(el); }], ['不唱', '', '這次先不唱', () => { rqAct('reject', it.id); dropToast(el); }]]);
+  const el = rqCard(it, rqAv(it), `${it.user} 想聽這首`, [
+    ['接受', 'rq-b pri', '排進待唱', () => { rqAct('accept', it.id); dropToast(el); }],
+    ['婉拒', 'rq-b', '這次先不唱', () => { rqAct('reject', it.id); dropToast(el); }]]);
   el.dataset.id = it.id;
-  el.querySelector('small').textContent = `🙋 ${it.user} 想聽`;
   box.appendChild(el);
-  setTimeout(() => dropToast(el), 15000);  // 15 秒沒處理就收起來 (還在面板的「等你決定」裡)
+  setTimeout(() => dropToast(el), 15000);  // 15 秒沒處理就收起來 (還在「等你決定」裡)
 }
-$('#c-req').onclick = e => {
-  e.stopPropagation();
-  $('#panel').classList.add('open');
-  document.querySelectorAll('#p-tabs button').forEach(x => x.classList.toggle('on', x.dataset.t === 'req'));
-  document.querySelectorAll('.ppane').forEach(x => x.classList.toggle('on', x.dataset.p === 'req'));
-};
+$('#c-req').onclick = e => { e.stopPropagation(); $('#panel').classList.remove('open'); $('#rq').classList.toggle('open'); };
+$('#rq-close').onclick = e => { e.stopPropagation(); $('#rq').classList.remove('open'); };
+$('#rq').addEventListener('click', e => e.stopPropagation());
 $('#rq-open').onchange = e => sendWs({type: 'queue_cfg', patch: {open: e.target.checked}});
-$('#rq-auto').onchange = e => sendWs({type: 'queue_cfg', patch: {auto_next: e.target.checked}});
-$('#rq-plus').onclick = () => rqAct('count', null, 1);
-$('#rq-minus').onclick = () => rqAct('count', null, -1);
-const rqAdd = () => { const v = $('#rq-add-in').value.trim(); if (v){ rqAct('add', null, v); $('#rq-add-in').value = ''; } };
-$('#rq-add-btn').onclick = rqAdd;
-$('#rq-add-in').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') rqAdd(); });
+setInterval(() => { if (rqState && $('#rq').classList.contains('open')) onQueue(rqState); }, 30000);
+$('#gear').addEventListener('click', () => $('#rq').classList.remove('open'));
 
 function applyOpts(){
   const r = document.documentElement.style;
@@ -1496,7 +1522,7 @@ const fullscreen = () => window.pywebview?.api?.fullscreen ? window.pywebview.ap
 $('#b-full').onclick = fullscreen;
 $('#b-prompter').onclick = () => sendWs({type: 'open_prompter'});
 addEventListener('keydown', e => { if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !OBS && !e.target.closest?.('input,select,textarea')) sendWs({type: 'open_prompter'}); });
-addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F' || e.key === 'F11') && !e.target.closest?.('input,select')){ e.preventDefault(); fullscreen(); } if (e.key === 'Escape'){ $('#panel').classList.remove('open'); window.pywebview?.api?.exit_fullscreen?.(); } });
+addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F' || e.key === 'F11') && !e.target.closest?.('input,select')){ e.preventDefault(); fullscreen(); } if (e.key === 'Escape'){ $('#panel').classList.remove('open'); $('#rq').classList.remove('open'); window.pywebview?.api?.exit_fullscreen?.(); } });
 $('#b-obs').onclick = async () => {
   const q = new URLSearchParams({obs: 1, mode: opt.mode, bg: opt.bg, size: opt.size, nsize: opt.nsize, font: opt.font, transparent: +opt.transparent, next: +opt.next,
                                  card: +opt.card, beat: +opt.beat, album: +opt.album, color: opt.color});
