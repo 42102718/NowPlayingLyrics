@@ -45,7 +45,9 @@ def _word(syls):
         coda = CODA[fin]
         if nxt is not None and fin:
             ni = nxt[0]
-            if ni == "ㅇ":  # 連音
+            if ni == "ㅇ" and fin == "ㅇ":  # ㅇ 받침不連音 (사랑에 → sarange)
+                pass
+            elif ni == "ㅇ":  # 連音
                 stay, move = LINK[fin]
                 coda = CODA[stay] if stay else ""
                 if stay == "ㄹ" and move:
@@ -123,7 +125,11 @@ def apply(lines):
         t = l.get("text") or ""
         n = dict(l)
         if HANGUL.search(t) and not n.get("rd"):
-            r = romanize(t)
+            try:
+                r = romanize(t)
+            except Exception as e:  # 一句轉失敗不要拖累整首
+                print("[ko]", repr(e), t, flush=True)
+                r = ""
             if r and r != t:
                 n["rd"] = r
         out.append(n)
