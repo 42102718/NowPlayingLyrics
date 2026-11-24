@@ -118,7 +118,10 @@ DEFAULT_CONFIG = {
     "notch_style": {"shape": "island", "color": "black", "hover": "smart"},  # 形狀 island/float/bar、顏色 black/album/theme、展開 smart/fast/click
     "wallpaper": {"enabled": False, "monitor": "primary"},
     "share": {"folder": "", "name": ""},
-    "chat": {"channel": "", "token": "", "bot": "", "commands": "!song !歌名 !這什麼歌 !歌"},  # 直播聊天室點歌指令 (Twitch)  # 和朋友共享歌詞的雲端資料夾、顯示的名字  # 桌布模式：舞台放在桌面圖示後面
+    "chat": {"channel": "", "token": "", "bot": "", "commands": "!song !歌名 !這什麼歌 !歌"},
+    # 直播點歌單：open 開放點歌、auto_next 唱完自動下一首、per_user 每人同時最多幾首 (0 = 不限)、
+    # platform 換歌時在哪裡打開搜尋 (auto 跟著現在的播放器 / spotify / ytmusic / youtube / none)、suffix 搜尋時加在後面的字 (例如「伴奏」)
+    "queue": {"open": False, "auto_next": False, "per_user": 2, "cmds": "!點歌 !sr", "platform": "auto", "suffix": ""},  # 直播聊天室點歌指令 (Twitch)  # 和朋友共享歌詞的雲端資料夾、顯示的名字  # 桌布模式：舞台放在桌面圖示後面
 }
 
 
@@ -157,6 +160,8 @@ def load_config():
                               "hover": ns.get("hover") if ns.get("hover") in ("smart", "fast", "click") else "smart"}
         if isinstance(saved.get("timer"), dict):
             cfg["timer"] = {"custom": int(saved["timer"].get("custom", 20))}
+        q = saved.get("queue") or {}
+        cfg["queue"] = {**DEFAULT_CONFIG["queue"], **{k: v for k, v in q.items() if k in DEFAULT_CONFIG["queue"]}}
         ch = saved.get("chat") or {}
         cfg["chat"].update({k: str(ch.get(k) or "") for k in ("channel", "token", "bot") if k in ch})
         if ch.get("commands"):
@@ -1655,6 +1660,7 @@ async def poll_loop():
     global AI, LOOP
     await media.init()
     LOOP = asyncio.get_running_loop()
+    init_queue()
     start_chat()
     try:
         import ai_lyrics
@@ -1697,6 +1703,11 @@ async def poll_loop():
             else:
                 state["track"] = None
                 last_id = None
+            if QUEUE is not None:
+                try:
+                    QUEUE.on_track(state["track"])
+                except Exception as e:
+                    print("[queue]", repr(e), flush=True)
             if state["track"] and time.monotonic() - VOL["at"] > 2:  # 每 2 秒重讀一次 (音量混音程式改過也會跟上)
                 VOL["at"] = time.monotonic()
                 try:
@@ -1705,7 +1716,7 @@ async def poll_loop():
                 except Exception:
                     pass
             await broadcast({"type": "state", "track": state["track"], "sessions": state["sessions"],
-                             "volume": volume_info(),
+                             "volume": volume_info(), "queue": QUEUE.snapshot() if QUEUE else None,
                              "recent": runtime.get("recent", []),
                              "pinned": media.pinned, "config": public_config(), "unlocked": runtime["unlocked"],
                              "chat": CHAT.status if CHAT else "off",
@@ -1913,6 +1924,22 @@ async def ws_handler(request):
                 lv = d.get("level")
                 await asyncio.to_thread(music_volume, float(d.get("delta") or 0),
                                         None if lv is None else min(1.0, max(0.0, float(lv))))
+            elif d.get("type") == "queue" and QUEUE is not None:
+                iid = d.get("id")
+                await asyncio.to_thread(QUEUE.act, str(d.get("action") or ""), int(iid) if iid is not None else None, d.get("value"))
+            elif d.get("type") == "queue_cfg":
+                qc = config["queue"]
+                for k, v in (d.get("patch") or {}).items():
+                    if k in ("open", "auto_next"):
+                        qc[k] = bool(v)
+                    elif k == "per_user":
+                        qc[k] = max(0, min(20, int(v or 0)))
+                    elif k == "platform" and v in ("auto", "spotify", "ytmusic", "youtube", "none"):
+                        qc[k] = v
+                    elif k in ("cmds", "suffix"):
+                        qc[k] = " ".join(str(v or "").split())[:100]
+                save_config()
+                queue_changed()
             elif d.get("type") == "duck":
                 await asyncio.to_thread(music_duck)
             elif d.get("type") == "browser_music":
@@ -2892,6 +2919,47 @@ def monitor_list():
 
 
 CHAT = None
+QUEUE = None
+
+
+def queue_changed():
+    """點歌單變了：馬上告訴所有畫面 (主視窗、OBS 點歌單)。哪個執行緒呼叫都可以。"""
+    if LOOP is None or QUEUE is None:
+        return
+    msg = {"type": "queue", **QUEUE.snapshot()}
+    LOOP.call_soon_threadsafe(lambda: asyncio.ensure_future(broadcast(msg)))
+
+
+def queue_open_search(query):
+    """換到下一首點歌時，在選好的平台打開搜尋 (網址在這裡組)。"""
+    from urllib.parse import quote
+    qc = config["queue"]
+    plat = qc.get("platform") or "auto"
+    if plat == "none":
+        return
+    q = quote(f'{query} {qc.get("suffix") or ""}'.strip())
+    if plat == "auto":
+        t = state.get("track") or {}
+        plat = "spotify" if t.get("source") == "Spotify" else "ytmusic"
+    if plat == "spotify":
+        try:
+            os.startfile(f"spotify:search:{q}")
+        except Exception:
+            webbrowser.open(f"https://open.spotify.com/search/{q}")
+    elif plat == "youtube":
+        webbrowser.open(f"https://www.youtube.com/results?search_query={q}")
+    else:
+        webbrowser.open(f"https://music.youtube.com/search?q={q}")
+
+
+def init_queue():
+    global QUEUE
+    try:
+        import songqueue
+        QUEUE = songqueue.SongQueue(DATA / "songqueue.json", lambda: config["queue"], queue_changed, queue_open_search,
+                                    lambda text: CHAT.say(text) if CHAT else None)
+    except Exception as e:
+        print("[queue] disabled:", repr(e))
 
 
 def public_config():
@@ -2913,7 +2981,9 @@ def start_chat():
         def on_ask(user, title, artist):  # 舞台 / OBS 跳出「現在播放」卡片
             asyncio.ensure_future(broadcast({"type": "chat_song", "user": user, "title": title, "artist": artist}))
         if CHAT is None:
-            CHAT = chat.TwitchChat(lambda: config["chat"], now_playing, on_ask)
+            CHAT = chat.TwitchChat(lambda: config["chat"], now_playing, on_ask,
+                                   on_request=lambda u, q, me: QUEUE.request(u, q, me) if QUEUE else None,
+                                   request_cmds=lambda: config["queue"].get("cmds") or "")
         CHAT.restart(LOOP)
     except Exception as e:
         print("[chat] disabled:", repr(e))
@@ -3101,6 +3171,10 @@ def make_app():
     async def prompter_page(request):
         return web.FileResponse(WEB / "prompter.html", headers={"Cache-Control": "no-store"})
     app.router.add_get("/prompter", prompter_page)
+
+    async def queue_page(request):  # OBS 用的點歌單 (透明背景)
+        return web.FileResponse(WEB / "queue.html", headers={"Cache-Control": "no-store"})
+    app.router.add_get("/queue", queue_page)
 
     async def icon_png(request):
         return web.FileResponse(ASSETS / "icon.png", headers={"Cache-Control": "no-cache"})  # 換圖示後馬上看得到 (之前快取一天)

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hummi 點歌單</title>
+<!--
+  OBS 用的點歌單 (透明背景)。網址參數：
+    ?n=3        顯示接下來幾首 (0 = 不顯示)
+    ?count=0    不顯示「今天唱了幾首」
+    ?hint=0     不顯示「聊天室打 !點歌 歌名」
+    ?side=right 靠右對齊
+    ?scale=1.2  整個放大
+    ?bg=0       不要底色 (只有字和陰影)
+-->
+<style>
+:root{--accent:#b9a6ff;--font:"Inter","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;--s:1}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:transparent;overflow:hidden;color:#fff;font-family:var(--font);-webkit-font-smoothing:antialiased}
+#card{position:fixed;left:24px;top:24px;width:min(460px,calc(100vw - 48px));transform-origin:top left;transform:scale(var(--s));
+  padding:16px 18px 14px;border-radius:20px;background:linear-gradient(180deg,rgba(18,16,28,.72),rgba(18,16,28,.58));
+  border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 20px 50px -18px rgba(0,0,0,.6);backdrop-filter:blur(20px)}
+body.right #card{left:auto;right:24px;transform-origin:top right}
+body.nobg #card{background:none;border:0;box-shadow:none;backdrop-filter:none}
+body.nobg *{text-shadow:0 2px 8px rgba(0,0,0,.8),0 0 2px rgba(0,0,0,.9)}
+.lbl{font:800 11px var(--font);letter-spacing:.16em;color:var(--accent);display:flex;align-items:center;gap:8px}
+.lbl .dot{width:8px;height:8px;border-radius:50%;background:#ff5a6e;box-shadow:0 0 10px #ff5a6e;animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.35}}
+#now{margin:6px 0 2px}
+#now .t{font:800 26px/1.2 var(--font);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#now .u{font:600 13px var(--font);color:rgba(255,255,255,.7);margin-top:2px}
+#now.enter .t,#now.enter .u{animation:rise .7s cubic-bezier(.2,.9,.25,1.1) both}
+#now.enter .u{animation-delay:.08s}
+@keyframes rise{from{opacity:0;transform:translateY(12px);filter:blur(4px)}}
+#next{margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12)}
+#next ol{list-style:none;display:flex;flex-direction:column;gap:5px;margin-top:6px}
+#next li{display:flex;gap:10px;align-items:baseline;font:600 15px var(--font);white-space:nowrap;overflow:hidden}
+#next li i{font-style:normal;flex:none;width:18px;color:rgba(255,255,255,.45);font-variant-numeric:tabular-nums}
+#next li span{overflow:hidden;text-overflow:ellipsis}
+#next li small{flex:none;font:500 12px var(--font);color:rgba(255,255,255,.55)}
+#foot{display:flex;align-items:center;gap:10px;margin-top:12px;font:600 12.5px var(--font);color:rgba(255,255,255,.75)}
+#count{display:flex;align-items:baseline;gap:6px}
+#count b{font:800 20px var(--font);color:#fff;font-variant-numeric:tabular-nums}
+#count b.bump{animation:bump .6s cubic-bezier(.3,1.6,.5,1)}
+@keyframes bump{40%{transform:scale(1.5);color:var(--accent)}}
+#hint{margin-left:auto;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.1)}
+#hint code{font:700 12.5px var(--font);color:var(--accent)}
+.empty{font:600 15px var(--font);color:rgba(255,255,255,.6);margin-top:6px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div id="card" hidden>
+  <div class="lbl"><span class="dot"></span>NOW SINGING · 現在唱</div>
+  <div id="now"><div class="t"></div><div class="u"></div></div>
+  <div class="empty" id="empty" hidden>等待下一首…</div>
+  <div id="next" hidden><div class="lbl" style="color:rgba(255,255,255,.55)">UP NEXT · 接下來</div><ol></ol></div>
+  <div id="foot"><span id="count">今天唱了 <b>0</b> 首</span><span id="hint" hidden></span></div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const P = new URLSearchParams(location.search);
+const N = Math.max(0, Math.min(8, +(P.get('n') ?? 3)));
+if (P.get('side') === 'right') document.body.classList.add('right');
+if (P.get('bg') === '0') document.body.classList.add('nobg');
+document.documentElement.style.setProperty('--s', Math.max(.5, Math.min(3, +(P.get('scale') || 1))));
+if (P.get('count') === '0') $('#count').hidden = true;
+let lastNow = null, lastCount = null, cmds = '!點歌';
+
+function render(q){
+  if (!q) return;
+  const now = q.items.find(i => i.status === 'now'), queued = q.items.filter(i => i.status === 'queued');
+  $('#card').hidden = !(now || queued.length || q.open || q.count);
+  const key = now ? now.id : null;
+  $('#now').hidden = !now; $('#empty').hidden = !!now;
+  $('#empty').textContent = queued.length ? '準備下一首…' : (q.open ? '還沒有人點歌，快來點！' : '等待下一首…');
+  if (now){
+    $('#now .t').textContent = now.query;
+    $('#now .u').textContent = now.user ? `🙋 ${now.user} 點的歌` : '🎤 實況主自選';
+    if (key !== lastNow){ const n = $('#now'); n.classList.remove('enter'); void n.offsetWidth; n.classList.add('enter'); }
+  }
+  lastNow = key;
+  const ol = $('#next ol'); ol.innerHTML = '';
+  queued.slice(0, N).forEach((it, k) => {
+    const li = document.createElement('li');
+    li.innerHTML = '<i></i><span></span><small></small>';
+    li.querySelector('i').textContent = k + 1;
+    li.querySelector('span').textContent = it.query;
+    li.querySelector('small').textContent = it.user ? it.user : '';
+    ol.appendChild(li);
+  });
+  $('#next').hidden = !N || !queued.length;
+  const b = $('#count b');
+  if (lastCount !== null && q.count > lastCount){ b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+  b.textContent = q.count; lastCount = q.count;
+  const h = $('#hint');
+  h.hidden = !q.open || P.get('hint') === '0';
+  h.innerHTML = '聊天室打 <code></code> 點歌'; h.querySelector('code').textContent = cmds + ' 歌名';
+}
+
+let ws;
+function connect(){
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onclose = () => setTimeout(connect, 1000);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'state'){
+      if (m.config && m.config.queue) cmds = (m.config.queue.cmds || '!點歌').split(/\s+/)[0] || '!點歌';
+      const a = m.track && m.track.accent; if (Array.isArray(a)) document.documentElement.style.setProperty('--accent', `rgb(${a.join(',')})`);
+      render(m.queue);
+    } else if (m.type === 'queue') render(m);
+  };
+}
+connect();
+</script>
+</body>
+</html>

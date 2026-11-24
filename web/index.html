@@ -1150,6 +1150,43 @@ body[data-layout="immersive"] #volume{width:100%}
 }
 body[data-layout="sheet"] #left{grid-template-areas:"h h h" "c m t" "p p p" "v v v" "k k k" "s s s"}
 body[data-layout="sheet"] #volume{grid-area:v;margin:0}
+
+/* ═════ 點歌單 ═════ */
+#q-dialog .dialog{width:min(560px,calc(100vw - 32px))}
+#q-dialog .body{gap:14px}
+.q-top{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(var(--ink),.05);border:1px solid rgba(var(--ink),.08)}
+.q-top .n{font:800 30px/1 var(--font);color:var(--hi);font-variant-numeric:tabular-nums;min-width:38px;text-align:center}
+.q-top .lbl{flex:1;font:500 13px/1.4 var(--font);color:var(--dim)}
+.q-top .lbl b{display:block;font:700 14px var(--font);color:var(--fg)}
+.q-top button{width:28px;height:28px;border-radius:50%;border:1px solid rgba(var(--ink),.12);background:none;color:var(--fg);font:700 14px var(--font);cursor:pointer}
+.q-top button:hover{background:rgba(var(--ink),.1)}
+.q-opts{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.q-opts .row{font-size:13px}
+.q-sec h4{font:700 12px var(--font);letter-spacing:.06em;color:var(--dim);margin:0 2px 6px;display:flex;align-items:center;gap:8px}
+.q-sec h4 .c{font-weight:600;padding:1px 7px;border-radius:9px;background:rgba(var(--ink),.1);color:var(--fg)}
+.q-list{display:flex;flex-direction:column;gap:6px}
+.q-item{display:flex;align-items:center;gap:10px;padding:9px 10px 9px 12px;border-radius:12px;background:rgba(var(--ink),.05);border:1px solid rgba(var(--ink),.07)}
+.q-item .q{flex:1;min-width:0;display:flex!important;flex-direction:column;align-items:flex-start;gap:1px}
+.q-item .q b,.q-item .q small{max-width:100%}
+#q-dialog header h2 .fi{margin-right:8px}
+.q-item .q b{display:block;font:700 14px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-item .q small{display:block;font:500 12px var(--font);color:var(--dim)}
+.q-item button{flex:none;height:30px;min-width:30px;padding:0 10px;border-radius:9px;border:1px solid rgba(var(--ink),.12);background:rgba(var(--ink),.06);
+  color:var(--fg);font:600 12.5px var(--font);cursor:pointer;transition:background .2s,transform .15s}
+.q-item button:hover{background:rgba(var(--ink),.14)}
+.q-item button:active{transform:scale(.94)}
+.q-item button.yes{background:color-mix(in srgb,var(--accent2) 75%,transparent);border-color:transparent;color:#fff}
+.q-item button.ic{padding:0;width:30px;font:13px "Segoe Fluent Icons","Segoe MDL2 Assets"}
+.q-now{background:linear-gradient(135deg,color-mix(in srgb,var(--accent2) 26%,transparent),rgba(var(--ink),.04));border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+.q-now .q b{font-size:16px}
+.q-empty{font:400 12.5px/1.6 var(--font);color:var(--dim);padding:4px 2px}
+.q-add{display:flex;gap:8px}
+.q-add input{flex:1;width:auto}
+#q-dialog .obs{font:400 12px/1.6 var(--font);color:var(--dim)}
+#q-dialog .obs code{user-select:all;padding:1px 6px;border-radius:6px;background:rgba(var(--ink),.08);color:var(--fg)}
+#btn-queue{position:relative}
+#btn-queue .badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#ff5a6e;color:#fff;font:700 10px/16px var(--font);display:none}
+#btn-queue .badge.on{display:block;animation:pop .3s}
 </style>
 </head>
 <body>
@@ -1193,6 +1230,7 @@ body[data-layout="sheet"] #volume{grid-area:v;margin:0}
       <button class="ibtn" id="btn-lyrmenu" title="重新找歌詞、手動搜尋、調整歌詞時間"><span class="fi">&#xE8D6;</span>歌詞</button>
       <button class="ibtn" id="btn-stage" title="全螢幕歌詞演出 (唱歌台、OBS)"><span class="fi">&#xE7F4;</span>舞台</button>
       <button class="ibtn" id="btn-devices" title="耳機、滑鼠、鍵盤、手把的電量"><span class="fi">&#xE7F6;</span>裝置</button>
+      <button class="ibtn" id="btn-queue" title="直播點歌單：觀眾點的歌、待唱清單、今天唱了幾首"><span class="fi">&#xE90B;</span>點歌<span class="badge"></span></button>
       <button class="ibtn" id="btn-focus" title="只顯示歌詞 (H)"><span class="fi">&#xE740;</span>專注</button>
       <button class="ibtn" id="btn-settings" title="設定"><span class="fi">&#xE713;</span>設定</button>
     </div>
@@ -1427,7 +1465,7 @@ body[data-layout="sheet"] #volume{grid-area:v;margin:0}
     </div>
   </section>
   <section class="grp"><h3>聊天室點歌指令</h3>
-    <p class="desc">觀眾在 Twitch 聊天室打 <b>!song</b>，舞台 / OBS 畫面會跳出現在播的歌；填了權杖還會直接回覆。</p>
+    <p class="desc">觀眾在 Twitch 聊天室打 <b>!song</b>，舞台 / OBS 畫面會跳出現在播的歌；打 <b>!點歌 歌名</b> 會進主視窗的「點歌」單，由你決定唱不唱。填了權杖還會直接在聊天室回覆。</p>
     <div class="card">
       <label class="row">Twitch 頻道 <input type="text" class="cfg-in" id="chat-channel" placeholder="你的頻道 ID" maxlength="40"></label>
       <label class="row">指令 <input type="text" class="cfg-in" id="chat-cmds" placeholder="!song !歌名" maxlength="200"></label>
@@ -1511,6 +1549,29 @@ body[data-layout="sheet"] #volume{grid-area:v;margin:0}
 
 <div id="upd-bar"><span class="dot"></span><span id="upd-text"></span><span class="prog" id="upd-prog" hidden><i></i></span>
   <button class="ghost" id="upd-notes">看更新內容</button><button class="go" id="upd-go">立即更新</button><button class="x" id="upd-x" aria-label="稍後">×</button></div>
+<div class="modal" id="q-dialog" role="dialog" aria-label="點歌單">
+  <div class="dialog">
+    <header><h2><span class="fi">&#xE90B;</span>點歌單</h2><button class="x" id="q-close" aria-label="關閉">×</button></header>
+    <div class="body">
+      <div class="q-top"><span class="n" id="q-count">0</span><span class="lbl"><b>今天唱了幾首</b>每首歌播超過 6 成就算一首，早上 6 點換日</span>
+        <button id="q-minus" title="少算一首">−</button><button id="q-plus" title="多算一首">＋</button><button id="q-reset" title="重新從 0 開始" style="width:auto;padding:0 10px;border-radius:14px;font-size:12px">歸零</button></div>
+      <div class="q-opts">
+        <label class="row" title="關掉時，觀眾點歌會收到「現在沒有開放點歌」">開放點歌 <span class="switch"><input type="checkbox" id="q-open"><span></span></span></label>
+        <label class="row" title="現在唱的這首播完，自動換待唱清單的下一首，並打開搜尋">唱完自動下一首 <span class="switch"><input type="checkbox" id="q-auto"><span></span></span></label>
+        <label class="row" title="同一個觀眾同時最多有幾首在排隊 (等你決定＋待唱)">每人最多 <select id="q-per"><option value="1">1 首</option><option value="2">2 首</option><option value="3">3 首</option><option value="5">5 首</option><option value="0">不限</option></select></label>
+        <label class="row" title="換到下一首時，在哪裡打開搜尋讓你挑版本 (Hummi 沒辦法直接幫播放器按播放)">換歌時打開 <select id="q-plat"><option value="auto">跟著播放器</option><option value="spotify">Spotify</option><option value="ytmusic">YouTube Music</option><option value="youtube">YouTube</option><option value="none">不要打開</option></select></label>
+        <label class="row" title="搜尋時加在歌名後面的字，例如「伴奏」「KTV」「Instrumental」">搜尋加上 <input type="text" class="cfg-in" id="q-suffix" placeholder="例如：伴奏" maxlength="30" style="width:110px"></label>
+        <label class="row" title="觀眾在聊天室打這些指令＋歌名就能點歌 (用空白分開)">點歌指令 <input type="text" class="cfg-in" id="q-cmds" placeholder="!點歌 !sr" maxlength="60" style="width:110px"></label>
+      </div>
+      <div class="q-sec"><h4>🎤 現在唱</h4><div class="q-list" id="q-now"></div></div>
+      <div class="q-sec"><h4>🙋 等你決定 <span class="c" id="q-pend-n">0</span></h4><div class="q-list" id="q-pend"></div></div>
+      <div class="q-sec"><h4>📋 待唱清單 <span class="c" id="q-queue-n">0</span></h4><div class="q-list" id="q-queue"></div>
+        <div class="q-add" style="margin-top:8px"><input type="text" class="cfg-in" id="q-add-in" placeholder="自己加一首 (按 Enter)" maxlength="80"><button class="chip" id="q-add-btn">加入</button></div></div>
+      <p class="obs" id="q-obs-hint">OBS：新增「瀏覽器」來源，網址填 <code>http://127.0.0.1:8765/queue</code>，畫面上就會顯示現在唱、接下來和今天唱了幾首 (透明背景)。
+        聊天室點歌要先在 設定 → 舞台與直播 → 聊天室點歌指令 填好 Twitch 頻道；有填權杖時，接受 / 不唱都會在聊天室告訴觀眾。</p>
+    </div>
+  </div>
+</div>
 <div class="modal" id="dev-dialog" role="dialog" aria-label="裝置電量">
   <div class="dialog">
     <header><h2><span class="fi">&#xE772;</span>裝置電量</h2>
@@ -1600,6 +1661,7 @@ function connect(){
     if (m.type === 'update'){ onUpdate(m); return; }
     if (m.type === 'share_status'){ $('#share-msg').textContent = `已設定！放入了 ${m.added} 首，資料夾裡現在共有 ${m.total} 首歌詞。`; return; }
     if (m.type === 'viz'){ onViz(m); return; }
+    if (m.type === 'queue'){ onQueue(m); return; }
     if (m.type === 'volume'){ onVolume(m); if (performance.now() - volDrag > 400) showVolOsd(); return; }
     if (m.type === 'state') onState(m);
     else if (m.type === 'lyrics') onLyrics(m);  // 其他訊息 (例如舞台設定 stage_opt) 不能當成歌詞，不然會把歌詞蓋成空白
@@ -1610,6 +1672,7 @@ const send = o => ws?.readyState === 1 && ws.send(JSON.stringify(o));
 function onState(m){
   sessions = m.sessions || []; pinned = m.pinned;
   if (m.volume && performance.now() - volDrag > 1500) onVolume(m.volume);
+  if (m.queue) onQueue(m.queue);
   if (m.config){
     cfg = m.config; unlocked = m.unlocked; autostart = !!m.autostart; canAutostart = !!m.can_autostart;
     if (m.version) $('#ver').textContent = `Hummi 哼哼 v${m.version}`;
@@ -2752,6 +2815,69 @@ $('#left').addEventListener('wheel', e => {  // 在封面 / 控制這一區滾�
   const step = volWheel > 0 ? -.04 : .04; volWheel = 0;
   volDrag = 0; send({type: 'volume', delta: step});
 }, {passive: false});
+
+// ───── 點歌單 ─────
+let qState = null, qEdit = -1e9;
+function qBtn(label, cls, title, fn){ const b = document.createElement('button'); b.className = cls || ''; b.innerHTML = label; if (title) b.title = title; b.onclick = fn; return b; }
+function qRow(it, extra){
+  const d = document.createElement('div'); d.className = 'q-item' + (it.status === 'now' ? ' q-now' : '');
+  const q = document.createElement('span'); q.className = 'q';
+  q.innerHTML = '<b></b><small></small>';
+  q.querySelector('b').textContent = it.query;
+  q.querySelector('small').textContent = it.user ? `點歌：${it.user}` : '自己加的';
+  d.appendChild(q); extra.forEach(b => d.appendChild(b));
+  return d;
+}
+const qAct = (action, id, value) => send({type: 'queue', action, id, value});
+function renderQueue(){
+  const s = qState; if (!s) return;
+  const pend = s.items.filter(i => i.status === 'pending'), queued = s.items.filter(i => i.status === 'queued'), now = s.items.find(i => i.status === 'now');
+  const badge = $('#btn-queue .badge');
+  badge.textContent = pend.length; badge.classList.toggle('on', pend.length > 0);
+  if (!$('#q-dialog').classList.contains('open')) return;
+  $('#q-count').textContent = s.count;
+  if (performance.now() - qEdit > 1500){
+    $('#q-open').checked = s.open; $('#q-auto').checked = s.auto_next;
+    const qc = cfg?.queue || {};
+    $('#q-per').value = String(qc.per_user ?? 2); $('#q-plat').value = qc.platform || 'auto';
+    if (document.activeElement !== $('#q-suffix')) $('#q-suffix').value = qc.suffix || '';
+    if (document.activeElement !== $('#q-cmds')) $('#q-cmds').value = qc.cmds || '';
+  }
+  const nowBox = $('#q-now'); nowBox.innerHTML = '';
+  if (now) nowBox.appendChild(qRow(now, [qBtn('唱完了，下一首 ▶', 'yes', '換待唱清單的下一首，並打開搜尋', () => qAct('next'))]));
+  else nowBox.appendChild(Object.assign(document.createElement('div'), {className: 'q-empty',
+    textContent: queued.length ? '按「下一首」開始唱待唱清單的第一首。' : '還沒有。接受觀眾點的歌，或自己加一首。'}));
+  if (!now && queued.length) nowBox.appendChild(qBtn('▶ 開始唱第一首', 'chip', '', () => qAct('next')));
+  const pb = $('#q-pend'); pb.innerHTML = ''; $('#q-pend-n').textContent = pend.length;
+  if (!pend.length) pb.appendChild(Object.assign(document.createElement('div'), {className: 'q-empty', textContent: s.open ? '觀眾點的歌會先出現在這裡，由你決定唱不唱。' : '點歌目前關閉。'}));
+  pend.forEach(it => pb.appendChild(qRow(it, [qBtn('唱', 'yes', '排進待唱清單 (聊天室會告訴他)', () => qAct('accept', it.id)),
+    qBtn('不唱', '', '這次先不唱 (聊天室會禮貌地告訴他)', () => qAct('reject', it.id))])));
+  const qb = $('#q-queue'); qb.innerHTML = ''; $('#q-queue-n').textContent = queued.length;
+  if (!queued.length) qb.appendChild(Object.assign(document.createElement('div'), {className: 'q-empty', textContent: '空的。'}));
+  queued.forEach((it, k) => qb.appendChild(qRow(it, [
+    qBtn('&#xE768;', 'ic', '現在就唱這首', () => qAct('sing', it.id)),
+    qBtn('&#xE70E;', 'ic', '往前', () => qAct('up', it.id)),
+    qBtn('&#xE70D;', 'ic', '往後', () => qAct('down', it.id)),
+    qBtn('&#xE711;', 'ic', '移除', () => qAct('remove', it.id))])));
+}
+function onQueue(m){ qState = m; renderQueue(); }
+function openQueue(){ $('#q-dialog').classList.add('open'); renderQueue(); }
+$('#btn-queue').onclick = openQueue;
+$('#q-close').onclick = () => $('#q-dialog').classList.remove('open');
+$('#q-dialog').onclick = e => { if (e.target.id === 'q-dialog') $('#q-dialog').classList.remove('open'); };
+const qCfg = patch => { qEdit = performance.now(); if (cfg) cfg.queue = {...(cfg.queue || {}), ...patch}; send({type: 'queue_cfg', patch}); };
+$('#q-open').onchange = e => qCfg({open: e.target.checked});
+$('#q-auto').onchange = e => qCfg({auto_next: e.target.checked});
+$('#q-per').onchange = e => qCfg({per_user: +e.target.value});
+$('#q-plat').onchange = e => qCfg({platform: e.target.value});
+$('#q-suffix').onchange = e => qCfg({suffix: e.target.value});
+$('#q-cmds').onchange = e => qCfg({cmds: e.target.value});
+$('#q-plus').onclick = () => qAct('count', null, 1);
+$('#q-minus').onclick = () => qAct('count', null, -1);
+$('#q-reset').onclick = () => { if (confirm('今天唱了幾首要從 0 重新算嗎？')) qAct('reset_count'); };
+const qAdd = () => { const v = $('#q-add-in').value.trim(); if (v){ qAct('add', null, v); $('#q-add-in').value = ''; } };
+$('#q-add-btn').onclick = qAdd;
+$('#q-add-in').onkeydown = e => { if (e.key === 'Enter') qAdd(); };
 // ───── 沒在播歌：時鐘、日期、最近播放 ─────
 let recent = [];
 function renderIdle(){

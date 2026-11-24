@@ -16,7 +16,7 @@ DEFAULT_CMDS = "!song !歌名 !這什麼歌 !歌"
 
 
 class TwitchChat:
-    def __init__(self, get_cfg, now_playing, on_ask, log=print):
+    def __init__(self, get_cfg, now_playing, on_ask, log=print, on_request=None, request_cmds=None):
         self.get_cfg = get_cfg          # -> {"channel", "token", "bot", "commands", "reply"}
         self.now_playing = now_playing  # -> (title, artist) 或 None
         self.on_ask = on_ask            # on_ask(觀眾, 歌名, 歌手)：舞台跳卡片
@@ -25,8 +25,22 @@ class TwitchChat:
         self.status = "off"
         self.last_reply = 0.0
         self.user_last = {}
+        self.on_request = on_request          # on_request(觀眾, 歌名, 是不是實況主本人) -> 要回覆的話
+        self.request_cmds = request_cmds      # -> "!點歌 !sr" (點歌指令)
+        self.ws = None
+        self.channel = ""
+        self.can_reply = False
+        self.loop = None
+
+    def say(self, text):
+        """在聊天室說話 (有權杖才會說)。哪個執行緒呼叫都可以。"""
+        if not (self.ws and self.can_reply and self.loop and text):
+            return
+        ws, ch = self.ws, self.channel
+        self.loop.call_soon_threadsafe(lambda: self.loop.create_task(ws.send_str(f"PRIVMSG #{ch} :{text[:450]}")))
 
     def restart(self, loop):
+        self.loop = loop
         if self.task:
             self.task.cancel()
         cfg = self.get_cfg()
@@ -65,6 +79,7 @@ class TwitchChat:
                     await ws.send_str(f"NICK justinfan{random.randint(10000, 99999)}")
                 await ws.send_str(f"JOIN #{channel}")
                 self.status = f"已連上 #{channel}" + ("" if token else " (只讀，不會回覆)")
+                self.ws, self.channel, self.can_reply = ws, channel, bool(token)
                 async for msg in ws:
                     if msg.type != aiohttp.WSMsgType.TEXT:
                         break
@@ -76,6 +91,7 @@ class TwitchChat:
                         elif "Login authentication failed" in line or "Improperly formatted auth" in line:
                             self.status = "權杖錯誤：只能讀，不能回覆"
                             token = ""
+                            self.can_reply = False
                         elif " PRIVMSG #" in line:
                             await self._on_msg(ws, line, channel, cmds, bool(token))
 
@@ -85,6 +101,12 @@ class TwitchChat:
             return
         user, text = m.group(1), m.group(2).strip()
         word = text.split()[0].lower() if text else ""
+        req = [c.lower() for c in ((self.request_cmds() if self.request_cmds else "") or "").split() if c.strip()]
+        if word in req and self.on_request:  # 點歌
+            reply = self.on_request(user, text[len(word):].strip(), user == channel)
+            if reply and can_reply:
+                await ws.send_str(f"PRIVMSG #{channel} :{reply[:450]}")
+            return
         if word not in cmds:
             return
         now = time.time()
