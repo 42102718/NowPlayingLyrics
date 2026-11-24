@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hummi 小抄</title>
+<title>Hummi 直播看板</title>
 <style>
 /* 提詞小抄：給唱歌的人自己看 (不放進直播畫面)。只追求好讀、好跟唱。 */
 :root{--u:min(1vw,1.9vh);--bg:#0b0b12;--fg:#fff;--dim:rgba(255,255,255,.42);--fill:#ffd54a;--size:1;--font:"Noto Sans TC","Inter",system-ui,sans-serif}
@@ -122,13 +122,13 @@ body:not(.playing) .bd-now .eq i{animation:none;height:30%}
 </style>
 </head>
 <body>
-<div id="top"><button id="modebtn" title="今天開什麼台 (切換後點歌、看板、計數都會跟著換)">不在直播 ▾</button><span class="t" id="song">Hummi 小抄</span><button id="facebtn" title="切換：歌詞 / 看板">看板</button><span class="k" id="clock"></span><span id="vol"><button id="v-btn" title="音樂音量：按一下暫時壓低 (Ctrl + Alt + M)">&#xE995;</button><input type="range" id="v-range" min="0" max="100" step="1" value="50" title="音樂音量"></span><button id="pin" title="讓小抄浮在所有視窗上面 (玩遊戲、開 OBS 時也看得到)">📌 置頂</button></div>
+<div id="top"><button id="modebtn" title="今天開什麼台 (切換後點歌、看板、計數都會跟著換)">不在直播 ▾</button><span class="t" id="song">Hummi 直播看板</span><button id="facebtn" title="切換：歌詞 / 看板">看板</button><span class="k" id="clock"></span><span id="vol"><button id="v-btn" title="音樂音量：按一下暫時壓低 (Ctrl + Alt + M)">&#xE995;</button><input type="range" id="v-range" min="0" max="100" step="1" value="50" title="音樂音量"></span><button id="pin" title="讓直播看板浮在所有視窗上面 (玩遊戲、開 OBS 時也看得到)">📌 置頂</button></div>
 <div id="modemenu">
-  <button data-m="sing"><b>🎤 唱歌台</b><small>唱歌時是小抄，休息時是點唱看板</small></button>
+  <button data-m="sing"><b>🎤 唱歌台</b><small>唱歌時顯示歌詞，休息時是點唱看板</small></button>
   <button data-m="chat"><b>💬 聊天台</b><small>看板為主，點播可以開關</small></button>
   <button data-m="draw"><b>🎨 畫畫台</b><small>播歌給大家聽，點播可以開關</small></button>
   <button data-m="game"><b>🎮 遊戲台</b><small>不開放點歌，只留正在播放</small></button>
-  <button data-m="off"><b>不在直播</b><small>一般的提詞小抄</small></button>
+  <button data-m="off"><b>不在直播</b><small>只顯示歌詞 (提詞)</small></button>
 </div>
 <div id="strip"></div>
 <div id="board"></div>

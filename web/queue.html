@@ -12,6 +12,7 @@
     ?side=right 靠右對齊
     ?scale=1.2  整個放大
     ?bg=0       不要底色 (只有字和陰影)
+    ?style=bar  細長的一條 (放在畫面下方)：唱歌時也一直在，觀眾隨時看得到自己的歌排第幾首
 -->
 <style>
 :root{--accent:#b9a6ff;--font:"Inter","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;--s:1}
@@ -49,9 +50,34 @@ body.nobg *{text-shadow:0 2px 8px rgba(0,0,0,.8),0 0 2px rgba(0,0,0,.9)}
 #hint code{font:700 12.5px var(--font);color:var(--accent)}
 .empty{font:600 15px var(--font);color:rgba(255,255,255,.6);margin-top:6px}
 [hidden]{display:none!important}
+/* ═════ 細長條 (?style=bar)：一直在畫面下方，觀眾看得到自己的歌排第幾 ═════ */
+#bar{position:fixed;left:24px;right:24px;bottom:20px;display:none;align-items:center;gap:14px;height:44px;padding:0 8px 0 16px;border-radius:22px;
+  transform-origin:bottom center;transform:scale(var(--s));background:linear-gradient(180deg,rgba(18,16,28,.7),rgba(18,16,28,.56));
+  border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 14px 36px -14px rgba(0,0,0,.6);backdrop-filter:blur(18px);
+  font:600 15px var(--font);white-space:nowrap;transition:opacity .6s,translate .6s cubic-bezier(.2,.9,.25,1)}
+body.style-bar #bar{display:flex}
+body.style-bar #card{display:none}
+body.nobg #bar{background:none;border:0;box-shadow:none;backdrop-filter:none}
+#bar.away{opacity:0;translate:0 12px}
+#bar .now{flex:none;display:flex;align-items:center;gap:8px;max-width:38%}
+#bar .now .k{font:700 12px var(--font);letter-spacing:.1em;color:var(--accent)}
+#bar .now .t{overflow:hidden;text-overflow:ellipsis}
+#bar .now .u{font:500 12.5px var(--font);color:rgba(255,255,255,.6)}
+#bar .sep{flex:none;width:1px;height:18px;background:rgba(255,255,255,.18)}
+#bar .up{flex:1;min-width:0;overflow:hidden;position:relative;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent)}
+#bar .up .track{display:inline-flex;gap:22px;align-items:baseline}
+#bar .up.scroll .track{animation:ticker var(--dur,20s) linear infinite}
+@keyframes ticker{0%,8%{transform:translateX(0)}92%,100%{transform:translateX(var(--shift))}}
+#bar .up i{font-style:normal;font-weight:800;color:var(--accent);margin-right:6px;font-variant-numeric:tabular-nums}
+#bar .up small{font:500 12px var(--font);color:rgba(255,255,255,.55);margin-left:6px}
+#bar .up .k{font:700 12px var(--font);letter-spacing:.1em;color:rgba(255,255,255,.5);margin-right:2px}
+#bar .help{flex:none;padding:6px 12px;border-radius:16px;background:rgba(255,255,255,.08);font:600 12.5px var(--font);color:rgba(255,255,255,.7)}
+#bar .help code{font:700 12.5px var(--font);color:var(--accent)}
 </style>
 </head>
 <body>
+<div id="bar" class="away"><span class="now"><span class="k">正在唱</span><span class="t"></span><span class="u"></span></span><span class="sep"></span>
+  <span class="up"><span class="track"></span></span><span class="help"></span></div>
 <div id="card" class="away">
   <div class="lbl"><span class="dot"></span>正在唱</div>
   <div id="now"><div class="t"></div><div class="u"></div></div>
@@ -64,6 +90,8 @@ const $ = s => document.querySelector(s);
 const P = new URLSearchParams(location.search);
 const N = Math.max(0, Math.min(8, +(P.get('n') ?? 3)));
 if (P.get('side') === 'right') document.body.classList.add('right');
+const BAR = P.get('style') === 'bar';
+if (BAR) document.body.classList.add('style-bar');
 if (P.get('bg') === '0') document.body.classList.add('nobg');
 document.documentElement.style.setProperty('--s', Math.max(.5, Math.min(3, +(P.get('scale') || 1))));
 if (P.get('count') === '0') $('#count').hidden = true;
@@ -116,8 +144,44 @@ function render(q){
   b.textContent = q.count; lastCount = q.count;
   const h = $('#hint');
   h.hidden = !q.open || P.get('hint') === '0';
-  h.innerHTML = '聊天室打 <code></code> 點歌'; h.querySelector('code').textContent = cmds + ' 歌名';
+  h.innerHTML = '聊天室打 <code></code> 點歌 · <code>!排隊</code> 查順序'; h.querySelector('code').textContent = cmds + ' 歌名';
+  if (BAR) renderBar(q, now, queued);
   $('#foot').hidden = $('#count').hidden && h.hidden;
+}
+
+// 細長條：唱歌時也在 (觀眾想知道自己的歌到了沒)；遊戲台、不在直播、沒開點歌又沒歌排隊時才收起來
+let barKey = '';
+function renderBar(q, now, queued){
+  const bar = $('#bar'), sing = q.mode === 'sing';
+  bar.classList.toggle('away', !q.kind || !(q.open || q.items.length));
+  const show = now ? {t: now.query, u: now.user ? `${now.user} 點的` : ''} : (!sing && trk) ? {t: trk.title, u: trk.artist || ''} : {t: '準備中', u: ''};
+  bar.querySelector('.now .k').textContent = sing ? '正在唱' : '正在播';
+  bar.querySelector('.now .t').textContent = show.t;
+  bar.querySelector('.now .u').textContent = show.u;
+  const key = JSON.stringify(queued.map(i => [i.id, i.query, i.user]));
+  if (key !== barKey){
+    barKey = key;
+    const tr = bar.querySelector('.up .track'); tr.innerHTML = '';
+    const head = document.createElement('span'); head.className = 'k'; head.textContent = queued.length ? '接下來' : (q.open ? '還沒有人點歌' : ''); tr.appendChild(head);
+    queued.forEach((it, k) => {
+      const el = document.createElement('span');
+      el.innerHTML = '<i></i><span></span><small></small>';
+      el.querySelector('i').textContent = k + 1;
+      el.querySelector('span').textContent = it.query;
+      el.querySelector('small').textContent = it.user || '';
+      tr.appendChild(el);
+    });
+    // 太長就慢慢往左捲 (到底停一下再回來)
+    requestAnimationFrame(() => {
+      const up = bar.querySelector('.up'), over = tr.scrollWidth - up.clientWidth;
+      up.classList.toggle('scroll', over > 8);
+      tr.style.setProperty('--shift', -(over + 24) + 'px');
+      tr.style.setProperty('--dur', Math.max(10, over / 30) + 's');
+    });
+  }
+  const help = bar.querySelector('.help');
+  help.hidden = !q.open || P.get('hint') === '0';
+  help.innerHTML = '<code></code> 點歌 · <code>!排隊</code> 查順序'; help.querySelector('code').textContent = cmds + ' 歌名';
 }
 
 let ws;

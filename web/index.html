@@ -1583,6 +1583,7 @@ body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #
 <div class="modal" id="q-dialog" role="dialog" aria-label="點歌">
   <div class="dialog">
     <header><h2>點歌</h2>
+      <button class="q-btn" id="q-board" title="給自己看的小視窗：點歌、待唱、誰問了歌名；唱歌時顯示大字歌詞。觀眾看不到" style="margin-right:12px">📋 打開直播看板</button>
       <label class="q-openpill" title="關掉時，觀眾點歌會收到「現在沒有開放點歌」"><span id="q-open-lbl">開放點歌</span><span class="switch"><input type="checkbox" id="q-open"><span></span></span></label>
       <button class="x" id="q-close" aria-label="關閉">×</button></header>
     <div class="body">
@@ -1606,7 +1607,8 @@ body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #
         <label class="row"><span>每人同時最多<small>等你決定＋待唱，加起來</small></span><select id="q-per"><option value="1">1 首</option><option value="2">2 首</option><option value="3">3 首</option><option value="5">5 首</option><option value="0">不限</option></select></label>
         <label class="row"><span>點歌指令<small>觀眾打指令＋歌名，用空白分開多個</small></span><input type="text" class="cfg-in" id="q-cmds" placeholder="!點歌 !sr" maxlength="60" style="width:120px"></label>
         <p class="obs">聊天室要先在 設定 → 舞台與直播 → 聊天室點歌指令 填好 Twitch 頻道；有填權杖時，接受、婉拒、開始唱都會在聊天室說一聲。<br>
-          想把點歌清單放上直播畫面：OBS 新增「瀏覽器」來源，網址 <code>http://127.0.0.1:8765/queue</code>。</p>
+          想讓觀眾看到自己的歌排第幾首：OBS 新增「瀏覽器」來源，網址 <code>http://127.0.0.1:8765/queue?style=bar</code> 是畫面下方一條細長條 (唱歌時也一直在)；
+          <code>http://127.0.0.1:8765/queue</code> 是角落的卡片 (唱歌台時唱歌中會淡出)。觀眾也可以在聊天室打 <b>!排隊</b> 查自己的歌排第幾首。</p>
       </details>
     </div>
   </div>
@@ -2894,7 +2896,7 @@ function renderQueue(){
   $('#q-open').disabled = !kind;
   document.querySelectorAll('#q-modes button').forEach(b => b.classList.toggle('on', b.dataset.m === s.mode));
   $('#q-modehint').textContent = {sing: '點唱：觀眾點、你來唱。唱歌時算「今天唱了幾首」，搜尋時預設加上「伴奏」。', chat: '點播：觀眾點的歌放給大家聽。這一台的點播預設關，要的時候打開右上角。',
-    draw: '點播：觀眾點的歌放給大家聽，播完自動準備下一首。這一台的點播預設關。', game: '遊戲台：不開放點歌，觀眾打 !點歌 會收到「今天是遊戲台」。', off: '不在直播：點歌都關著，小抄就是一般的提詞小抄。'}[s.mode] || '';
+    draw: '點播：觀眾點的歌放給大家聽，播完自動準備下一首。這一台的點播預設關。', game: '遊戲台：不開放點歌，觀眾打 !點歌 會收到「今天是遊戲台」。', off: '不在直播：點歌都關著，直播看板只顯示歌詞。'}[s.mode] || '';
   document.querySelectorAll('#q-dialog .q-stats, #q-dialog .q-sec').forEach(el => el.hidden = !kind);
   $('#q-dialog .q-stats .q-stat').hidden = s.mode !== 'sing';
   document.querySelectorAll('#q-dialog .q-sec h4')[0].firstChild.textContent = `正在${word}`;
@@ -2918,6 +2920,7 @@ function renderQueue(){
 function onQueue(m){ qState = m; renderQueue(); }
 function openQueue(){ $('#q-dialog').classList.add('open'); renderQueue(); }
 $('#btn-queue').onclick = openQueue;
+$('#q-board').onclick = () => send({type: 'open_prompter'});
 document.querySelectorAll('#q-modes button').forEach(b => b.onclick = () => { send({type: 'stream_mode', value: b.dataset.m}); if (qState){ qState.mode = b.dataset.m; } });
 $('#q-close').onclick = () => $('#q-dialog').classList.remove('open');
 $('#q-dialog').onclick = e => { if (e.target.id === 'q-dialog') $('#q-dialog').classList.remove('open'); };

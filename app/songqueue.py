@@ -113,6 +113,33 @@ class SongQueue:
                 return f"@{user} 收到點歌：{query}，等實況主決定要不要唱 🎤"
             return f"@{user} 收到點歌：{query}，等實況主確認後播放 🎵"
 
+    def position(self, user):
+        """觀眾打 !排隊：他點的歌排到第幾首了。"""
+        cfg = self.get_cfg()
+        with self.lock:
+            now = time.time()
+            if now - self.user_last.get("?" + user, 0) < 10:
+                return None
+            self.user_last["?" + user] = now
+            word = "唱" if self._sing() else "播"
+            queued = [i for i in self.items if i["status"] == "queued"]
+            mine = [i for i in self.items if i["user"].lower() == user.lower() and i["status"] in ("pending", "queued", "now")]
+            if not mine:
+                if not cfg.get("open"):
+                    return f"@{user} 你目前沒有點歌，現在也沒有開放點歌喔"
+                cmd = (cfg.get("cmds") or "!點歌").split()[0]
+                return f"@{user} 你目前沒有點歌，打 {cmd} 歌名 就能點 (現在排了 {len(queued)} 首)"
+            parts = []
+            for it in mine:
+                if it["status"] == "now":
+                    parts.append(f"「{it['query']}」正在{word}！")
+                elif it["status"] == "pending":
+                    parts.append(f"「{it['query']}」還在等實況主決定")
+                else:
+                    k = queued.index(it)
+                    parts.append(f"「{it['query']}」排第 {k + 1} 首" + (f" (前面還有 {k} 首)" if k else " (下一首就是你的！)"))
+            return f"@{user} " + "；".join(parts)
+
     # ───── 實況主操作 ─────
     def _find(self, iid):
         return next((i for i in self.items if i["id"] == iid), None)

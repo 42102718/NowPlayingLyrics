@@ -13,10 +13,11 @@ import time
 import aiohttp
 
 DEFAULT_CMDS = "!song !歌名 !這什麼歌 !歌"
+POSITION_CMDS = ("!排隊", "!我的歌", "!queue", "!position", "!順序")  # 觀眾查自己點的歌排第幾首
 
 
 class TwitchChat:
-    def __init__(self, get_cfg, now_playing, on_ask, log=print, on_request=None, request_cmds=None):
+    def __init__(self, get_cfg, now_playing, on_ask, log=print, on_request=None, request_cmds=None, on_position=None):
         self.get_cfg = get_cfg          # -> {"channel", "token", "bot", "commands", "reply"}
         self.now_playing = now_playing  # -> (title, artist) 或 None
         self.on_ask = on_ask            # on_ask(觀眾, 歌名, 歌手)：舞台跳卡片
@@ -27,6 +28,7 @@ class TwitchChat:
         self.user_last = {}
         self.on_request = on_request          # on_request(觀眾, 歌名, 是不是實況主本人) -> 要回覆的話
         self.request_cmds = request_cmds      # -> "!點歌 !sr" (點歌指令)
+        self.on_position = on_position        # on_position(觀眾) -> 「你點的歌排第幾首」
         self.ws = None
         self.channel = ""
         self.can_reply = False
@@ -102,6 +104,11 @@ class TwitchChat:
         user, text = m.group(1), m.group(2).strip()
         word = text.split()[0].lower() if text else ""
         req = [c.lower() for c in ((self.request_cmds() if self.request_cmds else "") or "").split() if c.strip()]
+        if word in POSITION_CMDS and self.on_position:  # 查自己點的歌排到第幾首
+            reply = self.on_position(user)
+            if reply and can_reply:
+                await ws.send_str(f"PRIVMSG #{channel} :{reply[:450]}")
+            return
         if word in req and self.on_request:  # 點歌
             reply = self.on_request(user, text[len(word):].strip(), user == channel)
             if reply and can_reply:

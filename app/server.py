@@ -1944,7 +1944,7 @@ async def ws_handler(request):
                 config["hotkeys"] = bool(d.get("value"))
                 save_config()
                 start_hotkeys()
-            elif d.get("type") == "volume":  # 主視窗 ↑ / ↓、音量滑桿、小抄、舞台
+            elif d.get("type") == "volume":  # 主視窗 ↑ / ↓、音量滑桿、直播看板、舞台
                 lv = d.get("level")
                 await asyncio.to_thread(music_volume, float(d.get("delta") or 0),
                                         None if lv is None else min(1.0, max(0.0, float(lv))))
@@ -2317,7 +2317,7 @@ def start_tray():
                              ("battery", "裝置電量"), ("gestures", "滾輪調音量、左右滑切歌")]
         ])),
         P("打開舞台", lambda i, it: open_stage()),
-        P("小抄 / 直播看板", lambda i, it: open_prompter()),
+        P("直播看板", lambda i, it: open_prompter()),
         P("裝置電量", lambda i, it: open_devices()),
         pystray.Menu.SEPARATOR,
         P("顯示浮動歌詞", toggle("enabled"), checked=lambda it: ov["enabled"]),
@@ -2558,7 +2558,7 @@ prompter_window = None
 
 
 class PrompterApi:
-    """小抄視窗的 📌 置頂開關。"""
+    """直播看板視窗的 📌 置頂開關。"""
 
     def set_on_top(self, on):
         # 不用 window.on_top：從這條執行緒改 WinForms 的 TopMost 會卡住整個程式 (主視窗的置頂也是這樣修的)
@@ -2566,14 +2566,14 @@ class PrompterApi:
         u = ctypes.windll.user32
         u.FindWindowW.restype = wt.HWND
         u.SetWindowPos.argtypes = [wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wt.UINT]
-        hwnd = u.FindWindowW(None, "Hummi 小抄")
+        hwnd = u.FindWindowW(None, "Hummi 直播看板")
         if hwnd:  # HWND_TOPMOST / HWND_NOTOPMOST；NOSIZE|NOMOVE|NOACTIVATE|ASYNCWINDOWPOS
             u.SetWindowPos(hwnd, wt.HWND(-1 if on else -2), 0, 0, 0, 0, 0x1 | 0x2 | 0x10 | 0x4000)
         return bool(on)
 
 
 def open_prompter():
-    """提詞小抄：給唱歌的人自己看的小視窗 (固定在最上層，不會出現在直播畫面，除非 OBS 去擷取它)。"""
+    """直播看板 (以前叫提詞小抄)：給實況主自己看的小視窗 (固定在最上層，不會出現在直播畫面，除非 OBS 去擷取它)。"""
     global prompter_window
     if window is None:
         webbrowser.open(f"http://127.0.0.1:{PORT}/prompter")
@@ -2581,7 +2581,7 @@ def open_prompter():
     try:
         import webview
         if prompter_window is None:
-            prompter_window = webview.create_window("Hummi 小抄", f"http://127.0.0.1:{PORT}/prompter?v={VERSION}",
+            prompter_window = webview.create_window("Hummi 直播看板", f"http://127.0.0.1:{PORT}/prompter?v={VERSION}",
                                                     width=760, height=380, min_size=(320, 140),
                                                     background_color="#0b0b12", js_api=PrompterApi())
 
@@ -2909,7 +2909,7 @@ def _set_music_volume(lv, manual=True):
 
 
 def music_volume(delta=0.0, level=None):
-    """只調播放器自己的音量 (快捷鍵 / 主視窗 / 小抄 / 舞台 / 膠囊滾輪)，膠囊會跳出音量條。level 是直接設成多少 (0~1)。"""
+    """只調播放器自己的音量 (快捷鍵 / 主視窗 / 直播看板 / 舞台 / 膠囊滾輪)，膠囊會跳出音量條。level 是直接設成多少 (0~1)。"""
     if not state.get("track"):
         return None
     if level is None:
@@ -3060,7 +3060,8 @@ def start_chat():
         if CHAT is None:
             CHAT = chat.TwitchChat(lambda: config["chat"], now_playing, on_ask,
                                    on_request=lambda u, q, me: QUEUE.request(u, q, me) if QUEUE else None,
-                                   request_cmds=lambda: config["queue"].get("cmds") or "")
+                                   request_cmds=lambda: config["queue"].get("cmds") or "",
+                                   on_position=lambda u: QUEUE.position(u) if QUEUE else None)
         CHAT.restart(LOOP)
     except Exception as e:
         print("[chat] disabled:", repr(e))
