@@ -1216,9 +1216,31 @@ body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #
 .q-more .row small{display:block;font:400 11.5px/1.4 var(--font);color:var(--dim);margin-top:2px}
 .q-more .obs{font:400 12px/1.6 var(--font);color:var(--dim);margin-top:10px}
 .q-more .obs code{user-select:all;padding:1px 6px;border-radius:6px;background:rgba(var(--ink),.08);color:var(--fg)}
+.q-obs > h4{display:flex;align-items:baseline;gap:8px;margin:0 2px 8px;font:700 13px var(--font);color:var(--fg)}
+.q-obs > h4 small{font:500 12px var(--font);color:var(--dim)}
+.q-obs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.q-obs-grid button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px;border-radius:14px;border:1px solid rgba(var(--ink),.08);
+  background:rgba(var(--ink),.04);color:var(--fg);text-align:left;cursor:pointer;transition:background .2s,transform .15s}
+.q-obs-grid button:hover{background:rgba(var(--ink),.09)}
+.q-obs-grid button:active{transform:scale(.97)}
+.q-obs-grid b{font:700 13.5px var(--font)}
+.q-obs-grid span{font:400 11.5px/1.45 var(--font);color:var(--dim)}
+.q-obs-grid em{font:600 11px var(--font);font-style:normal;color:var(--accent);margin-top:2px}
+.q-obs-msg{min-height:18px;margin:6px 2px 0;font:500 12px var(--font);color:var(--accent)}
 #btn-queue{position:relative}
 #btn-queue .badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent2);color:#fff;font:700 10px/16px var(--font);display:none}
 #btn-queue .badge.on{display:block;animation:pop .3s}
+
+/* 唱片版面：不管選了哪種介面質感，唱片一定是圓的 */
+body[data-layout="vinyl"] #cover,body[data-layout="vinyl"] #cover-wrap,body[data-layout="vinyl"] #cover-wrap .sheen,body[data-layout="vinyl"] #cover-glow{border-radius:50%!important}
+#cover-wrap.fit{transition:width .35s cubic-bezier(.2,.8,.2,1)}
+/* 封面比左欄窄很多時：封面、歌名、歌手、來源都置中 (跟下面置中的播放鍵對齊，不會左邊一張圖、右邊空空的) */
+@media (min-width:861px){
+  body.cover-center #left{align-items:center;text-align:center}
+  body.cover-center #cover-wrap{align-self:center}
+  body.cover-center #left .meta,body.cover-center #progress,body.cover-center #controls{width:100%}
+  body.cover-center #lyr-src{margin-left:0}
+}
 </style>
 </head>
 <body>
@@ -1407,6 +1429,7 @@ body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #
         <button data-jp="off">關</button><button data-jp="furigana">漢字標平假名</button><button data-jp="hiragana">整句平假名</button><button data-jp="romaji">羅馬拼音</button>
       </div>
       <p class="hint">只有日文歌會顯示。「漢字標平假名」在漢字上方標小字讀音；另外兩種在每句下面多一行。讀音是自動轉的，少數字可能讀錯。</p>
+      <label class="row" title="浮動歌詞的主句下面多一行讀音 (選羅馬拼音就是羅馬拼音，其他都是平假名)">浮動歌詞也顯示讀音 <span class="switch"><input type="checkbox" data-k="show_reading"><span></span></span></label>
     </div>
   </section>
   <section class="grp"><h3>AI 歌詞</h3>
@@ -1606,10 +1629,15 @@ body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #
         <label class="row"><span>搜尋時加上<small>例如「伴奏」「KTV」</small></span><input type="text" class="cfg-in" id="q-suffix" placeholder="不加" maxlength="30" style="width:120px"></label>
         <label class="row"><span>每人同時最多<small>等你決定＋待唱，加起來</small></span><select id="q-per"><option value="1">1 首</option><option value="2">2 首</option><option value="3">3 首</option><option value="5">5 首</option><option value="0">不限</option></select></label>
         <label class="row"><span>點歌指令<small>觀眾打指令＋歌名，用空白分開多個</small></span><input type="text" class="cfg-in" id="q-cmds" placeholder="!點歌 !sr" maxlength="60" style="width:120px"></label>
-        <p class="obs">聊天室要先在 設定 → 舞台與直播 → 聊天室點歌指令 填好 Twitch 頻道；有填權杖時，接受、婉拒、開始唱都會在聊天室說一聲。<br>
-          想讓觀眾看到自己的歌排第幾首：OBS 新增「瀏覽器」來源，網址 <code>http://127.0.0.1:8765/queue?style=bar</code> 是畫面下方一條細長條 (唱歌時也一直在)；
-          <code>http://127.0.0.1:8765/queue</code> 是角落的卡片 (唱歌台時唱歌中會淡出)。觀眾也可以在聊天室打 <b>!排隊</b> 查自己的歌排第幾首。</p>
+        <p class="obs">聊天室要先在 設定 → 舞台與直播 → 聊天室點歌指令 填好 Twitch 頻道；有填權杖時，接受、婉拒、開始唱都會在聊天室說一聲。觀眾打 <b>!排隊</b> 可以查自己的歌排第幾首。</p>
       </details>
+      <div class="q-obs"><h4>放上直播畫面 <small>OBS 新增「瀏覽器」來源，貼上網址；位置和大小在 OBS 裡自己拖</small></h4>
+        <div class="q-obs-grid">
+          <button data-u="/queue?style=bar"><b>細長條</b><span>一行顯示正在唱、接下來第幾首；唱歌時也在</span><em>來源大小建議 1600 × 70</em></button>
+          <button data-u="/queue"><b>小卡片</b><span>角落一張卡；唱歌台唱歌中會淡出</span><em>來源大小 1920 × 1080</em></button>
+          <button data-u="/queue?style=board"><b>大看板</b><span>正在唱＋接下來 8 首，放在畫面一側</span><em>來源大小建議 600 × 900</em></button>
+        </div>
+        <p class="q-obs-msg" id="q-obs-msg"></p></div>
     </div>
   </div>
 </div>
@@ -1910,9 +1938,10 @@ function renderLyrics(){
     const d = document.createElement('div');
     const nextT = (lyr.lines.slice(i + 1).find(x => x.t != null && x.text) || {}).t;
     const gap = !l.text && nextT != null && l.t != null && nextT - l.t >= 5;  // 間奏：顯示「♪ 間奏」，不要空空的
-    d.className = 'line' + (l.text ? '' : ' empty') + (gap ? ' gap' : '') + (l.tent ? ' tent' : '');
+    const outro = !l.text && nextT == null && l.t != null && i > 0;  // 最後一句唱完：顯示「♪ 尾奏」
+    d.className = 'line' + (l.text ? '' : ' empty') + (gap || outro ? ' gap' : '') + (l.tent ? ' tent' : '');
     const txt = document.createElement('span'); txt.className = 'txt'; setLineText(txt, l);
-    if (gap) txt.innerHTML = '<i class="note">♪</i>間奏<b class="dots"><i></i><i></i><i></i></b>';
+    if (gap || outro) txt.innerHTML = `<i class="note">♪</i>${gap ? '間奏' : '尾奏'}<b class="dots"><i></i><i></i><i></i></b>`;
     d.appendChild(txt);
     if (l.rd){ const rd = document.createElement('span'); rd.className = 'rd'; rd.textContent = l.rd; d.appendChild(rd); }
     if (l.tr){ const tr = document.createElement('span'); tr.className = 'tr'; tr.textContent = l.tr; d.appendChild(tr); }
@@ -2649,9 +2678,30 @@ function applyLook(v){
   try { localStorage.setItem('look', v); } catch {}
   placeAllThumbs();
 }
+// 封面跟著左欄剩下的空間放大 (視窗高的時候不會小小一張、旁邊空空的)
+const FIT_LAYOUTS = ['classic', 'mirror', 'vinyl', 'stack', 'sidebar'];
+function fitCover(){
+  const w = $('#cover-wrap'), left = $('#left');
+  if (!FIT_LAYOUTS.includes(document.body.dataset.layout) || innerWidth < 861 || document.body.classList.contains('idle')){
+    w.style.width = ''; w.classList.remove('fit'); document.body.classList.remove('cover-center'); return;
+  }
+  const gap = parseFloat(getComputedStyle(left).rowGap) || 0;
+  let used = 0, n = 0;
+  for (const c of left.children){
+    if (c === w || c.offsetParent === null) continue;
+    used += c.offsetHeight; n++;
+  }
+  const avail = left.clientHeight - used - gap * n - 12;
+  const size = Math.round(Math.max(120, Math.min(avail, left.clientWidth, 520)));
+  w.classList.add('fit');
+  if (Math.abs((parseFloat(w.style.width) || 0) - size) > 2) w.style.width = size + 'px';
+  document.body.classList.toggle('cover-center', left.clientWidth - size > 60);
+}
+new ResizeObserver(() => requestAnimationFrame(fitCover)).observe($('#left'));
+new ResizeObserver(() => requestAnimationFrame(fitCover)).observe($('#left .meta'));
 function applyLayout(v){
   v = ['classic', 'mirror', 'center', 'immersive', 'vinyl', 'bento', 'editorial', 'stack', 'sidebar', 'sheet'].includes(v) ? v : 'classic';
-  if (document.body.dataset.layout !== v){ document.body.dataset.layout = v; activeIdx = -2; sideKey = ''; stackKey = ''; $('#side').dataset.k = ''; setTimeout(renderSide, 0); }
+  if (document.body.dataset.layout !== v){ document.body.dataset.layout = v; activeIdx = -2; requestAnimationFrame(fitCover); sideKey = ''; stackKey = ''; $('#side').dataset.k = ''; setTimeout(renderSide, 0); }
   document.querySelectorAll('#layouts [data-layout]').forEach(b => b.classList.toggle('on', b.dataset.layout === v));
   try { localStorage.setItem('layout', v); } catch {}
 }
@@ -2921,6 +2971,11 @@ function onQueue(m){ qState = m; renderQueue(); }
 function openQueue(){ $('#q-dialog').classList.add('open'); renderQueue(); }
 $('#btn-queue').onclick = openQueue;
 $('#q-board').onclick = () => send({type: 'open_prompter'});
+document.querySelectorAll('.q-obs-grid button').forEach(b => b.onclick = async () => {
+  const url = `http://127.0.0.1:${location.port || 8765}${b.dataset.u}`;
+  try { await navigator.clipboard.writeText(url); $('#q-obs-msg').textContent = `已複製：${url}　到 OBS 新增「瀏覽器」來源貼上`; }
+  catch { $('#q-obs-msg').textContent = url; }
+});
 document.querySelectorAll('#q-modes button').forEach(b => b.onclick = () => { send({type: 'stream_mode', value: b.dataset.m}); if (qState){ qState.mode = b.dataset.m; } });
 $('#q-close').onclick = () => $('#q-dialog').classList.remove('open');
 $('#q-dialog').onclick = e => { if (e.target.id === 'q-dialog') $('#q-dialog').classList.remove('open'); };

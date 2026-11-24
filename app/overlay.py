@@ -495,22 +495,43 @@ class Overlay:
         if idx < 0:
             return ("intro", t["track_id"]), t["title"], t["artist"] or "", nxt, None
         cur = lines[idx]
-        if not cur["text"]:
-            return ("gap", t["track_id"], idx), "•   •   •", "", nxt, None
+        if not cur["text"]:  # 間奏 / 尾奏：寫出來，不要只有點點
+            return ("gap", t["track_id"], idx), "♪  間奏" if nxt else "♪  尾奏", "", nxt, None
         end = lines[idx + 1]["t"] if idx + 1 < len(lines) else cur["t"] + 5
         dur = min(end - cur["t"], len(cur["text"]) * 0.35 + 2.5)
         return ("line", t["track_id"], idx), cur["text"], cur.get("tr") or "", nxt, (cur["t"], dur, tt)
+
+    def reading(self, text):
+        """日文歌這一句的讀音 (只有日文歌才有；跟著「日文讀音」設定，羅馬拼音以外都用平假名)。"""
+        try:
+            import jp_reading
+            lyr = self.state.get("lyrics") or {}
+            tid = lyr.get("track_id")
+            if getattr(self, "_jp_tid", None) != tid:
+                self._jp_tid, self._jp_is = tid, jp_reading.is_japanese(lyr.get("lines") or [])
+            if not self._jp_is:
+                return ""
+            if self.config.get("jp_reading") == "romaji":
+                return jp_reading.romaji(text)
+            h = jp_reading.hiragana(text)
+            return h if h != text else ""
+        except Exception as e:
+            print("[overlay-jp]", repr(e), flush=True)
+            return ""
 
     def build_block(self, main, tr, nxt, karaoke, accent):
         ov = self.config["overlay"]
         maxw = self.W - self.pad * 2
         color = tuple(accent) if (ov["color"] == "album" and accent) else (255, 255, 255)
         items = [("main", TextLayer(main, self.fs, maxw, bright=color, karaoke=karaoke) if main else None)]
+        if ov.get("show_reading") and karaoke and main:  # 日文讀音 (一行小字)
+            rd = self.reading(main)
+            items.append(("rd", TextLayer(rd, int(self.fs * 0.5), maxw, dim_alpha=0.8) if rd else None))
         if ov["show_translation"]:
             items.append(("tr", TextLayer(tr, int(self.fs * 0.62), maxw, dim_alpha=0.88) if tr else None))
         if ov["show_next"]:
             items.append(("next", TextLayer(nxt, int(self.fs * 0.6), maxw, dim_alpha=0.45) if nxt else None))
-        heights = {"main": int(self.fs * 1.45), "tr": int(self.fs * 0.62 * 1.45), "next": int(self.fs * 0.6 * 1.5)}
+        heights = {"main": int(self.fs * 1.45), "rd": int(self.fs * 0.5 * 1.45), "tr": int(self.fs * 0.62 * 1.45), "next": int(self.fs * 0.6 * 1.5)}
         # 底部對齊時只把有內容的行往下貼
         rows = [(k, l) for k, l in items if l is not None]
         total = sum(heights[k] for k, _ in rows)

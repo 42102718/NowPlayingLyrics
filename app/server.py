@@ -106,6 +106,7 @@ DEFAULT_CONFIG = {
         "bg_opacity": 0,           # 0~100
         "show_translation": False,  # 歌詞翻譯 (主視窗、舞台、浮動歌詞、Folia 一起)；預設關
         "show_next": True,
+        "show_reading": False,     # 日文歌：主句下面多一行讀音 (跟著「日文讀音」的設定：羅馬拼音 / 其他都用平假名)
         "color": "album",          # white / album
         "auto_hide": True,         # 主視窗或舞台開著時自動隱藏 (避免同時好幾份歌詞)
         "monitor": "primary",      # primary / active (跟著正在用的螢幕) / mouse / 螢幕裝置名稱

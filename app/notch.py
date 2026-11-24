@@ -276,6 +276,9 @@ class Notch:
         self.vw = self.vh = 0.0
         self.exk = 0.0                 # 0 = 收起, 1 = 展開 (內容淡入淡出)
         self.expanded = False
+        self.ghost = False       # 滑鼠經過膠囊兩側：變透明、點擊穿過去 (點得到下面的分頁 ×)
+        self.ghost_a = 255.0     # 目前整個膠囊的透明度 (0~255)
+        self.ghost_ct = False    # 視窗現在是不是點擊穿透
         self.hover_since = self.leave_since = None
         self.last_frame = time.perf_counter()
         self.last_topmost = self.last_fs_check = 0.0
@@ -470,7 +473,7 @@ class Notch:
         x = self.x + (self.W - w) // 2
         user32.UpdateLayeredWindow(self.hwnd, self.screen_dc, ctypes.byref(wt.POINT(x, self.y)),
                                    ctypes.byref(wt.SIZE(w, h)), self.mem_dc,
-                                   ctypes.byref(wt.POINT(0, 0)), 0, ctypes.byref(BLENDFUNCTION(0, 0, 255, 1)), 2)
+                                   ctypes.byref(wt.POINT(0, 0)), 0, ctypes.byref(BLENDFUNCTION(0, 0, int(self.ghost_a), 1)), 2)
 
     def show(self, on):
         if on != self.visible_win:
@@ -1607,13 +1610,18 @@ class Notch:
         top = self.px(FLOAT_GAP) if shape == "float" else 0
         left = self.x + (self.W - w) / 2
         inside = (left - m <= px <= left + w + m) and (self.y <= py <= self.y + top + h + mv)
+        # 膠囊變寬 (顯示歌詞) 時，只有中間那段是膠囊的「按鈕」；兩側讓開給下面的東西 (瀏覽器分頁、視窗按鈕)
+        wide = w > self.px(200)
+        core = abs(px - (left + w / 2)) <= max(self.px(70), w * 0.2)
+        mode = (self.config.get("notch_style") or {}).get("hover", "smart")
+        self.set_ghost(inside and wide and not core and not self.expanded and mode != "click", now)
         if inside:
             self.leave_since = None
             if self.hover_since is None:
                 self.hover_since, self.hov_pts = now, []
             self.hov_pts = [q for q in self.hov_pts if now - q[0] <= 0.2] + [(now, px, py)]
             if not self.expanded and not (self.activity and self.activity["kind"] in ("volume", "update", "updated")) \
-                    and self.hover_intent(now, px, py):
+                    and (core or not wide) and self.hover_intent(now, px, py):
                 self.expanded = True
                 self.activity = None
         else:
@@ -1623,6 +1631,20 @@ class Notch:
             elif self.expanded and now - self.leave_since > (0.8 if self.page != "main" else 0.35):
                 self.expanded = False
                 self.page = "main"
+
+    def set_ghost(self, on, now):
+        """兩側讓開：淡成半透明、滑鼠點擊直接穿過膠囊。"""
+        self.ghost = on
+        tgt = 70.0 if on else 255.0
+        if abs(self.ghost_a - tgt) > 0.5:
+            self.ghost_a += (tgt - self.ghost_a) * 0.35
+            if abs(self.ghost_a - tgt) < 3:
+                self.ghost_a = tgt
+            self.static_sig = None  # 透明度在變：要重畫
+        if on != self.ghost_ct and self.hwnd:
+            ex = user32.GetWindowLongW(self.hwnd, -20)
+            user32.SetWindowLongW(self.hwnd, -20, (ex | 0x20) if on else (ex & ~0x20))  # WS_EX_TRANSPARENT
+            self.ghost_ct = on
 
     def hover_intent(self, now, px, py):
         """滑鼠是真的要看膠囊，還是只是路過 (要去點瀏覽器分頁、拖視窗)？
