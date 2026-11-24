@@ -1157,6 +1157,13 @@ body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #
 #q-dialog header{align-items:center}
 #q-dialog header h2{flex:1}
 #q-dialog .body{gap:18px;padding:16px 20px 20px}
+.q-modes{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:4px;border-radius:14px;background:rgba(var(--ink),.05)}
+.q-modes button{height:52px;border:0;border-radius:11px;background:none;color:var(--dim);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font:600 12.5px var(--font);transition:background .2s,color .2s}
+.q-modes button span{font-size:17px;line-height:1}
+.q-modes button:hover{background:rgba(var(--ink),.07);color:var(--fg)}
+.q-modes button.on{background:rgba(var(--ink),.13);color:var(--hi);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.q-modehint{margin:-8px 2px 0;font:400 12px/1.5 var(--font);color:var(--dim)}
 .q-openpill{display:flex;align-items:center;gap:10px;font:600 13px var(--font);color:var(--dim);margin-right:6px}
 .q-openpill b{font-weight:700;color:var(--fg)}
 /* 三格數字 */
@@ -1579,6 +1586,9 @@ body:is([data-layout="immersive"],[data-layout="sheet"],[data-layout="bento"]) #
       <label class="q-openpill" title="關掉時，觀眾點歌會收到「現在沒有開放點歌」"><span id="q-open-lbl">開放點歌</span><span class="switch"><input type="checkbox" id="q-open"><span></span></span></label>
       <button class="x" id="q-close" aria-label="關閉">×</button></header>
     <div class="body">
+      <div class="q-modes" id="q-modes"><button data-m="sing"><span>🎤</span>唱歌台</button><button data-m="chat"><span>💬</span>聊天台</button>
+        <button data-m="draw"><span>🎨</span>畫畫台</button><button data-m="game"><span>🎮</span>遊戲台</button><button data-m="off"><span>⏻</span>不在直播</button></div>
+      <p class="q-modehint" id="q-modehint"></p>
       <div class="q-stats">
         <div class="q-stat" title="舞台 (或 OBS 歌詞畫面) 開著的時候，每播完一首歌自動加一；早上 6 點重新算">
           <div class="fix"><button id="q-minus" title="算多了，減一首">−</button><button id="q-plus" title="漏算了，加一首">＋</button></div>
@@ -2879,7 +2889,16 @@ function renderQueue(){
     if (document.activeElement !== $('#q-suffix')) $('#q-suffix').value = qc.suffix || '';
     if (document.activeElement !== $('#q-cmds')) $('#q-cmds').value = qc.cmds || '';
   }
-  $('#q-open-lbl').textContent = s.open ? '開放點歌中' : '點歌已關閉';
+  const kind = s.kind, word = kind === 'play' ? '播' : '唱';
+  $('#q-open-lbl').textContent = !kind ? '點歌關閉' : s.open ? `開放點${word}中` : `點${word}已關閉`;
+  $('#q-open').disabled = !kind;
+  document.querySelectorAll('#q-modes button').forEach(b => b.classList.toggle('on', b.dataset.m === s.mode));
+  $('#q-modehint').textContent = {sing: '點唱：觀眾點、你來唱。唱歌時算「今天唱了幾首」，搜尋時預設加上「伴奏」。', chat: '點播：觀眾點的歌放給大家聽。這一台的點播預設關，要的時候打開右上角。',
+    draw: '點播：觀眾點的歌放給大家聽，播完自動準備下一首。這一台的點播預設關。', game: '遊戲台：不開放點歌，觀眾打 !點歌 會收到「今天是遊戲台」。', off: '不在直播：點歌都關著，小抄就是一般的提詞小抄。'}[s.mode] || '';
+  document.querySelectorAll('#q-dialog .q-stats, #q-dialog .q-sec').forEach(el => el.hidden = !kind);
+  $('#q-dialog .q-stats .q-stat').hidden = s.mode !== 'sing';
+  document.querySelectorAll('#q-dialog .q-sec h4')[0].firstChild.textContent = `正在${word}`;
+  document.querySelectorAll('#q-dialog .q-sec h4')[2].firstChild.textContent = `待${word} `;
   const empty = t => qEl(`<div class="q-empty"></div>`), fill = (box, list, mk, txt) => {
     box.innerHTML = '';
     if (!list.length){ const e = empty(); e.textContent = txt; box.appendChild(e); } else list.forEach((it, k) => box.appendChild(mk(it, k)));
@@ -2899,6 +2918,7 @@ function renderQueue(){
 function onQueue(m){ qState = m; renderQueue(); }
 function openQueue(){ $('#q-dialog').classList.add('open'); renderQueue(); }
 $('#btn-queue').onclick = openQueue;
+document.querySelectorAll('#q-modes button').forEach(b => b.onclick = () => { send({type: 'stream_mode', value: b.dataset.m}); if (qState){ qState.mode = b.dataset.m; } });
 $('#q-close').onclick = () => $('#q-dialog').classList.remove('open');
 $('#q-dialog').onclick = e => { if (e.target.id === 'q-dialog') $('#q-dialog').classList.remove('open'); };
 const qCfg = patch => { qEdit = performance.now(); if (cfg) cfg.queue = {...(cfg.queue || {}), ...patch}; send({type: 'queue_cfg', patch}); };

@@ -50,16 +50,88 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-
 #pin.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 0 12px rgba(255,213,74,.45)}
 #help{position:fixed;right:12px;bottom:12px;font:500 11px var(--font);color:var(--dim);opacity:0;transition:opacity .3s}
 body.ui #help{opacity:1}
-#vol{display:flex;align-items:center;gap:2px;height:24px;padding:0 2px;border-radius:12px;background:rgba(127,127,127,.15)}
-#vol button{width:22px;height:22px;border:0;border-radius:50%;background:none;color:var(--dim);font:700 14px var(--font);cursor:pointer;line-height:1}
-#vol button:hover{background:rgba(127,127,127,.25);color:var(--fg)}
-#v-pct{min-width:52px;text-align:center;font:600 12px var(--font);font-variant-numeric:tabular-nums;color:var(--dim);transition:color .3s}
-#v-pct.flash{color:var(--fg)}
+#vol{display:flex;align-items:center;gap:4px;height:24px}
+#v-btn{width:24px;height:24px;border:0;border-radius:50%;background:none;color:var(--fg);opacity:.8;font:14px "Segoe Fluent Icons","Segoe MDL2 Assets";cursor:pointer}
+#v-btn:hover{background:rgba(127,127,127,.22);opacity:1}
+#v-btn.ducked{color:var(--acc,#a78bff);opacity:1}
+#v-range{width:70px;height:18px;margin:0;-webkit-appearance:none;appearance:none;background:none;cursor:pointer;--v:50%}
+#v-range::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:linear-gradient(90deg,var(--fg) var(--v),rgba(127,127,127,.35) var(--v))}
+#v-range::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;margin-top:-4px;border-radius:50%;background:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.35)}
 @media (max-width:420px){#vol{display:none}}
+
+/* ═════ 直播看板：唱歌時是小抄，休息 / 聊天時變成點歌和聊天看板 ═════ */
+:root{--card:rgba(255,255,255,.055);--line:rgba(255,255,255,.09);--acc:#a78bff}
+body.light{--card:rgba(0,0,0,.045);--line:rgba(0,0,0,.1);--acc:#6a4fe0}
+#modebtn,#facebtn{flex:none;border:0;height:24px;padding:0 10px;border-radius:12px;background:rgba(127,127,127,.15);color:var(--fg);font:600 12px var(--font);cursor:pointer;white-space:nowrap}
+#modebtn:hover,#facebtn:hover{background:rgba(127,127,127,.26)}
+#facebtn{color:var(--dim)}
+#modemenu{position:fixed;z-index:30;top:38px;left:12px;display:none;flex-direction:column;gap:2px;padding:6px;border-radius:14px;min-width:200px;
+  background:rgba(22,20,34,.96);border:1px solid rgba(255,255,255,.1);box-shadow:0 18px 40px -12px rgba(0,0,0,.7)}
+body.light #modemenu{background:rgba(250,249,245,.98);border-color:rgba(0,0,0,.1)}
+#modemenu.open{display:flex;animation:mmIn .18s ease-out}
+@keyframes mmIn{from{opacity:0;transform:translateY(-4px)}}
+#modemenu button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 10px;border:0;border-radius:9px;background:none;color:var(--fg);text-align:left;cursor:pointer}
+#modemenu button:hover{background:var(--card)}
+#modemenu button.on{background:rgba(167,139,255,.18)}
+#modemenu b{font:700 13px var(--font)}
+#modemenu small{font:500 11px var(--font);color:var(--dim)}
+#strip{position:fixed;z-index:5;left:50%;top:40px;translate:-50% 0;display:none;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;
+  background:rgba(167,139,255,.22);border:1px solid rgba(167,139,255,.35);font:600 12px var(--font);color:var(--fg);cursor:pointer;white-space:nowrap}
+#strip.show{display:flex;animation:mmIn .3s ease-out}
+#board{position:absolute;inset:44px 14px 12px;overflow:auto;display:none;font-family:var(--font)}
+body.face-board #board{display:block}
+body.face-board #wrap,body.face-board #plain,body.face-board #bar,body.face-board #help{display:none!important}
+#board .cols{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:620px){#board .cols{grid-template-columns:1.1fr 1fr}}
+#board h4{display:flex;align-items:center;gap:8px;margin:0 2px 7px;font:700 11.5px var(--font);letter-spacing:.06em;color:var(--dim)}
+#board h4 em{font-style:normal;padding:0 7px;border-radius:8px;background:var(--card);color:var(--fg);font-size:11px;line-height:18px}
+#board h4 .sw{margin-left:auto}
+.bd-now{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--card);margin-bottom:12px}
+.bd-now .eq{flex:none;display:flex;align-items:flex-end;gap:2px;width:16px;height:16px}
+.bd-now .eq i{flex:1;height:60%;background:var(--acc);border-radius:1px;animation:bdeq 1s ease-in-out infinite}
+.bd-now .eq i:nth-child(2){animation-delay:-.4s}.bd-now .eq i:nth-child(3){animation-delay:-.7s}
+body:not(.playing) .bd-now .eq i{animation:none;height:30%}
+@keyframes bdeq{0%,100%{height:30%}50%{height:100%}}
+.bd-now .t{flex:1;min-width:0}
+.bd-now .t b{display:block;font:800 16px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-now .t span{display:block;font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-stat{display:flex;align-items:baseline;gap:6px;padding:0 4px;margin:-4px 0 12px;font:600 12px var(--font);color:var(--dim)}
+.bd-stat b{font:800 18px var(--font);color:var(--fg);font-variant-numeric:tabular-nums}
+.bd-c{display:flex;align-items:center;gap:10px;padding:9px 10px 9px 11px;border-radius:13px;background:var(--card);margin-bottom:6px}
+.bd-av{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 12.5px var(--font);color:#fff;background:hsl(var(--h,260) 55% 52%)}
+.bd-n{flex:none;width:16px;text-align:center;font:700 12px var(--font);color:var(--dim)}
+.bd-t{flex:1;min-width:0}
+.bd-t b{display:block;font:700 13.5px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-t span{display:block;font:500 11.5px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-b{flex:none;height:28px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--fg);font:600 12px var(--font);cursor:pointer}
+.bd-b:hover{background:var(--card)}
+.bd-b.pri{background:var(--fg);color:var(--bg);border-color:transparent}
+.bd-i{flex:none;width:26px;height:26px;border-radius:50%;border:0;background:none;color:var(--dim);cursor:pointer;font:12px "Segoe Fluent Icons","Segoe MDL2 Assets";opacity:0;transition:opacity .2s}
+.bd-c:hover .bd-i{opacity:1}
+.bd-i:hover{background:var(--card);color:var(--fg)}
+.bd-c.now{background:linear-gradient(120deg,rgba(167,139,255,.26),var(--card));border:1px solid rgba(167,139,255,.3)}
+.bd-e{padding:10px 12px;border-radius:13px;border:1px dashed var(--line);font:400 12px/1.6 var(--font);color:var(--dim);margin-bottom:6px}
+.bd-note{padding:14px 16px;border-radius:16px;background:var(--card);font:500 13px/1.7 var(--font);color:var(--dim)}
+.bd-note b{color:var(--fg)}
+.sw{display:inline-flex;align-items:center;gap:6px;font:600 11.5px var(--font);letter-spacing:0;color:var(--dim);cursor:pointer}
+.sw input{display:none}
+.sw i{position:relative;width:30px;height:18px;border-radius:9px;background:rgba(127,127,127,.3);transition:background .2s}
+.sw i::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.sw input:checked + i{background:var(--acc)}
+.sw input:checked + i::after{transform:translateX(12px)}
 </style>
 </head>
 <body>
-<div id="top"><span class="t" id="song">Hummi 小抄</span><span class="k" id="clock"></span><span id="vol"><button id="v-down" title="音樂音量 −">−</button><span id="v-pct" title="音樂音量">🔊 —</span><button id="v-up" title="音樂音量 ＋">＋</button></span><button id="pin" title="讓小抄浮在所有視窗上面 (玩遊戲、開 OBS 時也看得到)">📌 置頂</button></div>
+<div id="top"><button id="modebtn" title="今天開什麼台 (切換後點歌、看板、計數都會跟著換)">不在直播 ▾</button><span class="t" id="song">Hummi 小抄</span><button id="facebtn" title="切換：歌詞 / 看板">看板</button><span class="k" id="clock"></span><span id="vol"><button id="v-btn" title="音樂音量：按一下暫時壓低 (Ctrl + Alt + M)">&#xE995;</button><input type="range" id="v-range" min="0" max="100" step="1" value="50" title="音樂音量"></span><button id="pin" title="讓小抄浮在所有視窗上面 (玩遊戲、開 OBS 時也看得到)">📌 置頂</button></div>
+<div id="modemenu">
+  <button data-m="sing"><b>🎤 唱歌台</b><small>唱歌時是小抄，休息時是點唱看板</small></button>
+  <button data-m="chat"><b>💬 聊天台</b><small>看板為主，點播可以開關</small></button>
+  <button data-m="draw"><b>🎨 畫畫台</b><small>播歌給大家聽，點播可以開關</small></button>
+  <button data-m="game"><b>🎮 遊戲台</b><small>不開放點歌，只留正在播放</small></button>
+  <button data-m="off"><b>不在直播</b><small>一般的提詞小抄</small></button>
+</div>
+<div id="strip"></div>
+<div id="board"></div>
 <div id="wrap">
   <div class="l" id="prev"></div>
   <div id="cd"><span id="cd-txt">間奏</span><span class="n" id="cd-n"></span><span class="gbar"><i id="cd-bar"></i></span></div>
@@ -211,6 +283,116 @@ function setMsg(s){
   if ($('#msg').textContent !== s){ $('#msg').textContent = s; if (s){ ['#prev', '#cur', '#next', '#next2'].forEach(x => $(x).innerHTML = ''); $('#cd').classList.remove('on'); last = ''; } }
 }
 
+
+// ───── 直播看板 ─────
+const MODES = {off: '不在直播', sing: '🎤 唱歌台', chat: '💬 聊天台', draw: '🎨 畫畫台', game: '🎮 遊戲台'};
+let streamMode = 'off', q = null, asks = [], faceManual = null, lastPlayAt = 0, faceShown = '';
+const bdHue = s => [...(s || '?')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+const bdAgo = t => { const m = Math.max(0, Math.round((Date.now() / 1000 - t) / 60)); return m < 1 ? '剛剛' : m < 60 ? `${m} 分鐘前` : `${Math.round(m / 60)} 小時前`; };
+function bdEl(html){ const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; }
+function bdCard(it, lead, sub, acts){
+  const d = bdEl(`<div class="bd-c">${lead}<span class="bd-t"><b></b><span></span></span></div>`);
+  d.querySelector('b').textContent = it.query;
+  d.querySelector('.bd-t span').textContent = sub;
+  acts.forEach(([label, cls, title, fn]) => { const b = bdEl(`<button class="${cls}" title="${title}">${label}</button>`); b.onclick = e => { e.stopPropagation(); fn(); }; d.appendChild(b); });
+  return d;
+}
+const bdAv = it => `<span class="bd-av" style="--h:${bdHue(it.user)}">${esc((it.user || '我').slice(0, 1).toUpperCase())}</span>`;
+const qAct = (action, id, value) => send({type: 'queue', action, id, value});
+function bdList(list, mk, empty){
+  const box = document.createElement('div');
+  if (!list.length) box.appendChild(Object.assign(document.createElement('div'), {className: 'bd-e', textContent: empty}));
+  else list.forEach((it, k) => box.appendChild(mk(it, k)));
+  return box;
+}
+// 現在該顯示歌詞還是看板
+function autoFace(){
+  if (streamMode === 'off') return 'lyrics';
+  if (streamMode !== 'sing') return 'board';
+  if (!track || (lyr && !lyr.synced && !(lyr.lines || []).length)) return 'board';
+  if (playing) return 'lyrics';
+  return performance.now() - lastPlayAt < 5000 ? 'lyrics' : 'board';  // 暫停超過 5 秒 = 休息 / 聊天
+}
+function updateFace(){
+  const f = faceManual || autoFace();
+  document.body.classList.toggle('face-board', f === 'board');
+  document.body.classList.toggle('playing', !!playing);
+  $('#facebtn').textContent = f === 'board' ? '歌詞' : '看板';
+  $('#facebtn').hidden = streamMode === 'off' && !faceManual;
+  const pend = q ? q.items.filter(i => i.status === 'pending').length : 0;
+  const st = $('#strip');
+  st.classList.toggle('show', f === 'lyrics' && pend > 0);
+  if (pend) st.textContent = `🙋 ${pend} 首點歌等你決定 · 點這裡看`;
+  if (f !== faceShown){ faceShown = f; if (f === 'board') renderBoard(true); }
+}
+function renderBoard(force){
+  if (!document.body.classList.contains('face-board')) return;
+  // 資料沒變就不重畫 (不然滑鼠正要按的按鈕會被換掉)
+  const key = JSON.stringify([q, track?.title, track?.artist, asks.length, streamMode, cfgQ.cmds]);
+  if (!force && key === renderBoard.k) return;
+  renderBoard.k = key;
+  const b = $('#board'); b.innerHTML = '';
+  const cols = bdEl('<div class="cols"><div class="c1"></div><div class="c2"></div></div>');
+  const c1 = cols.querySelector('.c1'), c2 = cols.querySelector('.c2');
+  // 正在播放
+  const now = q?.items.find(i => i.status === 'now');
+  const nowEl = bdEl('<div class="bd-now"><span class="eq"><i></i><i></i><i></i></span><span class="t"><b></b><span></span></span></div>');
+  nowEl.querySelector('b').textContent = track ? track.title : '沒有在播放音樂';
+  nowEl.querySelector('.t span').textContent = track ? (track.artist || '') + (now && now.user ? `　·　${now.user} 點的` : '') : '';
+  c1.appendChild(nowEl);
+  if (streamMode === 'sing' && q) c1.appendChild(bdEl(`<div class="bd-stat">今天唱了 <b>${q.count}</b> 首</div>`));
+  const sing = q?.kind === 'sing';
+  if (q && q.kind){
+    const word = sing ? '唱' : '播';
+    const h = bdEl(`<h4>等你決定 <em>${q.items.filter(i => i.status === 'pending').length}</em><label class="sw" title="關掉時觀眾點歌會收到「現在沒有開放點歌」"><span>${q.open ? '開放點' + word : '點' + word + '已關閉'}</span><input type="checkbox" ${q.open ? 'checked' : ''}><i></i></label></h4>`);
+    h.querySelector('input').onchange = e => send({type: 'queue_cfg', patch: {open: e.target.checked}});
+    c1.appendChild(h);
+    c1.appendChild(bdList(q.items.filter(i => i.status === 'pending'), it => bdCard(it, bdAv(it), `${it.user} · ${bdAgo(it.at)}`,
+      [['接受', 'bd-b pri', '排進清單', () => qAct('accept', it.id)], ['婉拒', 'bd-b', '這次先不' + word, () => qAct('reject', it.id)]]),
+      q.open ? '還沒有新的點歌。觀眾打 ' + ((cfgQ.cmds || '!點歌').split(' ')[0]) + ' 歌名' : '點' + word + '目前關閉。'));
+    if (now){
+      c2.appendChild(bdEl(`<h4>正在${word}</h4>`));
+      const n = bdCard(now, '', now.user ? `${now.user} 點的` : '', [[sing ? '唱完了' : '播完了', 'bd-b', '從清單拿掉', () => qAct('next')]]);
+      n.classList.add('now'); c2.appendChild(n);
+    }
+    const queued = q.items.filter(i => i.status === 'queued');
+    c2.appendChild(bdEl(`<h4>${sing ? '待唱' : '待播'} <em>${queued.length}</em></h4>`));
+    c2.appendChild(bdList(queued, (it, k) => bdCard(it, `<span class="bd-n">${k + 1}</span>`, it.user ? `${it.user} 點的` : '', [
+      ['&#xE721;', 'bd-i', '在播放器搜尋這首', () => qAct('sing', it.id)], ['&#xE711;', 'bd-i', '拿掉', () => qAct('remove', it.id)]]),
+      sing ? '接受的點歌會排在這裡；自己放這些歌會自動對上。' : '接受的點歌會排在這裡。'));
+  } else {
+    c1.appendChild(bdEl(`<div class="bd-note">${streamMode === 'game' ? '<b>遊戲台</b>：不開放點歌，觀眾打 !點歌 會收到「今天是遊戲台」。' : '<b>不在直播</b>：選左上角的台別，點歌和看板就會打開。'}</div>`));
+  }
+  // 誰問了歌名 (!song)
+  c2.appendChild(bdEl(`<h4>問歌名 <em>${asks.length}</em></h4>`));
+  c2.appendChild(bdList(asks.slice(0, 5), it => bdCard({query: it.title}, bdAv({user: it.user}), `${it.user} 問了 · ${bdAgo(it.at)}`, []), '觀眾打 !song 會列在這裡。'));
+  b.appendChild(cols);
+}
+let cfgQ = {};
+function onStream(m){
+  const mode = m.config?.stream?.mode;
+  if (mode && mode !== streamMode){ streamMode = mode; faceManual = null; }
+  if (m.config?.queue) cfgQ = m.config.queue;
+  $('#modebtn').textContent = (MODES[streamMode] || '不在直播') + ' ▾';
+  document.querySelectorAll('#modemenu button').forEach(b => b.classList.toggle('on', b.dataset.m === streamMode));
+}
+function onQueue(m){ q = m; if (m.mode && m.mode !== streamMode){ streamMode = m.mode; faceManual = null; onStream({}); } renderBoard(); updateFace(); }
+$('#modebtn').onclick = e => { e.stopPropagation(); $('#modemenu').classList.toggle('open'); };
+document.querySelectorAll('#modemenu button').forEach(b => b.onclick = () => {
+  $('#modemenu').classList.remove('open');
+  streamMode = b.dataset.m; faceManual = null; onStream({}); send({type: 'stream_mode', value: streamMode}); updateFace(); renderBoard();
+});
+addEventListener('click', e => { if (!e.target.closest('#modemenu')) $('#modemenu').classList.remove('open'); });
+$('#facebtn').onclick = () => {
+  const cur = document.body.classList.contains('face-board') ? 'board' : 'lyrics';
+  const want = cur === 'board' ? 'lyrics' : 'board';
+  faceManual = want === autoFace() ? null : want;  // 跟自動的一樣就回到自動
+  updateFace();
+};
+$('#strip').onclick = () => { faceManual = 'board'; updateFace(); };
+setInterval(() => { if (playing) lastPlayAt = performance.now(); updateFace(); }, 500);
+setInterval(() => renderBoard(true), 30000);  // 「幾分鐘前」
+
 let ws;
 const send = m => { try { ws.readyState === 1 && ws.send(JSON.stringify(m)); } catch {} };
 function connect(){
@@ -218,7 +400,16 @@ function connect(){
   ws.onclose = () => setTimeout(connect, 1000);
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.type === 'state'){ onState(m); if (m.volume) showVol(m.volume, false); }
+    if (m.type === 'state'){
+      const tid = track?.track_id;
+      onState(m); onStream(m); if (m.volume) showVol(m.volume, false);
+      if (track?.track_id !== tid && faceManual === 'board' && streamMode === 'sing') faceManual = null;  // 換歌：回到自動
+      if (m.queue) q = m.queue;
+      updateFace();
+      renderBoard();
+    }
+    else if (m.type === 'queue') onQueue(m);
+    else if (m.type === 'chat_song'){ asks.unshift({user: m.user, title: m.title, at: Date.now() / 1000}); asks = asks.slice(0, 20); renderBoard(); }
     else if (m.type === 'volume') showVol(m, true);
     else if (m.type === 'lyrics') onLyrics(m);
   };
@@ -233,7 +424,7 @@ addEventListener('keydown', e => {
   applyLook();
   try { localStorage.setItem('prompter.size', size); localStorage.setItem('prompter.light', light ? '1' : '0'); } catch {}
 });
-addEventListener('wheel', e => { size = Math.max(.5, Math.min(2.6, +(size + (e.deltaY < 0 ? .05 : -.05)).toFixed(2))); applyLook();
+addEventListener('wheel', e => { if (document.body.classList.contains('face-board')) return; size = Math.max(.5, Math.min(2.6, +(size + (e.deltaY < 0 ? .05 : -.05)).toFixed(2))); applyLook();
   try { localStorage.setItem('prompter.size', size); } catch {} }, {passive: true});
 let uiT;
 addEventListener('mousemove', () => { document.body.classList.add('ui'); clearTimeout(uiT); uiT = setTimeout(() => document.body.classList.remove('ui'), 2500); });
@@ -249,15 +440,26 @@ function togglePin(){ pinned = !pinned; try { localStorage.setItem('prompter.pin
 $('#pin').onclick = togglePin;
 addEventListener('keydown', e => { if (e.key === 't' || e.key === 'T') togglePin(); });
 // 音樂音量 (只調播放器自己)
-let vFlashT = 0;
-function showVol(v, flash){
-  const el = $('#v-pct');
-  el.textContent = v.level == null ? '🔊 —' : (v.ducked ? '🔉 ' : '🔊 ') + Math.round(v.level * 100) + '%';
-  el.title = v.ducked ? '音樂已壓低 (Ctrl + Alt + M 恢復)' : '音樂音量';
-  if (flash){ el.classList.add('flash'); clearTimeout(vFlashT); vFlashT = setTimeout(() => el.classList.remove('flash'), 1200); }
+let volLv = null, volDrag = -1e9, volSendT = 0, volLastT = 0;
+function volIcon(lv, ducked){ return ducked || lv <= .15 ? '&#xE993;' : lv <= .5 ? '&#xE994;' : '&#xE995;'; }
+function showVol(v){
+  if (v.level == null) return;
+  if (performance.now() - volDrag < 1500) return;  // 正在拖：不要被拉回去
+  volLv = v.level;
+  const r = $('#v-range'); r.value = Math.round(volLv * 100); r.style.setProperty('--v', r.value + '%');
+  const b = $('#v-btn'); b.innerHTML = volIcon(volLv, v.ducked); b.classList.toggle('ducked', !!v.ducked);
+  b.title = v.ducked ? `音樂已壓低到 ${r.value}%：按一下恢復 (Ctrl + Alt + M)` : `音樂音量 ${r.value}%：按一下暫時壓低 (Ctrl + Alt + M)`;
+  r.title = `音樂音量 ${r.value}%`;
 }
-$('#v-up').onclick = e => { e.stopPropagation(); send({type: 'volume', delta: .05}); };
-$('#v-down').onclick = e => { e.stopPropagation(); send({type: 'volume', delta: -.05}); };
+$('#v-range').addEventListener('input', e => {
+  e.stopPropagation(); volDrag = performance.now(); volLv = e.target.value / 100;
+  e.target.style.setProperty('--v', e.target.value + '%'); e.target.title = `音樂音量 ${e.target.value}%`;
+  if (performance.now() - volSendT > 60){ volSendT = performance.now(); send({type: 'volume', level: volLv}); }
+  clearTimeout(volLastT); volLastT = setTimeout(() => send({type: 'volume', level: volLv}), 120);
+});
+$('#v-range').addEventListener('click', e => e.stopPropagation());
+$('#v-btn').onclick = e => { e.stopPropagation(); send({type: 'duck'}); };
+
 addEventListener('pywebviewready', applyPin);
 applyPin();
 connect();

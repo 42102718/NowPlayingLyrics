@@ -71,8 +71,12 @@ class SongQueue:
         with self.lock:
             self.roll_day()
             cfg = self.get_cfg()
-            return {"open": bool(cfg.get("open")), "auto_next": bool(cfg.get("auto_next")),
+            return {"open": bool(cfg.get("open")), "auto_next": bool(cfg.get("auto_next")), "suffix": cfg.get("suffix") or "",
+                    "mode": cfg.get("mode") or "off", "kind": cfg.get("kind"),
                     "items": [dict(i) for i in self.items], "count": self.count, "sung": self.sung[:20]}
+
+    def _sing(self):
+        return self.get_cfg().get("kind") != "play"  # 點唱 (唱歌台)；點播是放歌給大家聽
 
     def roll_day(self):
         d = stream_day()
@@ -86,6 +90,8 @@ class SongQueue:
         cfg = self.get_cfg()
         with self.lock:
             if not cfg.get("open"):
+                if cfg.get("mode") == "game":
+                    return f"@{user} 今天是遊戲台，不開放點歌喔 🎮"
                 return f"@{user} 現在沒有開放點歌喔"
             if not query:
                 cmd = (cfg.get("cmds") or "!點歌").split()[0]
@@ -103,7 +109,9 @@ class SongQueue:
             self.items.append({"id": self.next_id, "user": user, "query": query, "status": "pending", "at": now})
             self.next_id += 1
             self.changed()
-            return f"@{user} 收到點歌：{query}，等實況主決定要不要唱 🎤"
+            if self._sing():
+                return f"@{user} 收到點歌：{query}，等實況主決定要不要唱 🎤"
+            return f"@{user} 收到點歌：{query}，等實況主確認後播放 🎵"
 
     # ───── 實況主操作 ─────
     def _find(self, iid):
@@ -115,12 +123,15 @@ class SongQueue:
             if action == "accept" and it and it["status"] == "pending":
                 it["status"] = "queued"
                 pos = sum(1 for i in self.items if i["status"] == "queued")
-                self.say(f"@{it['user']} 你點的「{it['query']}」排進待唱清單了 (第 {pos} 首) ✨")
+                if self._sing():
+                    self.say(f"@{it['user']} 你點的「{it['query']}」排進待唱清單了 (第 {pos} 首) ✨")
+                else:
+                    self.say(f"@{it['user']} 你點的「{it['query']}」排進播放清單了 (第 {pos} 首) 🎵")
                 if not any(i["status"] == "now" for i in self.items) and self.get_cfg().get("auto_next"):
                     self._advance()
             elif action == "reject" and it and it["status"] == "pending":
                 self.items.remove(it)
-                self.say(f"@{it['user']} 「{it['query']}」這次先不唱，謝謝你點歌 🙏")
+                self.say(f"@{it['user']} 「{it['query']}」這次先不{'唱' if self._sing() else '播'}，謝謝你點歌 🙏")
             elif action == "remove" and it:
                 self.items.remove(it)
             elif action in ("up", "down") and it and it["status"] == "queued":
@@ -170,7 +181,7 @@ class SongQueue:
         self.now_since = time.time()
         self.bound, self.bound_peak = None, 0.0
         if it.get("user"):
-            self.say(f"🎤 接下來唱 @{it['user']} 點的「{it['query']}」")
+            self.say(f"🎤 接下來唱 @{it['user']} 點的「{it['query']}」" if self._sing() else f"🎵 接下來播 @{it['user']} 點的「{it['query']}」")
         try:
             self.open_search(it["query"])
         except Exception as e:
@@ -215,9 +226,9 @@ class SongQueue:
                     self.now_since = time.time()
                     self.bound, self.bound_peak = tid, frac
                     if hit.get("user"):
-                        self.say(f"🎤 正在唱 @{hit['user']} 點的「{hit['query']}」")
+                        self.say(f"🎤 正在唱 @{hit['user']} 點的「{hit['query']}」" if self._sing() else f"🎵 正在播 @{hit['user']} 點的「{hit['query']}」")
                     dirty = True
-            if tid and singing and not self.cur_counted and frac >= 0.9:
+            if tid and self.get_cfg().get("mode") == "sing" and not self.cur_counted and frac >= 0.9:  # 只有唱歌台才算
                 self.cur_counted = True
                 self.count += 1
                 self.sung.insert(0, {"title": track.get("title"), "artist": track.get("artist"), "at": time.time()})

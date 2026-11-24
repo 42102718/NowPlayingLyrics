@@ -316,9 +316,13 @@ body.ui.ctl #ctl{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 #ctl .track{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.18);cursor:pointer;position:relative}
 #ctl .track i{position:absolute;inset:0 auto 0 0;border-radius:3px;background:#fff;width:0}
 #ctl .vol{display:flex;align-items:center;gap:2px}
-#c-vpct{min-width:40px;text-align:center;font:600 12px system-ui,sans-serif;font-variant-numeric:tabular-nums;opacity:.75;transition:opacity .3s,color .3s}
-#c-vpct.flash{opacity:1}
-#c-vpct.ducked{color:#ffd54a}
+#ctl .vol{gap:4px;margin-left:2px}
+#ctl #c-vbtn{width:36px;height:36px;font:17px "Segoe Fluent Icons","Segoe MDL2 Assets"}
+#ctl #c-vbtn.ducked{color:#b9a6ff}
+#c-vrange{width:86px;height:20px;margin:0 6px 0 0;-webkit-appearance:none;appearance:none;background:none;cursor:pointer;--v:50%}
+#c-vrange::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,#fff var(--v),rgba(255,255,255,.22) var(--v))}
+#c-vrange::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;margin-top:-4px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .15s}
+#c-vrange:hover::-webkit-slider-thumb{transform:scale(1.2)}
 body.obs #ctl{display:none!important}
 @media (prefers-reduced-motion:reduce){.ln,.w{transition:none!important;animation:none!important}}
 
@@ -363,6 +367,11 @@ body.glass #ctl #c-play{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 20px
 .rq-sw i::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .rq-sw input:checked + i{background:#8b6cff}
 .rq-sw input:checked + i::after{transform:translateX(14px)}
+#rq .modes{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:0 18px 10px;padding:3px;border-radius:12px;background:rgba(255,255,255,.06)}
+#rq .modes button{height:44px;border:0;border-radius:9px;background:none;color:rgba(255,255,255,.55);font:600 11px "Noto Sans TC";cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+#rq .modes button span{font-size:15px;line-height:1}
+#rq .modes button:hover{color:#fff;background:rgba(255,255,255,.06)}
+#rq .modes button.on{background:rgba(255,255,255,.16);color:#fff}
 #rq .stat{display:flex;align-items:baseline;gap:8px;margin:0 18px 6px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.05)}
 #rq .stat b{font:800 26px/1 "Noto Sans TC";font-variant-numeric:tabular-nums}
 #rq .stat span{font:600 12.5px "Noto Sans TC";color:rgba(255,255,255,.7)}
@@ -442,7 +451,7 @@ body.obs #rq,body.obs #rq-toasts,body.obs #c-req{display:none!important}
   <button id="c-next" title="下一首 (Ctrl + →)">&#xF8AD;</button>
   <div class="bar"><span id="c-cur">0:00</span><div class="track" id="c-track"><i></i></div><span id="c-dur">0:00</span></div>
   <button id="c-req" title="點歌 (觀眾點的歌、待唱)">&#xE90B;<span class="badge"></span></button>
-  <div class="vol"><button id="c-vdown" title="音樂音量 − (↓)">&#xE993;</button><span id="c-vpct" title="音樂音量 (Ctrl + Alt + M 一鍵壓低)">—</span><button id="c-vup" title="音樂音量 + (↑)">&#xE995;</button></div>
+  <div class="vol"><button id="c-vbtn" title="音樂音量：按一下暫時壓低 (Ctrl + Alt + M)">&#xE995;</button><input type="range" id="c-vrange" min="0" max="100" step="1" value="50" title="音樂音量"></div>
 </div>
 <button id="gear" title="舞台設定">⚙</button>
 <aside id="panel">
@@ -492,7 +501,8 @@ body.obs #rq,body.obs #rq-toasts,body.obs #c-req{display:none!important}
 </aside>
 <aside id="rq" aria-label="點歌">
   <div class="hd"><h2>點歌</h2><label class="rq-sw" title="關掉時，觀眾點歌會收到「現在沒有開放點歌」"><span id="rq-open-lbl">開放中</span><input type="checkbox" id="rq-open"><i></i></label><button class="x" id="rq-close" aria-label="關閉">×</button></div>
-  <div class="stat" title="舞台開著的時候，每播完一首歌自動加一；早上 6 點重新算"><span>今天唱了</span><b id="rq-count">0</b><span>首</span><small>自動計算</small></div>
+  <div class="modes" id="rq-modes"><button data-m="sing"><span>🎤</span>唱歌</button><button data-m="chat"><span>💬</span>聊天</button><button data-m="draw"><span>🎨</span>畫畫</button><button data-m="game"><span>🎮</span>遊戲</button><button data-m="off"><span>⏻</span>關閉</button></div>
+  <div class="stat" title="唱歌台時，每播完一首歌自動加一；早上 6 點重新算"><span>今天唱了</span><b id="rq-count">0</b><span>首</span><small>自動計算</small></div>
   <div class="bd">
     <h4>正在唱</h4><div id="rq-now"></div>
     <h4>等你決定 <em id="rq-pend-n">0</em></h4><div id="rq-pend"></div>
@@ -609,15 +619,26 @@ const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60
 $('#c-play').onclick = e => { e.stopPropagation(); sendWs({type: 'toggle'}); };
 $('#c-prev').onclick = e => { e.stopPropagation(); sendWs({type: 'prev'}); };
 $('#c-next').onclick = e => { e.stopPropagation(); sendWs({type: 'next'}); };
-let vFlashT = 0;
-function showVol(v, flash){
-  const el = $('#c-vpct'); if (!el) return;
-  el.textContent = v.level == null ? '—' : Math.round(v.level * 100) + '%';
-  el.classList.toggle('ducked', !!v.ducked);
-  if (flash){ el.classList.add('flash'); clearTimeout(vFlashT); vFlashT = setTimeout(() => el.classList.remove('flash'), 1200); }
+let volLv = null, volDrag = -1e9, volSendT = 0, volLastT = 0;
+function volIcon(lv, ducked){ return ducked || lv <= .15 ? '&#xE993;' : lv <= .5 ? '&#xE994;' : '&#xE995;'; }
+function showVol(v){
+  if (v.level == null) return;
+  if (performance.now() - volDrag < 1500) return;  // 正在拖：不要被拉回去
+  volLv = v.level;
+  const r = $('#c-vrange'); r.value = Math.round(volLv * 100); r.style.setProperty('--v', r.value + '%');
+  const b = $('#c-vbtn'); b.innerHTML = volIcon(volLv, v.ducked); b.classList.toggle('ducked', !!v.ducked);
+  b.title = v.ducked ? `音樂已壓低到 ${r.value}%：按一下恢復 (Ctrl + Alt + M)` : `音樂音量 ${r.value}%：按一下暫時壓低 (Ctrl + Alt + M)`;
+  r.title = `音樂音量 ${r.value}%`;
 }
-$('#c-vup').onclick = e => { e.stopPropagation(); sendWs({type: 'volume', delta: .05}); };
-$('#c-vdown').onclick = e => { e.stopPropagation(); sendWs({type: 'volume', delta: -.05}); };
+$('#c-vrange').addEventListener('input', e => {
+  e.stopPropagation(); volDrag = performance.now(); volLv = e.target.value / 100;
+  e.target.style.setProperty('--v', e.target.value + '%'); e.target.title = `音樂音量 ${e.target.value}%`;
+  if (performance.now() - volSendT > 60){ volSendT = performance.now(); sendWs({type: 'volume', level: volLv}); }
+  clearTimeout(volLastT); volLastT = setTimeout(() => sendWs({type: 'volume', level: volLv}), 120);
+});
+$('#c-vrange').addEventListener('click', e => e.stopPropagation());
+$('#c-vbtn').onclick = e => { e.stopPropagation(); sendWs({type: 'duck'}); };
+
 $('#ctl').addEventListener('click', e => e.stopPropagation());
 $('#c-track').onclick = e => {
   e.stopPropagation();
@@ -1348,7 +1369,11 @@ function onQueue(q){
   const pend = q.items.filter(i => i.status === 'pending'), queued = q.items.filter(i => i.status === 'queued'), now = q.items.find(i => i.status === 'now');
   $('#c-req .badge').classList.toggle('on', pend.length > 0);
   $('#rq-count').textContent = q.count;
-  $('#rq-open').checked = q.open; $('#rq-open-lbl').textContent = q.open ? '開放中' : '已關閉';
+  $('#rq-open').checked = q.open; $('#rq-open-lbl').textContent = !q.kind ? '點歌關閉' : q.open ? '開放中' : '已關閉';
+  $('#rq-open').disabled = !q.kind;
+  document.querySelectorAll('#rq-modes button').forEach(b => b.classList.toggle('on', b.dataset.m === q.mode));
+  $('#rq .stat').hidden = q.mode !== 'sing';
+  $('#rq .bd').hidden = !q.kind;
   $('#rq-pend-n').textContent = pend.length; $('#rq-queue-n').textContent = queued.length;
   rqFill($('#rq-now'), now ? [now] : [], it => {
     const d = rqCard(it, '<span class="rq-eq"><i></i><i></i><i></i></span>', it.user ? `${it.user} 點的歌` : '待唱清單', [['唱完了', 'rq-b', '從清單拿掉', () => rqAct('next')]]);
@@ -1380,6 +1405,7 @@ function showReqToast(it){
 $('#c-req').onclick = e => { e.stopPropagation(); $('#panel').classList.remove('open'); $('#rq').classList.toggle('open'); };
 $('#rq-close').onclick = e => { e.stopPropagation(); $('#rq').classList.remove('open'); };
 $('#rq').addEventListener('click', e => e.stopPropagation());
+document.querySelectorAll('#rq-modes button').forEach(b => b.onclick = e => { e.stopPropagation(); sendWs({type: 'stream_mode', value: b.dataset.m}); });
 $('#rq-open').onchange = e => sendWs({type: 'queue_cfg', patch: {open: e.target.checked}});
 setInterval(() => { if (rqState && $('#rq').classList.contains('open')) onQueue(rqState); }, 30000);
 $('#gear').addEventListener('click', () => $('#rq').classList.remove('open'));

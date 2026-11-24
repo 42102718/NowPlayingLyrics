@@ -121,8 +121,27 @@ DEFAULT_CONFIG = {
     "chat": {"channel": "", "token": "", "bot": "", "commands": "!song !歌名 !這什麼歌 !歌"},
     # 直播點歌單：open 開放點歌、auto_next 唱完自動下一首、per_user 每人同時最多幾首 (0 = 不限)、
     # platform 換歌時在哪裡打開搜尋 (auto 跟著現在的播放器 / spotify / ytmusic / youtube / none)、suffix 搜尋時加在後面的字 (例如「伴奏」)
-    "queue": {"open": False, "auto_next": False, "per_user": 2, "cmds": "!點歌 !sr", "platform": "auto", "suffix": ""},  # 直播聊天室點歌指令 (Twitch)  # 和朋友共享歌詞的雲端資料夾、顯示的名字  # 桌布模式：舞台放在桌面圖示後面
+    "queue": {"open": False, "auto_next": False, "per_user": 2, "cmds": "!點歌 !sr", "platform": "auto", "suffix": ""},
+    # 今天開什麼台：off 不在直播 / sing 唱歌台 (點唱) / chat 聊天台、draw 畫畫台 (點播) / game 遊戲台。
+    # 每種台記住自己的點歌設定 (開不開放、唱完自動準備下一首、搜尋時加上的字)
+    "stream": {"mode": "off", "modes": {
+        "sing": {"open": True, "auto_next": False, "suffix": "伴奏"},
+        "chat": {"open": False, "auto_next": False, "suffix": ""},
+        "draw": {"open": False, "auto_next": True, "suffix": ""},
+        "game": {"open": False, "auto_next": False, "suffix": ""}}},  # 直播聊天室點歌指令 (Twitch)  # 和朋友共享歌詞的雲端資料夾、顯示的名字  # 桌布模式：舞台放在桌面圖示後面
 }
+
+
+STREAM_MODES = ("off", "sing", "chat", "draw", "game")
+REQUEST_KIND = {"sing": "sing", "chat": "play", "draw": "play"}  # 點唱 / 點播
+
+
+def queue_cfg():
+    """點歌單現在用的設定：共用的 (指令、每人上限、搜尋平台) + 這種台自己的 (開不開放、自動下一首、搜尋加上的字)。"""
+    mode = config["stream"]["mode"]
+    m = config["stream"]["modes"].get(mode, {})
+    kind = REQUEST_KIND.get(mode)
+    return {**config["queue"], **m, "open": bool(m.get("open")) and kind is not None, "mode": mode, "kind": kind}
 
 
 def load_config():
@@ -160,6 +179,12 @@ def load_config():
                               "hover": ns.get("hover") if ns.get("hover") in ("smart", "fast", "click") else "smart"}
         if isinstance(saved.get("timer"), dict):
             cfg["timer"] = {"custom": int(saved["timer"].get("custom", 20))}
+        st = saved.get("stream") or {}
+        if st.get("mode") in STREAM_MODES:
+            cfg["stream"]["mode"] = st["mode"]
+        for k, v in (st.get("modes") or {}).items():
+            if k in cfg["stream"]["modes"] and isinstance(v, dict):
+                cfg["stream"]["modes"][k].update({kk: vv for kk, vv in v.items() if kk in ("open", "auto_next", "suffix")})
         q = saved.get("queue") or {}
         cfg["queue"] = {**DEFAULT_CONFIG["queue"], **{k: v for k, v in q.items() if k in DEFAULT_CONFIG["queue"]}}
         ch = saved.get("chat") or {}
@@ -1930,16 +1955,25 @@ async def ws_handler(request):
             elif d.get("type") == "queue" and QUEUE is not None:
                 iid = d.get("id")
                 await asyncio.to_thread(QUEUE.act, str(d.get("action") or ""), int(iid) if iid is not None else None, d.get("value"))
+            elif d.get("type") == "stream_mode" and d.get("value") in STREAM_MODES:
+                config["stream"]["mode"] = d["value"]
+                config_changed()
+                queue_changed()
             elif d.get("type") == "queue_cfg":
                 qc = config["queue"]
+                mc = config["stream"]["modes"].get(config["stream"]["mode"])  # 這種台自己的設定
                 for k, v in (d.get("patch") or {}).items():
                     if k in ("open", "auto_next"):
-                        qc[k] = bool(v)
+                        if mc is not None:
+                            mc[k] = bool(v)
+                    elif k == "suffix":
+                        if mc is not None:
+                            mc[k] = " ".join(str(v or "").split())[:30]
                     elif k == "per_user":
                         qc[k] = max(0, min(20, int(v or 0)))
                     elif k == "platform" and v in ("auto", "spotify", "ytmusic", "youtube", "none"):
                         qc[k] = v
-                    elif k in ("cmds", "suffix"):
+                    elif k == "cmds":
                         qc[k] = " ".join(str(v or "").split())[:100]
                 save_config()
                 queue_changed()
@@ -2266,9 +2300,20 @@ def start_tray():
             config_changed()
         return f
 
+    def stream(mode):
+        def f(icon, item):
+            config["stream"]["mode"] = mode
+            config_changed()
+            queue_changed()
+        return f
+
     P = pystray.MenuItem
     menu = pystray.Menu(
         P("開啟主視窗", lambda i, it: show_window(), default=True),
+        P("今天開什麼台", pystray.Menu(*[
+            P(label, stream(k), checked=(lambda k: lambda it: config["stream"]["mode"] == k)(k), radio=True)
+            for k, label in [("sing", "🎤 唱歌台"), ("chat", "💬 聊天台"), ("draw", "🎨 畫畫台"), ("game", "🎮 遊戲台"), ("off", "不在直播")]
+        ])),
         P("膠囊模式 (螢幕頂端)", lambda i, it: set_notch(not config["notch"]), checked=lambda it: config["notch"]),
         P("膠囊選項", pystray.Menu(*[
             P(label, notch_toggle(k), checked=(lambda k: lambda it: config["notch_opts"][k])(k))
@@ -2276,7 +2321,7 @@ def start_tray():
                              ("battery", "裝置電量"), ("gestures", "滾輪調音量、左右滑切歌")]
         ])),
         P("打開舞台", lambda i, it: open_stage()),
-        P("提詞小抄 (唱歌時看)", lambda i, it: open_prompter()),
+        P("小抄 / 直播看板", lambda i, it: open_prompter()),
         P("裝置電量", lambda i, it: open_devices()),
         pystray.Menu.SEPARATOR,
         P("顯示浮動歌詞", toggle("enabled"), checked=lambda it: ov["enabled"]),
@@ -2937,7 +2982,7 @@ def queue_changed():
 def queue_open_search(query):
     """換到下一首點歌時，在選好的平台打開搜尋 (網址在這裡組)。"""
     from urllib.parse import quote
-    qc = config["queue"]
+    qc = queue_cfg()
     plat = qc.get("platform") or "auto"
     if plat == "none":
         return
@@ -2960,7 +3005,7 @@ def init_queue():
     global QUEUE
     try:
         import songqueue
-        QUEUE = songqueue.SongQueue(DATA / "songqueue.json", lambda: config["queue"], queue_changed, queue_open_search,
+        QUEUE = songqueue.SongQueue(DATA / "songqueue.json", queue_cfg, queue_changed, queue_open_search,
                                     lambda text: CHAT.say(text) if CHAT else None)
     except Exception as e:
         print("[queue] disabled:", repr(e))

@@ -21,6 +21,8 @@ html,body{background:transparent;overflow:hidden;color:#fff;font-family:var(--fo
   padding:16px 18px 14px;border-radius:20px;background:linear-gradient(180deg,rgba(18,16,28,.72),rgba(18,16,28,.58));
   border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 20px 50px -18px rgba(0,0,0,.6);backdrop-filter:blur(20px)}
 body.right #card{left:auto;right:24px;transform-origin:top right}
+#card{transition:opacity .6s ease,translate .6s cubic-bezier(.2,.9,.25,1)}
+#card.away{opacity:0;translate:0 -12px;pointer-events:none}
 body.nobg #card{background:none;border:0;box-shadow:none;backdrop-filter:none}
 body.nobg *{text-shadow:0 2px 8px rgba(0,0,0,.8),0 0 2px rgba(0,0,0,.9)}
 .lbl{font:700 12px var(--font);letter-spacing:.12em;color:var(--accent);display:flex;align-items:center;gap:8px}
@@ -50,7 +52,7 @@ body.nobg *{text-shadow:0 2px 8px rgba(0,0,0,.8),0 0 2px rgba(0,0,0,.9)}
 </style>
 </head>
 <body>
-<div id="card" hidden>
+<div id="card" class="away">
   <div class="lbl"><span class="dot"></span>正在唱</div>
   <div id="now"><div class="t"></div><div class="u"></div></div>
   <div class="empty" id="empty" hidden>等待下一首…</div>
@@ -65,18 +67,37 @@ if (P.get('side') === 'right') document.body.classList.add('right');
 if (P.get('bg') === '0') document.body.classList.add('nobg');
 document.documentElement.style.setProperty('--s', Math.max(.5, Math.min(3, +(P.get('scale') || 1))));
 if (P.get('count') === '0') $('#count').hidden = true;
-let lastNow = null, lastCount = null, cmds = '!點歌';
-
+let lastNow = null, lastCount = null, cmds = '!點歌', Q = null, trk = null, lastPlay = 0;
+// 跟著「今天開什麼台」：
+//   唱歌台：唱歌時淡出 (不搶歌詞)，休息 / 聊天時才浮出點唱清單
+//   聊天台、畫畫台：一直顯示「正在播放」，有開點播就加上清單
+//   遊戲台、不在直播：不出現
+function visible(q){
+  if (!q || !q.mode || q.mode === 'off' || q.mode === 'game') return false;
+  if (q.mode === 'sing'){
+    if (trk && trk.playing) return false;
+    if (performance.now() - lastPlay < 5000) return false;
+    return !!(q.items.length || q.open || q.count);
+  }
+  return !!trk || q.items.length > 0;
+}
 function render(q){
   if (!q) return;
+  Q = q;
   const now = q.items.find(i => i.status === 'now'), queued = q.items.filter(i => i.status === 'queued');
-  $('#card').hidden = !(now || queued.length || q.open || q.count);
-  const key = now ? now.id : null;
-  $('#now').hidden = !now; $('#empty').hidden = !!now;
-  $('#empty').textContent = queued.length ? '準備下一首…' : (q.open ? '還沒有人點歌，快來點！' : '等待下一首…');
-  if (now){
-    $('#now .t').textContent = now.query;
-    $('#now .u').textContent = now.user ? `${now.user} 點播` : '實況主選歌';
+  $('#card').classList.toggle('away', !visible(q));
+  const sing = q.mode === 'sing';
+  $('#card .lbl').lastChild.textContent = sing ? '正在唱' : '正在播放';
+  $('#count').hidden = !sing || P.get('count') === '0';
+  // 聊天 / 畫畫台：沒有點播在唱時，顯示播放器正在播的歌
+  const show = now ? {title: now.query, sub: now.user ? `${now.user} 點播` : '實況主選歌', key: 'q' + now.id}
+             : (!sing && trk) ? {title: trk.title, sub: trk.artist || '', key: 't' + trk.track_id} : null;
+  const key = show ? show.key : null;
+  $('#now').hidden = !show; $('#empty').hidden = !!show;
+  $('#empty').textContent = queued.length ? '準備下一首…' : (q.open ? '還沒有人點歌，快來點！' : '休息一下，等等繼續');
+  if (show){
+    $('#now .t').textContent = show.title;
+    $('#now .u').textContent = show.sub;
     if (key !== lastNow){ const n = $('#now'); n.classList.remove('enter'); void n.offsetWidth; n.classList.add('enter'); }
   }
   lastNow = key;
@@ -96,6 +117,7 @@ function render(q){
   const h = $('#hint');
   h.hidden = !q.open || P.get('hint') === '0';
   h.innerHTML = '聊天室打 <code></code> 點歌'; h.querySelector('code').textContent = cmds + ' 歌名';
+  $('#foot').hidden = $('#count').hidden && h.hidden;
 }
 
 let ws;
@@ -107,11 +129,14 @@ function connect(){
     if (m.type === 'state'){
       if (m.config && m.config.queue) cmds = (m.config.queue.cmds || '!點歌').split(/\s+/)[0] || '!點歌';
       const a = m.track && m.track.accent; if (Array.isArray(a)) document.documentElement.style.setProperty('--accent', `rgb(${a.join(',')})`);
-      render(m.queue);
+      trk = m.track || null;
+      if (trk && trk.playing) lastPlay = performance.now();
+      render(m.queue || Q);
     } else if (m.type === 'queue') render(m);
   };
 }
 connect();
+setInterval(() => render(Q), 1000);
 </script>
 </body>
 </html>
