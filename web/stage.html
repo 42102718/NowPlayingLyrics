@@ -343,6 +343,38 @@ body.glass #gear,body.glass #home,body.glass #find{background:linear-gradient(18
 body.glass button{transition:transform .22s cubic-bezier(.3,1.5,.5,1),background .2s,color .2s,opacity .3s}
 body.glass button:active:not(:disabled){transform:scale(.95)}
 body.glass #ctl #c-play{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 20px -6px rgba(0,0,0,.5)}
+
+/* ═════ 點歌 (舞台上也能處理；OBS 畫面不會出現) ═════ */
+#c-req{position:relative;font:17px "Segoe Fluent Icons","Segoe MDL2 Assets"!important}
+#c-req .badge{position:absolute;top:3px;right:3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#ff5a6e;color:#fff;
+  font:700 10px/16px "Noto Sans TC",sans-serif;display:none}
+#c-req .badge.on{display:block}
+.rq-top{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.06);margin-bottom:6px}
+.rq-top .n{font:800 26px/1 "Noto Sans TC";min-width:32px;text-align:center}
+.rq-top .l{flex:1;font:600 12px "Noto Sans TC";color:rgba(255,255,255,.65)}
+.rq-top button{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:none;color:#fff;cursor:pointer;font:700 13px "Noto Sans TC"}
+.rq-list{display:flex;flex-direction:column;gap:6px}
+.rq{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 11px;border-radius:12px;background:rgba(255,255,255,.06)}
+.rq .q{flex:1;min-width:0}
+.rq .q b{display:block;font:700 13.5px "Noto Sans TC";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rq .q small{display:block;font:500 11.5px "Noto Sans TC";color:rgba(255,255,255,.55)}
+.rq button{flex:none;height:28px;min-width:28px;padding:0 9px;border-radius:9px;border:0;background:rgba(255,255,255,.12);color:#fff;font:700 12px "Noto Sans TC";cursor:pointer}
+.rq button:hover{background:rgba(255,255,255,.22)}
+.rq button.yes{background:#8b6cff}
+.rq.now{background:linear-gradient(135deg,rgba(139,108,255,.35),rgba(255,255,255,.05))}
+.rq-empty{font:500 12px/1.6 "Noto Sans TC";color:rgba(255,255,255,.45);padding:2px}
+.rq-add{display:flex;gap:6px;margin-top:8px}
+.rq-add input{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:9px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font:500 13px "Noto Sans TC";outline:none}
+.rq-add button{height:32px;padding:0 12px;border-radius:9px;border:0;background:rgba(255,255,255,.12);color:#fff;font:700 12px "Noto Sans TC";cursor:pointer}
+/* 有人點歌時右上角跳出的小卡片：直接按「唱 / 不唱」，不用打開面板 */
+#rq-toasts{position:fixed;right:20px;top:76px;z-index:25;display:flex;flex-direction:column;gap:8px;width:300px;pointer-events:none}
+#rq-toasts .rq{pointer-events:auto;background:rgba(20,18,30,.86);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);
+  box-shadow:0 14px 36px -12px rgba(0,0,0,.6);animation:rqIn .45s cubic-bezier(.2,.9,.25,1.1)}
+#rq-toasts .rq.out{animation:rqOut .3s ease-in forwards}
+@keyframes rqIn{from{opacity:0;transform:translateX(30px)}}
+@keyframes rqOut{to{opacity:0;transform:translateX(30px)}}
+body.obs #rq-toasts,body.obs #c-req{display:none!important}
+#panel.open ~ #rq-toasts{display:none}
 </style>
 </head>
 <body class="ui">
@@ -381,12 +413,13 @@ body.glass #ctl #c-play{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 20px
   <button id="c-play" title="播放 / 暫停 (空白鍵)">&#xF5B0;</button>
   <button id="c-next" title="下一首 (Ctrl + →)">&#xF8AD;</button>
   <div class="bar"><span id="c-cur">0:00</span><div class="track" id="c-track"><i></i></div><span id="c-dur">0:00</span></div>
+  <button id="c-req" title="點歌單 (觀眾點的歌、待唱清單)">&#xE90B;<span class="badge"></span></button>
   <div class="vol"><button id="c-vdown" title="音樂音量 − (↓)">&#xE993;</button><span id="c-vpct" title="音樂音量 (Ctrl + Alt + M 一鍵壓低)">—</span><button id="c-vup" title="音樂音量 + (↑)">&#xE995;</button></div>
 </div>
 <button id="gear" title="舞台設定">⚙</button>
 <aside id="panel">
   <h2>舞台設定 <button id="p-close" aria-label="關閉">×</button></h2>
-  <nav id="p-tabs"><button data-t="fx" class="on">效果</button><button data-t="look">外觀</button><button data-t="live">直播</button></nav>
+  <nav id="p-tabs"><button data-t="fx" class="on">效果</button><button data-t="look">外觀</button><button data-t="live">直播</button><button data-t="req">點歌</button></nav>
   <div class="ppane on" data-p="fx">
     <div class="seg2" id="engine"><button data-e="folia">Folia 效果</button><button data-e="hummi">Hummi 效果</button></div>
     <div class="grid folia" id="fmodes"></div>
@@ -428,7 +461,19 @@ body.glass #ctl #c-play{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 20px
     <div class="src-note">在 OBS 新增「瀏覽器」來源，貼上網址，寬高設 1920×1080。Hummi 要開著，OBS 才拿得到歌詞。</div>
     <div id="msg"></div>
   </div>
+  <div class="ppane" data-p="req">
+    <div class="rq-top"><span class="n" id="rq-count">0</span><span class="l">今天唱了幾首<br>(播超過 6 成算一首)</span>
+      <button id="rq-minus" title="少算一首">−</button><button id="rq-plus" title="多算一首">＋</button></div>
+    <label class="row">開放點歌 <input type="checkbox" id="rq-open"></label>
+    <label class="row" title="現在唱的這首播完，自動換下一首並打開搜尋">唱完自動下一首 <input type="checkbox" id="rq-auto"></label>
+    <h3>🎤 現在唱</h3><div class="rq-list" id="rq-now"></div>
+    <h3>🙋 等你決定</h3><div class="rq-list" id="rq-pend"></div>
+    <h3>📋 待唱清單</h3><div class="rq-list" id="rq-queue"></div>
+    <div class="rq-add"><input id="rq-add-in" placeholder="自己加一首 (Enter)" maxlength="80"><button id="rq-add-btn">加入</button></div>
+    <div class="src-note">觀眾在 Twitch 聊天室打「!點歌 歌名」。指令、每人上限、換歌時打開哪裡，在主視窗的「點歌」裡設定。</div>
+  </div>
 </aside>
+<div id="rq-toasts"></div>
 <script>
 const $ = s => document.querySelector(s);
 const MODES = [['float','浮空','一句句浮上來'],['fly','飛入','字從四面飛來'],['bounce','彈跳','唱到的字跳起'],
@@ -483,7 +528,8 @@ function connect(){
   ws.onclose = () => setTimeout(connect, 1000);
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.type === 'state'){ onState(m); if (m.volume) showVol(m.volume, false); }
+    if (m.type === 'state'){ onState(m); if (m.volume) showVol(m.volume, false); if (m.queue) onQueue(m.queue); }
+    else if (m.type === 'queue') onQueue(m);
     else if (m.type === 'volume') showVol(m, true);
     else if (m.type === 'lyrics') onLyrics(m);
     else if (m.type === 'viz') onViz(m);
@@ -1250,6 +1296,68 @@ document.querySelectorAll('#p-tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.ppane').forEach(x => x.classList.toggle('on', x.dataset.p === b.dataset.t));
 });
 $('#p-close').onclick = () => $('#panel').classList.remove('open');
+// ───── 點歌 (舞台上直接處理) ─────
+let rqState = null, rqSeen = null;
+const rqAct = (action, id, value) => sendWs({type: 'queue', action, id, value});
+function rqRow(it, btns){
+  const d = document.createElement('div'); d.className = 'rq' + (it.status === 'now' ? ' now' : '');
+  d.innerHTML = '<span class="q"><b></b><small></small></span>';
+  d.querySelector('b').textContent = it.query;
+  d.querySelector('small').textContent = it.user ? `🙋 ${it.user}` : '自己加的';
+  btns.forEach(([label, cls, title, fn]) => { const b = document.createElement('button'); b.innerHTML = label; b.className = cls; b.title = title; b.onclick = e => { e.stopPropagation(); fn(); }; d.appendChild(b); });
+  return d;
+}
+const rqEmpty = t => Object.assign(document.createElement('div'), {className: 'rq-empty', textContent: t});
+function onQueue(q){
+  rqState = q;
+  const pend = q.items.filter(i => i.status === 'pending'), queued = q.items.filter(i => i.status === 'queued'), now = q.items.find(i => i.status === 'now');
+  const badge = $('#c-req .badge'); badge.textContent = pend.length; badge.classList.toggle('on', pend.length > 0);
+  $('#rq-count').textContent = q.count;
+  if (document.activeElement !== $('#rq-open')) $('#rq-open').checked = q.open;
+  if (document.activeElement !== $('#rq-auto')) $('#rq-auto').checked = q.auto_next;
+  const nb = $('#rq-now'); nb.innerHTML = '';
+  nb.appendChild(now ? rqRow(now, [['下一首 ▶', 'yes', '唱完了，換下一首', () => rqAct('next')]])
+                     : (queued.length ? rqRow({query: `待唱還有 ${queued.length} 首`, user: '', status: ''}, [['開始 ▶', 'yes', '開始唱第一首', () => rqAct('next')]]) : rqEmpty('還沒有。')));
+  const pb = $('#rq-pend'); pb.innerHTML = '';
+  if (!pend.length) pb.appendChild(rqEmpty(q.open ? '觀眾點的歌會先出現在這裡。' : '點歌目前關閉。'));
+  pend.forEach(it => pb.appendChild(rqRow(it, [['唱', 'yes', '排進待唱清單', () => rqAct('accept', it.id)], ['不唱', '', '這次先不唱', () => rqAct('reject', it.id)]])));
+  const qb = $('#rq-queue'); qb.innerHTML = '';
+  if (!queued.length) qb.appendChild(rqEmpty('空的。'));
+  queued.forEach(it => qb.appendChild(rqRow(it, [['&#xE768;', '', '現在就唱這首', () => rqAct('sing', it.id)], ['&#xE711;', '', '移除', () => rqAct('remove', it.id)]])));
+  qb.querySelectorAll('button').forEach(b => { if (b.innerHTML.length < 3) b.style.font = '12px "Segoe Fluent Icons","Segoe MDL2 Assets"'; });
+  // 新的點歌：右上角跳小卡片 (第一次載入的不跳)
+  const ids = new Set(pend.map(i => i.id));
+  if (rqSeen && !OBS){
+    pend.filter(i => !rqSeen.has(i.id)).forEach(showReqToast);
+  }
+  rqSeen = ids;
+  // 已經處理掉的卡片收起來
+  document.querySelectorAll('#rq-toasts .rq').forEach(el => { if (!ids.has(+el.dataset.id)) dropToast(el); });
+}
+function dropToast(el){ if (el.classList.contains('out')) return; el.classList.add('out'); setTimeout(() => el.remove(), 320); }
+function showReqToast(it){
+  const box = $('#rq-toasts');
+  while (box.children.length >= 3) box.firstChild.remove();
+  const el = rqRow(it, [['唱', 'yes', '排進待唱清單', () => { rqAct('accept', it.id); dropToast(el); }], ['不唱', '', '這次先不唱', () => { rqAct('reject', it.id); dropToast(el); }]]);
+  el.dataset.id = it.id;
+  el.querySelector('small').textContent = `🙋 ${it.user} 想聽`;
+  box.appendChild(el);
+  setTimeout(() => dropToast(el), 15000);  // 15 秒沒處理就收起來 (還在面板的「等你決定」裡)
+}
+$('#c-req').onclick = e => {
+  e.stopPropagation();
+  $('#panel').classList.add('open');
+  document.querySelectorAll('#p-tabs button').forEach(x => x.classList.toggle('on', x.dataset.t === 'req'));
+  document.querySelectorAll('.ppane').forEach(x => x.classList.toggle('on', x.dataset.p === 'req'));
+};
+$('#rq-open').onchange = e => sendWs({type: 'queue_cfg', patch: {open: e.target.checked}});
+$('#rq-auto').onchange = e => sendWs({type: 'queue_cfg', patch: {auto_next: e.target.checked}});
+$('#rq-plus').onclick = () => rqAct('count', null, 1);
+$('#rq-minus').onclick = () => rqAct('count', null, -1);
+const rqAdd = () => { const v = $('#rq-add-in').value.trim(); if (v){ rqAct('add', null, v); $('#rq-add-in').value = ''; } };
+$('#rq-add-btn').onclick = rqAdd;
+$('#rq-add-in').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') rqAdd(); });
+
 function applyOpts(){
   const r = document.documentElement.style;
   r.setProperty('--size', opt.size);
