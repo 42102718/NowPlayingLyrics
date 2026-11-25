@@ -37,6 +37,8 @@ body.transparent #vignette{display:none}
   letter-spacing:.01em;will-change:transform,opacity,filter}
 .ln.next{--k:var(--next,1)}  /* 下一句的大小 (設定 → 外觀 → 下一句大小) */
 .ln .tr{display:block;font-weight:700;font-size:.42em;margin-top:.45em;opacity:.75;letter-spacing:.02em}
+.ln .tr.rd + .tr.tl{margin-top:.25em}  /* 讀音和翻譯都有：靠近一點 */
+.ln .tr.tl{opacity:.68}
 .ln .w{position:relative}
 .ln .w .rt{position:absolute;left:0;bottom:100%;width:calc(var(--n,1) * 2.6em);margin-bottom:-.1em;text-align:center;font-size:.36em;font-weight:700;line-height:1;
   font-style:normal;white-space:nowrap;letter-spacing:0;color:#fff;-webkit-text-fill-color:#fff;opacity:.85;pointer-events:none}
@@ -109,7 +111,9 @@ body.transparent #vignette{display:none}
               .06em 0 0 #0a0a1e,-.06em 0 0 #0a0a1e,0 .06em 0 #0a0a1e,0 -.06em 0 #0a0a1e,0 .12em .2em rgba(0,0,0,.6)}
 .m-ktv .ln .w::after{content:attr(data-t);position:absolute;left:0;top:0;width:calc(var(--p,0) * 100%);overflow:hidden;white-space:pre;
   color:var(--accent);text-shadow:inherit}
-.m-ktv .ln .tr{display:none}
+.m-ktv .ln .tr{font-size:.38em;margin-top:.35em;opacity:.85;color:#fff;
+  text-shadow:0 0 .1em #0a0a1e,.06em .06em 0 #0a0a1e,-.06em .06em 0 #0a0a1e,.06em -.06em 0 #0a0a1e,-.06em -.06em 0 #0a0a1e}
+.m-ktv .ln .tr + .tr{margin-top:.15em}
 
 
 /* 7. 霧窗：起霧的玻璃，唱到的字被手指抹開，透出後面清楚的光 (畫在 canvas 上) */
@@ -814,6 +818,8 @@ function addReading(el, l){
     }
   }
   if (l.rd){ const s = document.createElement('span'); s.className = 'tr rd'; s.textContent = l.rd; el.appendChild(s); }
+  // 翻譯 (有開「顯示歌詞翻譯」才會有)：放在讀音下面
+  if (l.tr){ const s = document.createElement('span'); s.className = 'tr tl'; s.textContent = l.tr; el.appendChild(s); }
 }
 function layoutLine(el, l){
   const ws = [...el.querySelectorAll('.w')];
