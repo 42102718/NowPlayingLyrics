@@ -530,7 +530,73 @@ def clean_title(title: str) -> str:
     t = NOISE.sub(" ", t)
     t = LYRIC_VIDEO.sub(" ", t)
     t = re.sub(r"\s+", " ", t).strip(" -–—|｜/*")
+    if not t and title:  # 整個歌名都被當成雜訊清掉了 (例如 #thatPOWER)：只拿掉 # 號
+        t = re.sub(r"\s+", " ", (title or "").replace("#", " ")).strip()
     return t
+
+
+# ───── 羅馬拼音歌名 (Hana ni Bourei = 花に亡霊、Kaikai Kitan = 廻廻奇譚) ─────
+_KANA_KANJI = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
+_HANGUL_CH = re.compile(r"[\uac00-\ud7a3]")
+_ASIAN = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]")
+
+
+def _rom_norm(s):
+    """羅馬拼音比對用：小寫、只留英數、長音合併 (bourei = borei、kyou = kyo)。"""
+    s = (s or "").lower()
+    s = s.translate(str.maketrans("āīūēōâîûêô", "aiueoaiueo"))
+    s = re.sub(r"[^a-z0-9]", "", s)
+    for a, b in (("ou", "o"), ("oo", "o"), ("uu", "u"), ("aa", "a"), ("ii", "i"), ("ee", "e"), ("wo", "o")):
+        s = s.replace(a, b)
+    return s
+
+
+_rom_cache = {}
+
+
+def _romanize_title(t):
+    """日文 / 韓文歌名 → 羅馬拼音 (比對用，可能有兩種唸法)。不是日韓文就回傳空的。"""
+    t = PAREN.sub("", t or "").strip() or (t or "")
+    if t in _rom_cache:
+        return _rom_cache[t]
+    r = ""
+    try:
+        if _HANGUL_CH.search(t):
+            import ko_reading
+            r = ko_reading.romanize(t)
+        elif _KANA_KANJI.search(t):
+            import jp_reading
+            r = jp_reading.romaji(t)
+    except Exception as e:
+        print("[romanize-title]", repr(e), flush=True)
+    # 助詞は / へ / を 單獨一個字時唸 wa / e / o
+    alt = " ".join({"ha": "wa", "he": "e", "wo": "o"}.get(w, w) for w in r.split())
+    _rom_cache[t] = r = {x for x in (_rom_norm(r), _rom_norm(alt)) if x}
+    return r
+
+
+def _rom_title_eq(query, cand):
+    """播放器的羅馬拼音 / 英文歌名，跟候選的日韓文歌名唸起來一樣嗎？"""
+    if _ASIAN.search(query or "") or not _ASIAN.search(cand or ""):
+        return False
+    q = _rom_norm(PAREN.sub("", query or "") or query)
+    if len(q) < 3:
+        return False
+    for c in _romanize_title(cand):
+        if q == c or (len(q) >= 6 and (q in c or c in q) and min(len(q), len(c)) >= 0.75 * max(len(q), len(c))):
+            return True
+    return False
+
+
+# 歌詞是不是「日文 / 韓文的羅馬拼音」(不是原文)：大部分的字都是子音 + 母音的拼法
+_ROM_WORD = re.compile(r"^(?:(?:[kgsztdnhbpmyrwfj]|ch|sh|ts|ky|gy|ny|hy|my|ry|by|py)?(?:[aiueo]|eo|eu|ae|oe|ui|wa|wo)n?|n|ng)+$")
+
+
+def _looks_romanized(lines):
+    words = re.findall(r"[a-z]+", " ".join((l.get("text") or "") for l in lines).lower())
+    if len(words) < 20:
+        return False
+    return sum(1 for w in words if _ROM_WORD.match(w)) / len(words) >= 0.72
 
 
 def _split_artists(a: str):
@@ -543,7 +609,10 @@ _LATIN_NAME = re.compile(r"^[\sA-Za-z0-9.,'’&!?()\-À-ɏ]+$")
 
 
 def _name_tokens(s):
-    return frozenset(re.findall(r"[a-z0-9]+", (s or "").lower()))
+    """名字拆成英數字片段 (忽略大小寫、重音：René = Rene、Beyoncé = Beyonce)。"""
+    import unicodedata
+    s = "".join(ch for ch in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(ch))
+    return frozenset(re.findall(r"[a-z0-9]+", s.lower()))
 
 
 def _primary_artist(a: str) -> str:
@@ -597,6 +666,8 @@ def title_variants(title: str, artist: str):
     if m and " - " in t[m.end():]:
         t = t[m.end():].strip()
     out = [(t, a)]
+    if " - " in t:  # 「Flowers - Single Version」「Take On Me - 2015 Remaster」：前半段才是歌名
+        out.append((t.split(" - ", 1)[0].strip(), a))
     pairs = []
     for sep in ("｜", "|"):  # 「歌手｜歌名」或「歌名｜頻道」
         if sep in t:
@@ -623,6 +694,9 @@ def title_variants(title: str, artist: str):
     mm = re.match(r"^([^A-Za-z\s]*[㐀-鿿][^A-Za-z]*?)\s*([A-Za-z][A-Za-z\s'’.&!?-]+)$", t)
     if mm and not head:
         out += [(mm.group(1).strip(), a), (mm.group(2).strip(), a)]
+    mm = re.match(r"^([A-Za-z][A-Za-z\s'’.&!?-]+?)\s+([^A-Za-z\s][^A-Za-z]*[㐀-鿿가-힣぀-ヿ][^A-Za-z]*)$", t)
+    if mm and not head:  # 「Sunny Day 晴天」：原文歌名在後面
+        out += [(mm.group(2).strip(), a), (mm.group(1).strip(), a)]
     # 歌手中英並列「周杰倫 Jay Chou」：搜尋時多一串英文名反而找不到 → 中文、英文各試一次
     split = []
     for tt, aa in out:
@@ -710,8 +784,21 @@ QQ_HEADERS = {"Referer": "https://y.qq.com/"}
 NETEASE_HEADERS = {"Referer": "https://music.163.com/"}
 
 
+def _fold(s: str) -> str:
+    """比對用：去掉重音、全形轉半形 (Beyoncé = Beyonce、Lạc Trôi = Lac Troi、Ｌｅｍｏｎ = Lemon)。
+    日文的濁音、韓文字也會被拆開再合回去，兩邊一起處理所以不影響比對。"""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s or "").replace("đ", "d").replace("Đ", "D")
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    s = s.translate(_SMALL_KANA)  # うっせぇわ = うっせえわ
+    return unicodedata.normalize("NFC", s)
+
+
+_SMALL_KANA = str.maketrans("ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ", "あいうえおやゆよわアイウエオヤユヨワ")
+
+
 def _norm(s: str) -> str:
-    return re.sub(r"[\s\W_]+", "", to_trad(s or "").lower())
+    return re.sub(r"[\s\W_]+", "", _fold(to_trad(s or "")).lower())
 
 
 # 「短標籤 : 名字」的形狀 (編程 : xxx、Guitar : xxx…)，關鍵字清單永遠列不完，所以用形狀判斷
@@ -805,6 +892,9 @@ def _pick_alias(title, duration, hits, album=None):
         same = [k for k, cs in hits.items() if al and any(_fnorm(PAREN.sub("", c.get("album") or "") or "") == al for c in cs)]
         if len(same) == 1:
             return same[0]
+    rom = [k for k, cs in hits.items() if _rom_title_eq(title, cs[0].get("title"))]
+    if len(rom) == 1:  # Hana ni Bourei = 花に亡霊
+        return rom[0]
     counts = sorted(((len(cs), k) for k, cs in hits.items()), reverse=True)
     if len(counts) > 1 and counts[0][0] >= 3 and counts[0][0] >= 2 * counts[1][0]:
         return counts[0][1]
@@ -899,6 +989,7 @@ class Lyrics:
                 names.append(a)
         # 原文名字排前面：英文名字常常只搜得到英文版 / 翻唱 (Dry Flower 用 Yuuri 搜到的是英文版，用 優里 才是原曲)
         names = [n for n in await self.native_artists(artist) if n not in names] + names[:2]
+        q_asian = set(_ASIAN.findall(clean_title(title)))
         for a in names[:4]:
             try:
                 cands = await self.search("", a, limit=30)  # 只靠歌手找：多拿一些 (這位歌手的歌可能很多)
@@ -907,6 +998,8 @@ class Lyrics:
                 return None
             hits = {}
             for c in cands:
+                if q_asian and not (q_asian & set(_ASIAN.findall(c.get("title") or ""))):
+                    continue  # 「晴天」不可能是「等你下課」
                 if artist_matches(a, c.get("artist")) and c.get("duration") and abs(c["duration"] - duration) <= 2:
                     hits.setdefault(_fnorm(PAREN.sub("", c.get("title") or "") or c.get("title") or ""), []).append(c)
             if len(hits) > 1:
@@ -973,6 +1066,68 @@ class Lyrics:
                         return r
         return None
 
+    async def _romaji_title(self, title, artist, duration):
+        """播放器給的歌名是羅馬拼音 (Kaikai Kitan、Hana ni Bourei)：用原文歌手名把他的歌都拿來，
+        找唸起來跟播放器歌名一樣的那首 (原文的日文 / 韓文歌詞，不是羅馬拼音版)。"""
+        t = clean_title(title)
+        if _ASIAN.search(t) or not artist:
+            return None
+        bare = PAREN.sub("", t.split(" - ", 1)[0]).strip() or t
+        # 原文名字 (ヨルシカ) 先試；本來就用英文名字的歌手 (Eve、Vaundy、LiSA) 用原本的名字
+        names = [n for n in await self.native_artists(artist) if _ASIAN.search(n)] + _split_artists(artist)[:2]
+        for n in names[:4]:
+            try:
+                cands = await self.search("", n, limit=30)
+            except Exception as e:
+                print("[romaji-title]", repr(e), flush=True)
+                return None
+            hits = [c for c in cands if _rom_title_eq(bare, c.get("title")) and artist_matches(n, c.get("artist"))
+                    and (not duration or not c.get("duration") or abs(c["duration"] - duration) <= 10)]
+            hits.sort(key=lambda c: abs((c.get("duration") or 0) - duration) if duration else 0)
+            for c in hits[:4]:
+                r = await self.fetch(c)
+                if r and r["synced"] and r["lines"]:
+                    print(f"[romaji-title] {title} → {c.get('title')} / {c.get('artist')}", flush=True)
+                    return r
+        return None
+
+    async def _native_from_romanized(self, rom_lines, title, artist, duration):
+        """找到的歌詞是羅馬拼音寫的：在這位歌手的日 / 韓文歌裡，找「歌詞轉成羅馬拼音後」跟它一樣的那首，
+        改用原文歌詞 (漢字讀法不只一種，比歌名可靠)。長度最接近的先試 (TV 版、完整版都可能)。"""
+        def grams(text):
+            t = _rom_norm(text)
+            return {t[i:i + 3] for i in range(len(t) - 2)}
+        ref = grams(" ".join((l.get("text") or "") for l in rom_lines[:12]))
+        if len(ref) < 30:
+            return None
+        names = [n for n in await self.native_artists(artist) if _ASIAN.search(n)] + _split_artists(artist)[:2]
+        tried = 0
+        for n in names[:3]:
+            try:
+                cands = await self.search("", n, limit=30)
+            except Exception:
+                return None
+            cands = [c for c in cands if _ASIAN.search(c.get("title") or "") and artist_matches(n, c.get("artist"))]
+            cands.sort(key=lambda c: abs((c.get("duration") or 0) - duration) if duration else 0)
+            for c in cands[:8]:
+                if tried >= 10:
+                    return None
+                tried += 1
+                r = await self.fetch(c)
+                if not (r and r["synced"] and r["lines"]):
+                    continue
+                texts = [l.get("text") or "" for l in r["lines"] if (l.get("text") or "").strip()][:12]
+                try:
+                    import jp_reading, ko_reading
+                    rom = " ".join(ko_reading.romanize(x) if _HANGUL_CH.search(x) else jp_reading.romaji(x) for x in texts)
+                except Exception:
+                    return None
+                g = grams(rom)
+                if g and len(ref & g) / min(len(ref), len(g)) >= 0.5:
+                    print(f"[native-lyrics] {title} → {c.get('title')} / {c.get('artist')} (歌詞唸起來一樣)", flush=True)
+                    return r
+        return None
+
     async def find(self, title, artist, album, duration, need_artist=False):
         k = self.key(title, artist)
         if k in self.overrides:
@@ -992,6 +1147,14 @@ class Lyrics:
                             break
                 if result and result["synced"]:
                     break
+        # 播放器的歌名是羅馬拼音：找原文歌名的版本 (沒找到、或找到的是羅馬拼音寫的歌詞時)
+        if artist and _LATIN_NAME.match(clean_title(title) or "x") and \
+                (not (result and result["synced"]) or _looks_romanized(result["lines"])):
+            r = await self._romaji_title(title, artist, duration)
+            if r is None and result and result["synced"] and _looks_romanized(result["lines"]):
+                r = await self._native_from_romanized(result["lines"], title, artist, duration)
+            if r:
+                result = r
         if not (result and result["synced"]) and artist:  # 英文歌手名對不上原文：用原文名字再找
             r = await self._with_native(title, artist, duration)
             if r:
@@ -1459,7 +1622,7 @@ def _fnorm(s):
     global _cc_s
     if _cc_s is None:
         _cc_s = OpenCC("tw2s")
-    s = _cc_s.convert(str(s or "")).lower()
+    s = _fold(_cc_s.convert(str(s or ""))).lower()
     return re.sub(r"[\s\W_]+", "", s)
 
 
