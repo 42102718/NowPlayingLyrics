@@ -655,8 +655,10 @@ def bracket_variants(raw, artist):
     return out
 
 
-def title_variants(title: str, artist: str):
-    """產生幾組 (歌名, 歌手) 嘗試搜尋。"""
+def title_variants(title: str, artist: str, music: bool = False):
+    """產生幾組 (歌名, 歌手) 嘗試搜尋。
+    music = 音樂 App / 音樂平台 (Spotify、YouTube Music)：歌名、歌手欄位是準的，整個歌名 + 原本的歌手最先試
+    (歌名裡的「-」不是「歌手 - 歌名」，例如「Capper.罗言;TOYOKI.M.A.C-雪&暴雨 (TOKBINL MASHUP)」是一首 mashup 的歌名)。"""
     t, a = clean_title(title), clean_artist(artist)
     if CHANNEL_NAME.search(a):
         a = ""  # 上傳者是官方頻道 / 唱片公司：歌手要從標題裡拆
@@ -711,6 +713,8 @@ def title_variants(title: str, artist: str):
         parts = [p for p in _split_artists(aa) if p]
         if len(parts) > 1:
             out += [(tt, p) for p in parts[:3]]
+    if music and a:
+        out = [(t, a)] + [x for x in out if x != (t, a)]
     seen, res = set(), []
     for x in out:
         x = (x[0].strip(" -–—/*"), x[1].strip(" -–—/*"))
@@ -1136,7 +1140,7 @@ class Lyrics:
             return self.cache[k]
         result = await self._lrclib_exact(clean_title(title), clean_artist(artist), album, duration)
         if not (result and result["synced"]):
-            for t, a in title_variants(title, artist):
+            for t, a in title_variants(title, artist, music=not need_artist):
                 cands = self.rank(await self.search(t, a, duration=duration), t, a, duration,
                                   need_artist=need_artist or (bool(a) and a != clean_artist(artist)))
                 for c in cands[:4]:

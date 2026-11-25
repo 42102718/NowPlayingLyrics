@@ -59,7 +59,7 @@ html.mica #grain{display:none}
 .dialog header .tab.on{background:rgba(var(--ink),.1);color:var(--hi)}
 .dialog header .x{margin-left:auto;background:none;border:0;color:var(--dim);font-size:22px;cursor:pointer}
 .dialog .body{padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0}
-.dialog .q{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+.dialog .q{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px}
 .dialog input[type=text],.dialog textarea{width:100%;padding:0 12px;height:40px;border-radius:10px;border:1px solid var(--glass-b);background:rgba(0,0,0,.25);color:var(--fg);font:500 14px var(--font);outline:none}
 .dialog input[type=text]:focus,.dialog textarea:focus{border-color:var(--accent2)}
 .dialog textarea{height:260px;padding:10px 12px;resize:vertical;font:500 13px/1.6 Consolas,"Microsoft JhengHei",monospace}
@@ -69,14 +69,15 @@ html.mica #grain{display:none}
 .dialog .msg{font:500 13px var(--font);color:var(--dim);min-height:18px}
 .dialog .msg.err{color:#ff8a8a}
 #lyr-results{display:flex;flex-direction:column;gap:4px}
-#lyr-results button{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid transparent;background:rgba(var(--ink),.04);color:var(--fg);cursor:pointer}
+#lyr-results button{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid transparent;background:rgba(var(--ink),.04);color:var(--fg);cursor:pointer}
 #lyr-results button:hover{background:rgba(var(--ink),.1);border-color:var(--glass-b)}
 #lyr-results button:disabled{opacity:.5}
 #lyr-results .src{font:700 11px var(--font);padding:3px 8px;border-radius:6px;white-space:nowrap}
 #lyr-results .src.lrclib{background:#2f6f5e}#lyr-results .src.netease{background:#a3262a}#lyr-results .src.kugou{background:#1f5fbf}#lyr-results .src.qq{background:#1f9d55}#lyr-results .src.lyricsplus{background:#c2185b}
 #lyr-results .t{display:block;font:700 15px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #lyr-results .a{display:block;font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#lyr-results .d{font:500 12px var(--font);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+#lyr-results .d{font:500 12px var(--font);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:34px}
+#lyr-results button > span{min-width:0}
 #lyr-results .d .ok{color:#7ee2a8}
 .dialog footer{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid rgba(var(--ink),.07)}
 .dialog footer .hint{margin:0 auto 0 0;font:400 12px/1.5 var(--font);color:var(--dim)}
@@ -107,7 +108,9 @@ html.mica #grain{display:none}
 #source.paused .dot{animation:none;opacity:.4;box-shadow:none}
 #source .dot{animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{50%{transform:scale(.6);opacity:.6}}
-#title{font:800 clamp(24px,min(3vw,4.6vh),42px)/1.12 var(--font);letter-spacing:-.02em;margin-top:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#title{font:800 clamp(24px,min(3vw,4.6vh),42px)/1.12 var(--font);letter-spacing:-.02em;margin-top:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+#title.long{font-size:clamp(18px,min(2.1vw,3.4vh),30px);line-height:1.18;-webkit-line-clamp:3}
+#title.xlong{font-size:clamp(16px,min(1.7vw,2.8vh),24px);line-height:1.2;-webkit-line-clamp:3}
 #artist{font:500 clamp(15px,1.4vw,19px) var(--font);color:rgba(var(--ink),.7);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 #progress{margin-top:4px}
@@ -226,7 +229,7 @@ kbd{font:600 11px var(--font);padding:2px 6px;border-radius:5px;background:rgba(
 #find-q{flex:1;height:42px;padding:0 14px;border-radius:12px;border:1px solid var(--glass-b);background:rgba(var(--ink),.06);color:var(--fg);font:500 15px var(--font);outline:none}
 #find-q:focus{border-color:rgba(185,166,255,.6)}
 #find-list{display:flex;flex-direction:column;gap:6px}
-.fr{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 12px;border-radius:12px;background:rgba(var(--ink),.04)}
+.fr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 12px;border-radius:12px;background:rgba(var(--ink),.04)}
 .fr:hover{background:rgba(var(--ink),.08)}
 .fr .t{font:700 15px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fr .a{font:500 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1827,6 +1830,8 @@ function onState(m){
 
 function onTrackChange(t){
   $('#title').textContent = t.title || '未知歌曲';
+  { const n = [...(t.title || '')].reduce((w, ch) => w + (/[⺀-￯]/.test(ch) ? 2 : 1), 0);  // 中日韓字算兩個寬
+    $('#title').classList.toggle('long', n > 28 && n <= 48); $('#title').classList.toggle('xlong', n > 48); }
   $('#artist').textContent = [t.artist, t.album && t.album !== t.title ? t.album : ''].filter(Boolean).join(' — ');
   document.title = `${t.title} · ${t.artist}`;
   $('#cover').dataset.loaded = '';

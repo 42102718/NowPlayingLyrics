@@ -111,6 +111,11 @@ CASES = [
     ("fold", "Under Pressure - Remastered 2011", "Queen & David Bowie", "", "Under Pressure", "Queen", "found"),
     ("fold", "Something Just Like This", "The Chainsmokers & Coldplay", "", "Something Just Like This", "The Chainsmokers", "found"),
     ("fold", "後來", "René Liu", "", "後來", "劉若英", "found"),
+    # ── 冷門 / 混音 (歌名裡有「-」但不是「歌手 - 歌名」) ──
+    ("niche", "Capper.罗言;TOYOKI.M.A.C-雪&暴雨（TOKBINL 2023 MASHUP）", "TOKBINL", "人间失落",
+     "Capper.罗言;TOYOKI.M.A.C-雪&暴雨（TOKBINL 2023 MASHUP）", "TokBinL", "found"),
+    ("niche", "TOYOKI,Capper-MISTAKE（TOKBINL&KANYE MASHUP）", "TOKBINL", "",
+     "TOYOKI,Capper-MISTAKE（TOKBINL&KANYE MASHUP）", "TokBinL", "found"),
     # ── 不該找到別首歌 (純音樂 / 不存在) ──
     ("none", "Clair de lune", "Claude Debussy, Paul Barton", "", "", "", "none"),
     ("none", "Merry Christmas Mr. Lawrence", "Ryuichi Sakamoto", "", "", "", "none"),
