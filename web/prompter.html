@@ -33,6 +33,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-
 @media (max-height:300px){#prev,#next2{display:none}}
 @media (max-height:190px){#next{display:none}#top{display:none}#wrap{inset:6px 12px 8px}}
 .rd{display:block;font-size:.5em;font-weight:600;opacity:.75;margin-top:.15em}
+.trl{display:block;font-size:.46em;font-weight:600;opacity:.6;margin-top:.15em;-webkit-text-fill-color:currentColor;color:var(--fg)}
 .l ruby{ruby-position:over}
 .l rt{font-size:.42em;font-weight:600;opacity:.85}
 /* 間奏 / 前奏倒數 */
@@ -205,7 +206,7 @@ function lineHtml(l){
     p = o + n;
   }
   html += esc(t.slice(p));
-  return html + (l.rd ? `<span class="rd">${esc(l.rd)}</span>` : '');
+  return html + (l.rd ? `<span class="rd">${esc(l.rd)}</span>` : '') + (l.tr ? `<span class="trl">${esc(l.tr)}</span>` : '');
 }
 // 目前這句：拆成一段一段 (有逐字時間就用，沒有就照字數平均分)，唱到的填色
 function curWords(l, end){
@@ -252,7 +253,7 @@ function frame(){
       words = curWords(cur, nx ? nx.t : cur.t + 6);
       // 有日文讀音時直接顯示整句 (填色只做整句)，不然逐段填色
       if (cur.ruby || cur.rd) $('#cur').innerHTML = `<span class="w all">${lineHtml(cur)}</span>`;
-      else $('#cur').innerHTML = words.map(w => `<span class="w">${esc(w.s)}</span>`).join('');
+      else $('#cur').innerHTML = words.map(w => `<span class="w">${esc(w.s)}</span>`).join('') + (cur.tr ? `<span class="trl">${esc(cur.tr)}</span>` : '');
       $('#next').innerHTML = lineHtml(nx);
       $('#next2').innerHTML = lineHtml(nx2);
     }

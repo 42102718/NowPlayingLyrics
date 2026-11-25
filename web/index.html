@@ -1423,7 +1423,16 @@ body[data-layout="vinyl"] #cover,body[data-layout="vinyl"] #cover-wrap,body[data
   <section class="grp"><h3>翻譯</h3>
     <div class="card">
       <label class="row" title="外文歌在歌詞下面顯示中文翻譯 (主視窗、舞台、浮動歌詞、Folia 一起)">顯示歌詞翻譯 <span class="switch"><input type="checkbox" data-k="show_translation"><span></span></span></label>
-      <p class="hint">外文歌每一句下面多一行中文翻譯 (有翻譯的歌才有)，所有畫面一起套用。</p>
+      <p class="hint">每一句下面多一行翻譯，主視窗、舞台、直播看板、浮動歌詞一起套用。翻成中文時先用網易雲 / QQ 音樂的網友翻譯；沒有的話用機器翻譯。</p>
+      <label class="row">翻譯成 <select id="tr-lang">
+        <option value="zh-TW">繁體中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option>
+        <option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="th">ไทย</option>
+        <option value="vi">Tiếng Việt</option><option value="id">Bahasa Indonesia</option></select></label>
+      <label class="row" title="沒有網友翻譯 (或要翻成中文以外的語言) 時，用機器翻譯。歌詞會送到翻譯服務；每首歌翻過一次就存在這台電腦，之後不再送出">沒有網友翻譯時用機器翻譯 <span class="switch"><input type="checkbox" id="tr-machine"><span></span></span></label>
+      <label class="row">機器翻譯服務 <select id="tr-provider"><option value="mymemory">MyMemory (免費，不用註冊)</option><option value="deepl">DeepL (填自己的免費金鑰)</option></select></label>
+      <label class="row" id="tr-email-row" title="MyMemory 的規定：附上 email 每天可以翻的字數變 10 倍。只會送給 MyMemory，不會出現在其他地方">email (可選，額度變 10 倍) <input type="text" class="cfg-in" id="tr-email" placeholder="不填也可以" maxlength="120" autocomplete="off"></label>
+      <label class="row" id="tr-key-row" title="到 deepl.com 申請免費的 API 金鑰 (每月 50 萬字)，貼在這裡。只存在這台電腦">DeepL 金鑰 <input type="password" class="cfg-in" id="tr-key" placeholder="xxxxxxxx-…:fx" maxlength="120" autocomplete="off"></label>
+      <p class="hint" id="tr-hint">MyMemory 不用註冊，每天大約可以翻 2～3 首新歌 (填 email 變 10 倍)；DeepL 品質比較好，每月 50 萬字免費，要自己到 deepl.com 申請金鑰。翻過的歌會存起來，重聽不會再用掉額度。</p>
     </div>
   </section>
   <section class="grp"><h3>日文、韓文讀音</h3>
@@ -1749,6 +1758,7 @@ function onState(m){
   sessions = m.sessions || []; pinned = m.pinned;
   if (m.volume && performance.now() - volDrag > 1500) onVolume(m.volume);
   if (m.queue) onQueue(m.queue);
+  if (m.config) renderTr();
   if (m.config){
     cfg = m.config; unlocked = m.unlocked; autostart = !!m.autostart; canAutostart = !!m.can_autostart;
     if (m.version) $('#ver').textContent = `Hummi 哼哼 v${m.version}`;
@@ -1932,7 +1942,9 @@ function renderLyrics(){
     + (lyr.other_length ? '・這個版本長度不同，AI 正在對時間' : '')
     + (lyr.guessed ? `・依歌手和長度配對到〈${lyr.guessed_title || ''}〉，不對的話可以手動搜尋` : '')
     + (lyr.inst ? (lyr.scaled && Math.abs(lyr.scaled - 1) > .03 ? '・器樂版，原曲歌詞的時間是按長度推算的 (對不上可用 ← → 調整)' : '・伴奏版，顯示原曲歌詞') : '')
-    + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() && !lyr.inst ? '・AI 對時中' : '');
+    + (lyr.ai ? '・AI 產生，可能有錯字' : '') + (!lyr.synced && aiActive() && !lyr.inst ? '・AI 對時中' : '')
+    + (cfg?.overlay?.show_translation && lyr.tr_src ? `・翻譯：${lyr.tr_src}` : '')
+    + (cfg?.overlay?.show_translation && lyr.tr_note ? `・${lyr.tr_note}` : '');
   if (lyr.ai === 'live') $('#lyr-src').insertAdjacentHTML('afterbegin', '<span class="ai-dot"></span>');
   if (lyr.override){ const b = document.createElement('button'); b.textContent = '恢復自動'; b.onclick = resetLyrics; $('#lyr-src').appendChild(b); }
 
@@ -2999,6 +3011,29 @@ $('#q-cmds').onchange = e => qCfg({cmds: e.target.value});
 $('#q-plus').onclick = () => qAct('count', null, 1);
 $('#q-minus').onclick = () => qAct('count', null, -1);
 setInterval(() => { if ($('#q-dialog').classList.contains('open')) renderQueue(); }, 30000);  // 「幾分鐘前」
+
+// ───── 翻譯設定 ─────
+let trEdit = -1e9;
+function renderTr(){
+  const t = cfg?.translate || {};
+  if (performance.now() - trEdit > 1500){
+    $('#tr-lang').value = t.lang || 'zh-TW';
+    $('#tr-machine').checked = t.machine !== false;
+    $('#tr-provider').value = t.provider || 'mymemory';
+    if (document.activeElement !== $('#tr-key')) $('#tr-key').placeholder = t.has_key ? '已設定 (重新輸入可以換掉)' : 'xxxxxxxx-…:fx';
+    if (document.activeElement !== $('#tr-email')) $('#tr-email').placeholder = t.has_email ? '已設定 (重新輸入可以換掉)' : '不填也可以';
+  }
+  const deepl = $('#tr-provider').value === 'deepl', machine = $('#tr-machine').checked;
+  $('#tr-key-row').hidden = !deepl || !machine;
+  $('#tr-email-row').hidden = deepl || !machine;
+  $('#tr-provider').closest('.row').classList.toggle('disabled', !machine);
+}
+const trSend = patch => { trEdit = performance.now(); if (cfg) cfg.translate = {...(cfg.translate || {}), ...patch}; send({type: 'translate', patch}); renderTr(); };
+$('#tr-lang').onchange = e => trSend({lang: e.target.value});
+$('#tr-machine').onchange = e => trSend({machine: e.target.checked});
+$('#tr-provider').onchange = e => trSend({provider: e.target.value});
+$('#tr-key').onchange = e => { const v = e.target.value.trim(); if (v){ trSend({deepl_key: v, has_key: true}); e.target.value = ''; } };
+$('#tr-email').onchange = e => { const v = e.target.value.trim(); trSend({email: v, has_email: !!v}); e.target.value = ''; };
 // ───── 沒在播歌：時鐘、日期、最近播放 ─────
 let recent = [];
 function renderIdle(){

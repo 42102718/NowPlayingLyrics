@@ -117,6 +117,9 @@ DEFAULT_CONFIG = {
     "net_alert": True,             # 網路斷線 / 恢復時膠囊提醒
     "jp_reading": "off",           # 日文讀音：off / furigana (漢字標平假名) / hiragana (整句平假名) / romaji
     "ko_reading": "off",           # 韓文讀音：off / romaji (每句下面一行羅馬拼音)
+    # 翻譯：lang 翻成什麼語言、machine 沒有人工翻譯時用機器翻譯、provider mymemory (免費) / deepl (自己的金鑰)、
+    # email 給 MyMemory 的 (額度變 10 倍，可不填)
+    "translate": {"lang": "zh-TW", "machine": True, "provider": "mymemory", "deepl_key": "", "email": ""},
     "notch_style": {"shape": "island", "color": "black", "hover": "smart"},  # 形狀 island/float/bar、顏色 black/album/theme、展開 smart/fast/click
     "wallpaper": {"enabled": False, "monitor": "primary"},
     "share": {"folder": "", "name": ""},
@@ -176,6 +179,10 @@ def load_config():
             cfg["stage_live"] = saved["stage_live"]
         cfg["jp_reading"] = saved.get("jp_reading") if saved.get("jp_reading") in ("off", "furigana", "hiragana", "romaji") else "off"
         cfg["ko_reading"] = "romaji" if saved.get("ko_reading") == "romaji" else "off"
+        tl = saved.get("translate") or {}
+        cfg["translate"].update({k: v for k, v in tl.items() if k in cfg["translate"]})
+        if cfg["translate"]["lang"] not in ("zh-TW", "en", "ja", "ko", "es", "fr", "de", "th", "vi", "id"):
+            cfg["translate"]["lang"] = "zh-TW"
         ns = saved.get("notch_style") if isinstance(saved.get("notch_style"), dict) else {}
         cfg["notch_style"] = {"shape": ns.get("shape") if ns.get("shape") in ("island", "float", "bar") else "island",
                               "color": ns.get("color") if ns.get("color") in ("black", "album", "theme") else "black",
@@ -1020,6 +1027,35 @@ class Lyrics:
                     return {**r, "guessed": True, "guessed_title": c.get("title")}
         return None
 
+    async def human_translation(self, title, artist, duration, lines):
+        """現在的歌詞 (例如 LRCLIB 的) 沒有翻譯：去網易雲 / QQ 找同一首歌的網友翻譯，
+        照「原句一樣」對過來 (不同來源的時間會差一點，用原句比較準)。回傳 ({原句: 翻譯}, 來源名稱)。"""
+        want = {_norm(l.get("text")) for l in lines if (l.get("text") or "").strip()}
+        want.discard("")
+        if len(want) < 3:
+            return None, None
+        tried = set()
+        variants = title_variants(title, artist, music=True)[:2]
+        for n in (await self.native_artists(artist))[:1]:
+            variants.append((clean_title(title), n))
+        for t, a in variants:
+            try:
+                cands = self.rank(await self.search(t, a, duration=duration), t, a, duration)
+            except Exception as e:
+                print("[human-tr]", repr(e), flush=True)
+                return None, None
+            for c in [c for c in cands if c["source"] in ("netease", "qq")][:3]:
+                if (c["source"], c["id"]) in tried:
+                    continue
+                tried.add((c["source"], c["id"]))
+                r = await self.fetch(c)
+                if not r:
+                    continue
+                m = {_norm(l["text"]): to_trad(l["tr"]) for l in r["lines"] if l.get("tr") and l.get("text")}
+                if len(m) >= 3 and len(want & set(m)) / len(want) >= 0.4:
+                    return m, SOURCES[c["source"]]
+        return None, None
+
     async def native_artists(self, artist):
         """播放器給的是英文 / 羅馬拼音的歌手名 (Li Ronghao、Kay Tse、Yuuri)，歌詞網站卻用原文 (李荣浩、謝安琪、優里)：
         用網易雲的歌手搜尋找原文名字 (它有別名 / 英文名)。回傳最多兩個原文名字。"""
@@ -1794,6 +1830,7 @@ async def fetch_lyrics(track):
     if state["track"] and state["track"]["track_id"] == track["track_id"]:
         state["lyrics"] = {"track_id": track["track_id"], **res}
         await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
+        asyncio.ensure_future(add_translation())
         if AI is not None:
             if res.get("ai") and res.get("heard", 1.0) < 0.95:  # 上次沒聽完整：這次繼續聽，補齊後更新
                 AI.set_job(track, Lyrics.key(track["title"], track["artist"]),
@@ -1805,6 +1842,109 @@ async def fetch_lyrics(track):
                 AI.set_job(track, Lyrics.key(track["title"], track["artist"]),
                            [{"t": None, "text": l["text"], **({"tr": l["tr"]} if l.get("tr") else {})}
                             for l in res["lines"] if l["text"].strip()] or None)
+
+
+TRANSLATOR = None  # translate.Translator：機器翻譯 + 存檔
+
+
+def _translator():
+    global TRANSLATOR
+    if TRANSLATOR is None:
+        import translate
+        TRANSLATOR = translate.Translator(DATA / "translations.json", lambda: config["translate"])
+    return TRANSLATOR
+
+
+def schedule_translation():
+    """歌詞好了 / 翻譯設定改了：在背景補翻譯。哪個執行緒呼叫都可以。"""
+    if LOOP is not None:
+        LOOP.call_soon_threadsafe(lambda: asyncio.ensure_future(add_translation()))
+
+
+_tr_running = {"id": None}
+
+
+async def add_translation():
+    """幫現在這份歌詞補上翻譯：
+    1. 翻成中文時：歌詞本身有網友翻譯就用；沒有就去網易雲 / QQ 找同一首歌的網友翻譯
+    2. 還是沒有 (或要翻成別的語言)：機器翻譯 (翻過的歌會存起來，不再送出去)
+    歌本身就是那個語言 (中文歌翻中文) 就不翻。"""
+    lyr = state.get("lyrics")
+    t = state.get("track")
+    if not lyr or not t or lyr.get("track_id") != t.get("track_id") or not show_tr():
+        return
+    lines = lyr.get("lines") or []
+    text_lines = [l for l in lines if (l.get("text") or "").strip()]
+    if len(text_lines) < 2:
+        return
+    run = object()
+    _tr_running["id"] = run
+    import translate as T
+    tc = config["translate"]
+    target = tc.get("lang") or "zh-TW"
+    key = Lyrics.key(t["title"], t["artist"])
+    for l in lines:  # 歌詞本身帶的網友翻譯先備份 (換語言再換回來還在)
+        if l.get("tr") and "tr_h" not in l:
+            l["tr_h"] = l["tr"]
+        l.pop("tr", None)
+    src, note = None, ""
+
+    def coverage():
+        return sum(1 for l in text_lines if l.get("tr")) / len(text_lines)
+    sl = T.song_lang(text_lines)
+    if not T.same_language(sl, target):
+        if target == "zh-TW":
+            if sum(1 for l in text_lines if l.get("tr_h")) / len(text_lines) >= 0.4:
+                for l in text_lines:
+                    if l.get("tr_h"):
+                        l["tr"] = l["tr_h"]
+                so = lyr.get("source") or ""
+                src = f"{so}網友翻譯" if so in (SOURCES["netease"], SOURCES["qq"]) else "歌詞附的翻譯"
+            else:
+                try:
+                    m, who = await lyrics.human_translation(t["title"], t["artist"], t.get("duration") or 0, text_lines)
+                except Exception as e:
+                    print("[human-tr]", repr(e), flush=True)
+                    m, who = None, None
+                if m:
+                    for l in text_lines:
+                        tr = m.get(_norm(l["text"]))
+                        if tr and _norm(tr) != _norm(l["text"]):
+                            l["tr"] = tr
+                    src = f"{who}網友翻譯"
+        if coverage() < 0.9 and tc.get("machine", True):  # 網友翻譯缺了幾句：缺的用機器翻譯補齊
+            TR = _translator()
+            hit = TR.cached(key, target)
+            try:
+                todo = [l["text"].strip() for l in text_lines if not l.get("tr")]
+                mp, prov = (dict(hit["map"]), hit.get("by")) if hit else ({}, None)
+                missing = [x for x in todo if x not in mp]
+                if missing:  # 存檔裡沒有的句子才送出去
+                    got, prov2 = await TR.translate(await lyrics.session(), missing, target)
+                    mp.update(got)
+                    for x in missing:
+                        mp.setdefault(x, "")  # 翻不出來 (例如 oh oh oh)：記成空的，下次不再送
+                    prov = prov or prov2
+                    TR.remember(key, target, mp, prov)
+                import html as _html
+                n_machine = 0
+                for l in text_lines:
+                    if not l.get("tr") and mp.get(l["text"].strip()):
+                        l["tr"] = _html.unescape(mp[l["text"].strip()])
+                        n_machine += 1
+                if n_machine:
+                    name = "機器翻譯 (DeepL)" if prov == "deepl" else "機器翻譯"
+                    src = f"{src}＋{name}" if src else name
+            except T.QuotaError as e:
+                note = str(e)
+            except Exception as e:
+                print("[translate]", repr(e), flush=True)
+                note = "機器翻譯暫時連不上"
+    if _tr_running["id"] is not run:
+        return  # 這段時間又開始了新的翻譯 (換歌 / 改設定)：以新的為準
+    lyr["tr_src"], lyr["tr_note"] = src, note
+    if state.get("lyrics") is lyr:
+        await broadcast({"type": "lyrics", **lyr_view(lyr)})
 
 
 async def resolve_lyrics(track, kind="music"):
@@ -1903,6 +2043,8 @@ async def _ai_push(track_id, key, result, live):
     if live and not result["lines"] and cur.get("lines"):
         return
     state["lyrics"] = {"track_id": track_id, **traditionalize({**result, "lines": [dict(l) for l in result["lines"]]})}
+    if not live:
+        asyncio.ensure_future(add_translation())
     await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
 
 
@@ -2087,6 +2229,8 @@ async def ws_handler(request):
                 config_changed()
                 if "show_translation" in patch and state["lyrics"]:
                     await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
+                    if patch["show_translation"]:
+                        asyncio.ensure_future(add_translation())
             elif d.get("type") == "background":
                 patch = {k: v for k, v in (d.get("patch") or {}).items() if k in config["background"] and k != "image"}
                 config["background"].update(patch)
@@ -2217,6 +2361,21 @@ async def ws_handler(request):
                 save_config()
                 if state["lyrics"]:
                     await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
+            elif d.get("type") == "translate":
+                tc = config["translate"]
+                for k, v in (d.get("patch") or {}).items():
+                    if k == "lang" and v in ("zh-TW", "en", "ja", "ko", "es", "fr", "de", "th", "vi", "id"):
+                        tc[k] = v
+                    elif k == "machine":
+                        tc[k] = bool(v)
+                    elif k == "provider" and v in ("mymemory", "deepl"):
+                        tc[k] = v
+                    elif k in ("deepl_key", "email"):
+                        tc[k] = str(v or "").strip()[:200]
+                save_config()
+                if TRANSLATOR is not None:
+                    TRANSLATOR.quota_until = 0  # 換了服務 / 金鑰：重新試
+                asyncio.ensure_future(add_translation())
             elif d.get("type") == "ko_reading" and d.get("value") in ("off", "romaji"):
                 config["ko_reading"] = d["value"]
                 save_config()
@@ -2577,6 +2736,8 @@ def start_tray():
             config_changed()
             if key == "show_translation" and LOOP is not None and state["lyrics"]:  # 主視窗、舞台馬上換
                 LOOP.call_soon_threadsafe(lambda: asyncio.ensure_future(broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})))
+                if ov[key]:
+                    schedule_translation()
         return f
 
     def notch_toggle(key):
@@ -3342,6 +3503,8 @@ def public_config():
     """送給網頁的設定：權杖不送出去 (OBS 的網頁也連得到 /ws)。"""
     c = dict(config)
     c["chat"] = {**config["chat"], "token": "", "has_token": bool(config["chat"].get("token"))}
+    tl = config["translate"]  # 金鑰、email 不送給網頁 (OBS 的網頁也連得到 /ws)
+    c["translate"] = {**tl, "deepl_key": "", "email": "", "has_key": bool(tl.get("deepl_key")), "has_email": bool(tl.get("email"))}
     return c
 
 
@@ -3643,6 +3806,7 @@ def make_app():
         if AI is not None:
             AI.set_job(None)
         state["lyrics"] = {"track_id": t["track_id"], **result, "override": True}
+        schedule_translation()
         await broadcast({"type": "lyrics", **lyr_view(state["lyrics"])})
         return web.json_response({"ok": True, "source": result["source"], "synced": result["synced"]})
 
