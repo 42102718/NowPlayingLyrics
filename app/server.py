@@ -794,11 +794,17 @@ def _alias_tokens(s):
     return set(re.findall(r"\d{2,}", s)) | set(re.findall(r"[a-z]{3,}", s))
 
 
-def _pick_alias(title, duration, hits):
+def _pick_alias(title, duration, hits, album=None):
     """同歌手、長度差不多的歌不只一首時，試著分出是哪一首：
+    0. 只有一首在播放器顯示的那張專輯裡 (CROSS THE LINE. → 선 넘네.)
     1. 好幾個來源都是同一個歌名，其他只零星出現 (原曲 vs 中文版、英文版、翻唱)：取多數
     2. 只有一首跟播放器的歌名有共同的數字 / 英文片段 (互相包含也算)
     3. 或是長度明顯最接近 (差不到 1 秒，其他都差 1.5 秒以上)"""
+    if album:
+        al = _fnorm(PAREN.sub("", album) or album)
+        same = [k for k, cs in hits.items() if al and any(_fnorm(PAREN.sub("", c.get("album") or "") or "") == al for c in cs)]
+        if len(same) == 1:
+            return same[0]
     counts = sorted(((len(cs), k) for k, cs in hits.items()), reverse=True)
     if len(counts) > 1 and counts[0][0] >= 3 and counts[0][0] >= 2 * counts[1][0]:
         return counts[0][1]
@@ -884,7 +890,7 @@ class Lyrics:
                         "lines": [{"t": None, "text": l["text"]} for l in r["lines"] if (l.get("text") or "").strip()]}
         return None
 
-    async def _artist_length(self, title, artist, duration):
+    async def _artist_length(self, title, artist, duration, album=None):
         """最後的備案：影片標題用的是歌裡的一句話或別名 (不是正式歌名)，照歌名配不到。
         改用「歌手一模一樣 + 長度差不到 2 秒」，而且這位歌手只有剛好一首符合，才採用。"""
         names = []
@@ -904,7 +910,7 @@ class Lyrics:
                 if artist_matches(a, c.get("artist")) and c.get("duration") and abs(c["duration"] - duration) <= 2:
                     hits.setdefault(_fnorm(PAREN.sub("", c.get("title") or "") or c.get("title") or ""), []).append(c)
             if len(hits) > 1:
-                pick = _pick_alias(title, duration, hits)
+                pick = _pick_alias(title, duration, hits, album)
                 if pick is None:
                     continue  # 不只一首長度一樣、又分不出來：不猜
                 hits = {pick: hits[pick]}
@@ -993,7 +999,7 @@ class Lyrics:
         if not result and duration and artist:
             result = await self._other_length(title, artist, duration)
         if not (result and result["synced"]) and duration:
-            r = await self._artist_length(title, artist, duration)
+            r = await self._artist_length(title, artist, duration, album)
             if r:
                 result = r
         result = result or {"source": None, "synced": False, "lines": []}
