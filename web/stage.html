@@ -798,27 +798,9 @@ function lineEl(i){
   layoutLine(el, l);
   return el;
 }
-// 日文讀音：漢字上方的小字 (掛在那幾個字的第一個方塊上，寬度跨過整個詞)；整句平假名 / 羅馬拼音放在下面一行
+// 舞台是給觀眾看的：不放讀音 (平假名 / 羅馬拼音是實況主自己唱的時候看的，在主視窗、直播看板、浮動歌詞)。
+// 只放翻譯 (有開「顯示歌詞翻譯」才會有)
 function addReading(el, l){
-  if (l.ruby && l.ruby.length){
-    const spans = [...el.querySelectorAll('.w')];
-    const txt = spans.map(s => s.textContent);
-    let k = 0;
-    for (const [o, n, r] of l.ruby){
-      const surf = (l.text || '').slice(o, o + n);
-      for (let j = k; j < spans.length; j++){
-        let acc = '', m = j;
-        while (m < spans.length && acc.length < surf.length){ acc += txt[m]; m++; }
-        if (acc.trim() === surf){
-          const rt = document.createElement('i'); rt.className = 'rt'; rt.textContent = r;
-          rt.style.setProperty('--n', m - j);
-          spans[j].appendChild(rt); k = m; break;
-        }
-      }
-    }
-  }
-  if (l.rd){ const s = document.createElement('span'); s.className = 'tr rd'; s.textContent = l.rd; el.appendChild(s); }
-  // 翻譯 (有開「顯示歌詞翻譯」才會有)：放在讀音下面
   if (l.tr){ const s = document.createElement('span'); s.className = 'tr tl'; s.textContent = l.tr; el.appendChild(s); }
 }
 function layoutLine(el, l){
